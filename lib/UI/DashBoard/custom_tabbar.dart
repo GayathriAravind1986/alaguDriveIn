@@ -6,6 +6,7 @@ import 'package:simple/Bloc/Report/report_bloc.dart';
 import 'package:simple/Bloc/StockIn/stock_in_bloc.dart';
 import 'package:simple/Bloc/demo/demo_bloc.dart';
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
+import 'package:simple/Offline/Offline_Service_API/Offline_API_Service.dart';
 import 'package:simple/UI/CustomAppBar/custom_appbar.dart';
 import 'package:simple/UI/Home_screen/home_screen.dart';
 import 'package:simple/UI/Order/order_list.dart';

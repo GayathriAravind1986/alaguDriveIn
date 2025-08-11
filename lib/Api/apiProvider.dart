@@ -102,6 +102,7 @@ class ApiProvider {
         if (response.data['success'] == true) {
           GetCategoryModel getCategoryResponse =
               GetCategoryModel.fromJson(response.data);
+          debugPrint("categoryRespnse:$getCategoryResponse");
           return getCategoryResponse;
         }
       } else {

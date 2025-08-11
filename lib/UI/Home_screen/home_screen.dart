@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
@@ -9,17 +10,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Category/category_bloc.dart';
 import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart';
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart';
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart' as category;
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart';
-import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
+import 'package:simple/ModelClass/Order/Get_view_order_model.dart' hide Data;
 import 'package:simple/ModelClass/Order/Post_generate_order_model.dart';
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
-import 'package:simple/ModelClass/Table/Get_table_model.dart';
+import 'package:simple/ModelClass/Table/Get_table_model.dart' hide Data;
+import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/image.dart';
 import 'package:simple/Reusable/space.dart';
@@ -32,6 +35,8 @@ import 'package:simple/UI/Home_screen/Widget/another_imin_printer/mock_imin_prin
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/real_device_printer.dart';
 import 'package:simple/UI/Home_screen/Widget/category_card.dart';
 import 'package:simple/UI/IminHelper/printer_helper.dart';
+
+import '../../Offline/Hive_helper/LocalClass/category_model.dart';
 
 class FoodOrderingScreen extends StatelessWidget {
   final GlobalKey<FoodOrderingScreenViewState>? foodKey;
@@ -73,13 +78,16 @@ class FoodOrderingScreenView extends StatefulWidget {
 }
 
 class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
-  GetCategoryModel getCategoryModel = GetCategoryModel();
+  category.GetCategoryModel getCategoryModel = category.GetCategoryModel();
   GetProductByCatIdModel getProductByCatIdModel = GetProductByCatIdModel();
   PostAddToBillingModel postAddToBillingModel = PostAddToBillingModel();
   PostGenerateOrderModel postGenerateOrderModel = PostGenerateOrderModel();
   GetTableModel getTableModel = GetTableModel();
   UpdateGenerateOrderModel updateGenerateOrderModel =
       UpdateGenerateOrderModel();
+
+  /// offline initializer
+  final NetworkManager _networkManager = NetworkManager();
 
   TextEditingController searchController = TextEditingController();
   TextEditingController amountController = TextEditingController();
@@ -553,6 +561,30 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     });
   }
 
+  Future<void> loadDataBasedOnConnectivity() async {
+    final connection = await Connectivity().checkConnectivity();
+
+    if (connection != ConnectivityResult.none) {
+      context.read<FoodCategoryBloc>().add(FoodCategory());
+    } else {
+      final localCategories = Hive.box<HiveCategory>('categories').values.toList();
+
+      final offlineModel = category.GetCategoryModel(
+        success: true,
+        data: localCategories
+            .map((cat) => category.Data(
+          id: cat.id.toString(),
+          name: cat.name,
+          image: cat.image,
+          // map other fields as needed
+        ))
+            .toList(),
+        errorResponse: null,
+      );
+
+      context.read<FoodCategoryBloc>().add(FoodCategoryOffline(offlineModel));
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -563,6 +595,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     } else {
       printerService = MockPrinterService();
     }
+    Hive.box<HiveCategory>('categories');
     if (widget.hasRefreshedOrder == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.foodKey?.currentState?.refreshHome();
@@ -572,7 +605,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
         });
       });
     } else {
-      context.read<FoodCategoryBloc>().add(FoodCategory());
+      loadDataBasedOnConnectivity();
       context.read<FoodCategoryBloc>().add(
           FoodProductItem(selectedCatId.toString(), searchController.text));
       getDeviceInfo();
@@ -5392,6 +5425,85 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                     }
                                                                                   }
                                                                                 },
+                                                                                // onPressed: () async {
+                                                                                //   if (selectedValue == null && selectDineIn == true) {
+                                                                                //     setState(() {
+                                                                                //       isCompleteOrder = false;
+                                                                                //     });
+                                                                                //     showToast("Table number is required for DINE-IN orders", context, color: false);
+                                                                                //     return;
+                                                                                //   }
+                                                                                //
+                                                                                //   setState(() {
+                                                                                //     isCompleteOrder = false;
+                                                                                //     orderLoad = true;
+                                                                                //   });
+                                                                                //
+                                                                                //   List<Map<String, dynamic>> payments = [
+                                                                                //     {
+                                                                                //       "amount": (postAddToBillingModel.total ?? 0).toDouble(),
+                                                                                //       "balanceAmount": 0,
+                                                                                //       "method": selectedFullPaymentMethod.toUpperCase(),
+                                                                                //     },
+                                                                                //   ];
+                                                                                //
+                                                                                //   final orderPayload = buildOrderPayload(
+                                                                                //     postAddToBillingModel: postAddToBillingModel,
+                                                                                //     tableId: selectDineIn == true ? tableId : null,
+                                                                                //     orderStatus: 'WAITLIST',
+                                                                                //     orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                //     discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
+                                                                                //     isDiscountApplied: isDiscountApplied,
+                                                                                //     tipAmount: tipController.text,
+                                                                                //     payments: widget.isEditingOrder == true ? [] : payments,
+                                                                                //   );
+                                                                                //
+                                                                                //   // Check if online or offline
+                                                                                //   if (_networkManager.isOnline) {
+                                                                                //     // Online - use existing API
+                                                                                //     if (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
+                                                                                //       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder?.data!.id));
+                                                                                //     } else {
+                                                                                //       context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
+                                                                                //     }
+                                                                                //   } else {
+                                                                                //     // Offline - save locally
+                                                                                //     try {
+                                                                                //       await _syncService.saveOrderLocally(orderPayload);
+                                                                                //
+                                                                                //       // Clear cart and reset state
+                                                                                //       setState(() {
+                                                                                //         orderLoad = false;
+                                                                                //         billingItems.clear();
+                                                                                //         selectedValue = null;
+                                                                                //         tableId = null;
+                                                                                //         selectDineIn = true;
+                                                                                //         isCompleteOrder = false;
+                                                                                //         isSplitPayment = false;
+                                                                                //         amountController.clear();
+                                                                                //         selectedFullPaymentMethod = "";
+                                                                                //         widget.isEditingOrder = false;
+                                                                                //         balance = 0;
+                                                                                //         if (billingItems.isEmpty) {
+                                                                                //           isDiscountApplied = false;
+                                                                                //         }
+                                                                                //       });
+                                                                                //
+                                                                                //       await _syncService.clearLocalBillingItems();
+                                                                                //       await _updatePendingOrdersCount();
+                                                                                //
+                                                                                //       showToast("Order saved offline. Will sync when online.", context, color: true);
+                                                                                //
+                                                                                //       // Update billing state
+                                                                                //       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                //     } catch (e) {
+                                                                                //       setState(() {
+                                                                                //         orderLoad = false;
+                                                                                //       });
+                                                                                //       showToast("Error saving order: $e", context, color: false);
+                                                                                //     }
+                                                                                //   }
+                                                                                // },
                                                                                 style: ElevatedButton.styleFrom(
                                                                                   backgroundColor: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? appPrimaryColor : greyColor,
                                                                                   minimumSize: const Size(0, 50), // Height only
@@ -5593,6 +5705,91 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                     }
                                                                                   }
                                                                                 },
+                                                                                // onPressed: () async {
+                                                                                //   if (selectedValue == null && selectDineIn == true) {
+                                                                                //     showToast("Table number is required for DINE-IN orders", context, color: false);
+                                                                                //     return;
+                                                                                //   }
+                                                                                //
+                                                                                //   setState(() {
+                                                                                //     isCompleteOrder = true;
+                                                                                //     completeLoad = true;
+                                                                                //   });
+                                                                                //
+                                                                                //   if (selectedFullPaymentMethod.isEmpty || (selectedFullPaymentMethod != "Cash" && selectedFullPaymentMethod != "Card" && selectedFullPaymentMethod != "UPI")) {
+                                                                                //     setState(() {
+                                                                                //       completeLoad = false;
+                                                                                //     });
+                                                                                //     showToast("Select any one of the payment method", context, color: false);
+                                                                                //     return;
+                                                                                //   }
+                                                                                //
+                                                                                //   List<Map<String, dynamic>> payments = [
+                                                                                //     {
+                                                                                //       "amount": (postAddToBillingModel.total ?? 0).toDouble(),
+                                                                                //       "balanceAmount": 0,
+                                                                                //       "method": selectedFullPaymentMethod.toUpperCase(),
+                                                                                //     }
+                                                                                //   ];
+                                                                                //
+                                                                                //   final orderPayload = buildOrderPayload(
+                                                                                //     postAddToBillingModel: postAddToBillingModel,
+                                                                                //     tableId: selectDineIn == true ? tableId : null,
+                                                                                //     orderStatus: 'COMPLETED',
+                                                                                //     orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                //     discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
+                                                                                //     isDiscountApplied: isDiscountApplied,
+                                                                                //     tipAmount: tipController.text,
+                                                                                //     payments: payments,
+                                                                                //   );
+                                                                                //
+                                                                                //   // Check if online or offline
+                                                                                //   if (_networkManager.isOnline) {
+                                                                                //     // Online - use existing API
+                                                                                //     if (widget.isEditingOrder == true && widget.existingOrder?.data!.orderStatus == "WAITLIST") {
+                                                                                //       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder!.data!.id));
+                                                                                //     } else {
+                                                                                //       context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
+                                                                                //     }
+                                                                                //   } else {
+                                                                                //     // Offline - save locally
+                                                                                //     try {
+                                                                                //       await _syncService.saveOrderLocally(orderPayload);
+                                                                                //
+                                                                                //       // Clear cart and reset state
+                                                                                //       setState(() {
+                                                                                //         completeLoad = false;
+                                                                                //         billingItems.clear();
+                                                                                //         selectedValue = null;
+                                                                                //         tableId = null;
+                                                                                //         selectDineIn = true;
+                                                                                //         isCompleteOrder = false;
+                                                                                //         isSplitPayment = false;
+                                                                                //         amountController.clear();
+                                                                                //         selectedFullPaymentMethod = "";
+                                                                                //         widget.isEditingOrder = false;
+                                                                                //         balance = 0;
+                                                                                //         if (billingItems.isEmpty) {
+                                                                                //           isDiscountApplied = false;
+                                                                                //         }
+                                                                                //       });
+                                                                                //
+                                                                                //       await _syncService.clearLocalBillingItems();
+                                                                                //       await _updatePendingOrdersCount();
+                                                                                //
+                                                                                //       showToast("Order completed offline. Will sync when online.", context, color: true);
+                                                                                //
+                                                                                //       // Update billing state
+                                                                                //       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                //     } catch (e) {
+                                                                                //       setState(() {
+                                                                                //         completeLoad = false;
+                                                                                //       });
+                                                                                //       showToast("Error completing order: $e", context, color: false);
+                                                                                //     }
+                                                                                //   }
+                                                                                // },
+
                                                                                 style: ElevatedButton.styleFrom(
                                                                                   backgroundColor: appPrimaryColor,
                                                                                   minimumSize: const Size(0, 50),
@@ -5764,6 +5961,136 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             }
                                                                           }
                                                                         },
+                                                                        // onPressed:
+                                                                        //     () async {
+                                                                        //   if (!allSplitAmountsFilled() ||
+                                                                        //       !allPaymentMethodsSelected()) {
+                                                                        //     showToast("Please complete payment method and amount fields",
+                                                                        //         context,
+                                                                        //         color: false);
+                                                                        //     return;
+                                                                        //   }
+                                                                        //
+                                                                        //   if (totalSplit !=
+                                                                        //       postAddToBillingModel.total) {
+                                                                        //     showToast("Split payments must sum to total amount",
+                                                                        //         context,
+                                                                        //         color: false);
+                                                                        //     return;
+                                                                        //   }
+                                                                        //
+                                                                        //   if (selectedValue == null &&
+                                                                        //       selectDineIn == true) {
+                                                                        //     showToast("Table number is required for DINE-IN orders",
+                                                                        //         context,
+                                                                        //         color: false);
+                                                                        //     return;
+                                                                        //   }
+                                                                        //
+                                                                        //   setState(
+                                                                        //       () {
+                                                                        //     completeLoad =
+                                                                        //         true;
+                                                                        //   });
+                                                                        //
+                                                                        //   List<Map<String, dynamic>>
+                                                                        //       payments =
+                                                                        //       [];
+                                                                        //   for (int i = 0;
+                                                                        //       i < _paymentFieldCount;
+                                                                        //       i++) {
+                                                                        //     final method =
+                                                                        //         selectedPaymentMethods[i];
+                                                                        //     final amountText =
+                                                                        //         splitAmountControllers[i].text;
+                                                                        //     final amount =
+                                                                        //         double.tryParse(amountText) ?? 0;
+                                                                        //
+                                                                        //     if (method == null ||
+                                                                        //         method.isEmpty) {
+                                                                        //       setState(() {
+                                                                        //         completeLoad = false;
+                                                                        //       });
+                                                                        //       showToast("Please select a payment method for split #${i + 1}", context, color: false);
+                                                                        //       return;
+                                                                        //     }
+                                                                        //
+                                                                        //     payments.add({
+                                                                        //       "amount": amount,
+                                                                        //       "balanceAmount": 0,
+                                                                        //       "method": method.toUpperCase(),
+                                                                        //     });
+                                                                        //   }
+                                                                        //
+                                                                        //   final orderPayload =
+                                                                        //       buildOrderPayload(
+                                                                        //     postAddToBillingModel:
+                                                                        //         postAddToBillingModel,
+                                                                        //     tableId: selectDineIn == true
+                                                                        //         ? tableId
+                                                                        //         : null,
+                                                                        //     orderStatus:
+                                                                        //         'COMPLETED',
+                                                                        //     orderType: selectDineIn == true
+                                                                        //         ? 'DINE-IN'
+                                                                        //         : 'TAKE-AWAY',
+                                                                        //     discountAmount:
+                                                                        //         postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
+                                                                        //     isDiscountApplied:
+                                                                        //         isDiscountApplied,
+                                                                        //     tipAmount:
+                                                                        //         tipController.text,
+                                                                        //     payments:
+                                                                        //         payments,
+                                                                        //   );
+                                                                        //
+                                                                        //   // Check if online or offline
+                                                                        //   if (_networkManager
+                                                                        //       .isOnline) {
+                                                                        //     // Online - use existing API
+                                                                        //     if (widget.isEditingOrder == true &&
+                                                                        //         widget.existingOrder?.data!.orderStatus == "WAITLIST") {
+                                                                        //       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder!.data!.id));
+                                                                        //     } else {
+                                                                        //       context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
+                                                                        //     }
+                                                                        //   } else {
+                                                                        //     // Offline - save locally
+                                                                        //     try {
+                                                                        //       await _syncService.saveOrderLocally(orderPayload);
+                                                                        //
+                                                                        //       // Clear cart and reset state
+                                                                        //       setState(() {
+                                                                        //         completeLoad = false;
+                                                                        //         billingItems.clear();
+                                                                        //         selectedValue = null;
+                                                                        //         tableId = null;
+                                                                        //         selectDineIn = true;
+                                                                        //         isCompleteOrder = false;
+                                                                        //         isSplitPayment = false;
+                                                                        //         selectedFullPaymentMethod = "";
+                                                                        //         widget.isEditingOrder = false;
+                                                                        //         balance = 0;
+                                                                        //         if (billingItems.isEmpty) {
+                                                                        //           isDiscountApplied = false;
+                                                                        //         }
+                                                                        //       });
+                                                                        //
+                                                                        //       await _syncService.clearLocalBillingItems();
+                                                                        //       await _updatePendingOrdersCount();
+                                                                        //
+                                                                        //       showToast("Split payment order completed offline. Will sync when online.", context, color: true);
+                                                                        //
+                                                                        //       // Update billing state
+                                                                        //       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                        //     } catch (e) {
+                                                                        //       setState(() {
+                                                                        //         completeLoad = false;
+                                                                        //       });
+                                                                        //       showToast("Error completing split payment order: $e", context, color: false);
+                                                                        //     }
+                                                                        //   }
+                                                                        // },
                                                                         style: ElevatedButton
                                                                             .styleFrom(
                                                                           backgroundColor: (allSplitAmountsFilled() && allPaymentMethodsSelected() && totalSplit == postAddToBillingModel.total) || (widget.isEditingOrder == true && widget.existingOrder?.data!.orderStatus == "COMPLETED")
@@ -5793,17 +6120,45 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
     return BlocBuilder<FoodCategoryBloc, dynamic>(
       buildWhen: ((previous, current) {
-        if (current is GetCategoryModel) {
+        // if (current is category.GetCategoryModel) {
+        //   getCategoryModel = current;
+        //   if (getCategoryModel.success == true) {
+        //     setState(() {
+        //       categoryLoad = false;
+        //     });
+        //   }
+        //   if (getCategoryModel.errorResponse?.isUnauthorized == true) {
+        //     _handle401Error();
+        //     return true;
+        //   }
+        //   return true;
+        // }
+        if (current is category.GetCategoryModel) {
           getCategoryModel = current;
+
           if (getCategoryModel.success == true) {
+            // ✅ Save to Hive for offline use
+            //Hive.openBox<HiveCategory>('categories');
+            final categoryBox = Hive.box<HiveCategory>('categories');
+            categoryBox.clear();
+            for (var cat in getCategoryModel.data ?? []) {
+              categoryBox.add(HiveCategory(
+                id: cat.id,
+                name: cat.name ?? '',
+                image: cat.image ?? '',
+              ));
+            }
+
             setState(() {
               categoryLoad = false;
             });
           }
+
           if (getCategoryModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
             return true;
           }
+
           return true;
         }
         if (current is GetProductByCatIdModel) {
