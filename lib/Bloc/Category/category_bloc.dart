@@ -5,7 +5,10 @@ import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
     as category;
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
+    as product;
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 
 abstract class FoodCategoryEvent {}
 
@@ -21,6 +24,11 @@ class FoodProductItem extends FoodCategoryEvent {
   String catId;
   String searchKey;
   FoodProductItem(this.catId, this.searchKey);
+}
+
+class FoodProductItemOffline extends FoodCategoryEvent {
+  final product.GetProductByCatIdModel offlineData;
+  FoodProductItemOffline(this.offlineData);
 }
 
 class AddToBilling extends FoodCategoryEvent {
@@ -45,69 +53,301 @@ class TableDine extends FoodCategoryEvent {}
 class StockDetails extends FoodCategoryEvent {}
 
 class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
-  FoodCategoryBloc() : super(dynamic) {
-    // on<FoodCategory>((event, emit) async {
-    //   await ApiProvider().getCategoryAPI().then((value) {
-    //     emit(value);
-    //   }).catchError((error) {
-    //     emit(error);
-    //   });
-    // });
+  FoodCategoryBloc() : super(null) {
     on<FoodCategory>((event, emit) async {
-      emit(GetCategoryModel(
-          success: false, data: [], errorResponse: null)); // Loading
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+        bool hasConnection = false;
 
-      final connection = await Connectivity().checkConnectivity();
+        // Handle both old and new versions of connectivity_plus
+        if (connectivityResult is List<ConnectivityResult>) {
+          // New version - returns List<ConnectivityResult>
+          hasConnection = connectivityResult
+              .any((result) => result != ConnectivityResult.none);
+        } else if (connectivityResult is ConnectivityResult) {
+          // Old version - returns single ConnectivityResult
+          hasConnection = connectivityResult != ConnectivityResult.none;
+        }
 
-      if (connection != ConnectivityResult.none) {
-        // Online: fetch from API, save to Hive, then emit
-        try {
-          final value = await ApiProvider().getCategoryAPI();
-
-          if (value.success == true && value.data != null) {
-            await saveCategoriesToHive(value.data!); // Save to Hive
-          }
-
-          emit(value);
-        } catch (error) {
+        if (hasConnection) {
+          // Online: show loading, fetch from API, save to Hive, then emit
           emit(GetCategoryModel(
-            success: false,
-            data: [],
-            errorResponse:
-                ErrorResponse(message: error.toString(), statusCode: 500),
+              success: false,
+              data: [],
+              errorResponse: null)); // Loading state only for online
+
+          try {
+            final value = await ApiProvider().getCategoryAPI();
+
+            if (value.success == true && value.data != null) {
+              await saveCategoriesToHive(value.data!); // Save to Hive
+            }
+
+            emit(value);
+          } catch (error) {
+            // If online but API fails, try to load from Hive as fallback
+            final localData = await loadCategoriesFromHive();
+            if (localData.isNotEmpty) {
+              emit(GetCategoryModel(
+                success: true,
+                data: localData
+                    .map((cat) => category.Data(
+                          id: cat.id,
+                          name: cat.name,
+                          image: cat.image,
+                        ))
+                    .toList(),
+                errorResponse: null,
+              ));
+            } else {
+              emit(GetCategoryModel(
+                success: false,
+                data: [],
+                errorResponse:
+                    ErrorResponse(message: error.toString(), statusCode: 500),
+              ));
+            }
+          }
+        } else {
+          // Offline: load from Hive directly without loading state
+          final localData = await loadCategoriesFromHive();
+          print('Offline data count: ${localData.length}');
+
+          emit(GetCategoryModel(
+            success: true,
+            data: localData
+                .map((cat) => category.Data(
+                      id: cat.id,
+                      name: cat.name,
+                      image: cat.image,
+                    ))
+                .toList(),
+            errorResponse: null,
           ));
         }
-      } else {
-        // Offline: load from Hive and emit
+      } catch (e) {
+        print('Error in FoodCategory event: $e');
+        // If connectivity check fails, try to load from cache first, then try API
         final localData = await loadCategoriesFromHive();
-        print('Offline data count: ${localData.length}');
-        for (var d in localData) {
-          print('Category: id=${d.id}, name=${d.name}, image=${d.image}');
+        if (localData.isNotEmpty) {
+          emit(GetCategoryModel(
+            success: true,
+            data: localData
+                .map((cat) => category.Data(
+                      id: cat.id,
+                      name: cat.name,
+                      image: cat.image,
+                    ))
+                .toList(),
+            errorResponse: null,
+          ));
+        } else {
+          // Try API as last resort
+          try {
+            final value = await ApiProvider().getCategoryAPI();
+            if (value.success == true && value.data != null) {
+              await saveCategoriesToHive(value.data!);
+            }
+            emit(value);
+          } catch (apiError) {
+            emit(GetCategoryModel(
+              success: false,
+              data: [],
+              errorResponse:
+                  ErrorResponse(message: apiError.toString(), statusCode: 500),
+            ));
+          }
         }
-        emit(GetCategoryModel(
-          success: true,
-          data: localData
-              .map((cat) => category.Data(
-                    id: cat.id,
-                    name: cat.name,
-                    image: cat.image,
-                  ))
-              .toList(),
-          errorResponse: null,
-        ));
       }
     });
     on<FoodCategoryOffline>((event, emit) async {
       emit(event.offlineData);
     });
+    // on<FoodProductItem>((event, emit) async {
+    //   await ApiProvider()
+    //       .getProductItemAPI(event.catId, event.searchKey)
+    //       .then((value) {
+    //     emit(value);
+    //   }).catchError((error) {
+    //     emit(error);
+    //   });
+    // });
     on<FoodProductItem>((event, emit) async {
-      await ApiProvider()
-          .getProductItemAPI(event.catId, event.searchKey)
-          .then((value) {
-        emit(value);
-      }).catchError((error) {
-        emit(error);
-      });
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+        bool hasConnection = false;
+
+        if (connectivityResult is List<ConnectivityResult>) {
+          hasConnection = connectivityResult
+              .any((result) => result != ConnectivityResult.none);
+        } else if (connectivityResult is ConnectivityResult) {
+          hasConnection = connectivityResult != ConnectivityResult.none;
+        }
+
+        if (hasConnection) {
+          // Online: fetch from API and save to Hive
+          try {
+            final value = await ApiProvider()
+                .getProductItemAPI(event.catId, event.searchKey);
+
+            if (value.success == true && value.rows != null) {
+              // Save products to Hive for offline use
+              await saveProductsToHive(value.rows!, event.catId);
+            }
+
+            emit(value);
+          } catch (error) {
+            // If API fails but we're online, try to load from Hive as fallback
+            final localProducts = await loadProductsFromHive(event.catId);
+            if (localProducts.isNotEmpty) {
+              // Convert Hive products to API model format
+              final offlineProducts = localProducts
+                  .map((hiveProduct) => product.Rows(
+                        id: hiveProduct.id,
+                        name: hiveProduct.name,
+                        image: hiveProduct.image,
+                        basePrice: hiveProduct.basePrice,
+                        availableQuantity: hiveProduct.availableQuantity,
+                        addons: hiveProduct.addons
+                            ?.map((hiveAddon) => product.Addons(
+                                  id: hiveAddon.id,
+                                  name: hiveAddon.name,
+                                  price: hiveAddon.price,
+                                  isFree: hiveAddon.isFree,
+                                  maxQuantity: hiveAddon.maxQuantity,
+                                  isAvailable: hiveAddon.isAvailable,
+                                  quantity: 0, // Default quantity
+                                  isSelected: false, // Default selection
+                                ))
+                            .toList(),
+                        counter: 0, // Default counter
+                      ))
+                  .toList();
+
+              emit(product.GetProductByCatIdModel(
+                success: true,
+                rows: offlineProducts,
+                stockMaintenance: true, // Assume stock maintenance for offline
+                errorResponse: null,
+              ));
+            } else {
+              emit(product.GetProductByCatIdModel(
+                success: false,
+                rows: [],
+                stockMaintenance: false,
+                errorResponse:
+                    ErrorResponse(message: error.toString(), statusCode: 500),
+              ));
+            }
+          }
+        } else {
+          // Offline: load from Hive directly
+          final localProducts = await loadProductsFromHive(event.catId);
+          print(
+              'Offline products count for category ${event.catId}: ${localProducts.length}');
+
+          if (localProducts.isNotEmpty) {
+            // Filter products based on search key if provided
+            var filteredProducts = localProducts;
+            if (event.searchKey.isNotEmpty) {
+              filteredProducts = localProducts
+                  .where((product) =>
+                      product.name
+                          ?.toLowerCase()
+                          .contains(event.searchKey.toLowerCase()) ??
+                      false)
+                  .toList();
+            }
+
+            final offlineProducts = filteredProducts
+                .map((hiveProduct) => product.Rows(
+                      id: hiveProduct.id,
+                      name: hiveProduct.name,
+                      image: hiveProduct.image,
+                      basePrice: hiveProduct.basePrice,
+                      availableQuantity: hiveProduct.availableQuantity,
+                      addons: hiveProduct.addons
+                              ?.map((hiveAddon) => product.Addons(
+                                    id: hiveAddon.id,
+                                    name: hiveAddon.name,
+                                    price: hiveAddon.price,
+                                    isFree: hiveAddon.isFree,
+                                    maxQuantity: hiveAddon.maxQuantity,
+                                    isAvailable: hiveAddon.isAvailable,
+                                    quantity: 0,
+                                    isSelected: false,
+                                  ))
+                              .toList() ??
+                          [],
+                      counter: 0,
+                    ))
+                .toList();
+
+            emit(product.GetProductByCatIdModel(
+              success: true,
+              rows: offlineProducts,
+              stockMaintenance: true,
+              errorResponse: null,
+            ));
+          } else {
+            // No offline data, return empty result
+            emit(product.GetProductByCatIdModel(
+              success: true,
+              rows: [],
+              stockMaintenance: false,
+              errorResponse: null,
+            ));
+          }
+        }
+      } catch (e) {
+        print('Error in FoodProductItem event: $e');
+        final localProducts = await loadProductsFromHive(event.catId);
+        if (localProducts.isNotEmpty) {
+          final offlineProducts = localProducts
+              .map((hiveProduct) => product.Rows(
+                    id: hiveProduct.id,
+                    name: hiveProduct.name,
+                    image: hiveProduct.image,
+                    basePrice: hiveProduct.basePrice,
+                    availableQuantity: hiveProduct.availableQuantity,
+                    addons: hiveProduct.addons
+                            ?.map((hiveAddon) => product.Addons(
+                                  id: hiveAddon.id,
+                                  name: hiveAddon.name,
+                                  price: hiveAddon.price,
+                                  isFree: hiveAddon.isFree,
+                                  maxQuantity: hiveAddon.maxQuantity,
+                                  isAvailable: hiveAddon.isAvailable,
+                                  quantity: 0,
+                                  isSelected: false,
+                                ))
+                            .toList() ??
+                        [],
+                    counter: 0,
+                  ))
+              .toList();
+
+          emit(product.GetProductByCatIdModel(
+            success: true,
+            rows: offlineProducts,
+            stockMaintenance: true,
+            errorResponse: null,
+          ));
+        } else {
+          emit(product.GetProductByCatIdModel(
+            success: false,
+            rows: [],
+            stockMaintenance: false,
+            errorResponse:
+                ErrorResponse(message: e.toString(), statusCode: 500),
+          ));
+        }
+      }
+    });
+
+    // Add offline product event handler
+    on<FoodProductItemOffline>((event, emit) async {
+      emit(event.offlineData);
     });
     on<AddToBilling>((event, emit) async {
       await ApiProvider()

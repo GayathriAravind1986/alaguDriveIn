@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' hide Category;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,12 +17,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Category/category_bloc.dart';
 import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart';
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart' as category;
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart';
-import 'package:simple/ModelClass/Order/Get_view_order_model.dart' hide Data;
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
+    as category;
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
+    as product;
+import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
 import 'package:simple/ModelClass/Order/Post_generate_order_model.dart';
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
-import 'package:simple/ModelClass/Table/Get_table_model.dart' hide Data;
+import 'package:simple/ModelClass/Table/Get_table_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/product_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/image.dart';
@@ -79,7 +84,8 @@ class FoodOrderingScreenView extends StatefulWidget {
 
 class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   category.GetCategoryModel getCategoryModel = category.GetCategoryModel();
-  GetProductByCatIdModel getProductByCatIdModel = GetProductByCatIdModel();
+  product.GetProductByCatIdModel getProductByCatIdModel =
+      product.GetProductByCatIdModel();
   PostAddToBillingModel postAddToBillingModel = PostAddToBillingModel();
   PostGenerateOrderModel postGenerateOrderModel = PostGenerateOrderModel();
   GetTableModel getTableModel = GetTableModel();
@@ -91,6 +97,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
   TextEditingController searchController = TextEditingController();
   TextEditingController amountController = TextEditingController();
+
+  List<product.Category> displayedCategories = [];
+  List<product.Category> sortedCategories = [];
+
   List<TextEditingController> splitAmountControllers = [];
   List<String?> selectedPaymentMethods = [];
   double totalSplit = 0.0;
@@ -467,10 +477,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
   void refreshHome() {
     if (!mounted || !context.mounted) return;
-    context.read<FoodCategoryBloc>().add(FoodCategory());
-    context
-        .read<FoodCategoryBloc>()
-        .add(FoodProductItem(selectedCatId.toString(), searchController.text));
+    loadDataBasedOnConnectivity();
+    // context.read<FoodCategoryBloc>().add(FoodCategory());
+    // context
+    //     .read<FoodCategoryBloc>()
+    //     .add(FoodProductItem(selectedCatId.toString(), searchController.text));
     setState(() {
       categoryLoad = true;
       resetCartState();
@@ -561,30 +572,171 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     });
   }
 
-  Future<void> loadDataBasedOnConnectivity() async {
-    final connection = await Connectivity().checkConnectivity();
+  StreamSubscription? _connectivitySubscription;
 
-    if (connection != ConnectivityResult.none) {
-      context.read<FoodCategoryBloc>().add(FoodCategory());
-    } else {
-      final localCategories = Hive.box<HiveCategory>('categories').values.toList();
+  void _setupConnectivityListener() {
+    try {
+      _connectivitySubscription =
+          Connectivity().onConnectivityChanged.listen((dynamic result) {
+        bool hasConnection = false;
 
-      final offlineModel = category.GetCategoryModel(
-        success: true,
-        data: localCategories
-            .map((cat) => category.Data(
-          id: cat.id.toString(),
-          name: cat.name,
-          image: cat.image,
-          // map other fields as needed
-        ))
-            .toList(),
-        errorResponse: null,
-      );
+        // Handle both old and new versions of connectivity_plus
+        if (result is List<ConnectivityResult>) {
+          // New version - returns List<ConnectivityResult>
+          hasConnection = result.any((r) => r != ConnectivityResult.none);
+        } else if (result is ConnectivityResult) {
+          // Old version - returns single ConnectivityResult
+          hasConnection = result != ConnectivityResult.none;
+        }
 
-      context.read<FoodCategoryBloc>().add(FoodCategoryOffline(offlineModel));
+        // Only reload if we go from offline to online and don't have recent data
+        if (hasConnection) {
+          // Check if we need to refresh data (optional - you might want to refresh on reconnection)
+          final categoryBox = Hive.box<HiveCategory>('categories');
+          if (categoryBox.isEmpty) {
+            loadDataBasedOnConnectivity();
+          }
+        }
+      });
+    } catch (e) {
+      print('Error setting up connectivity listener: $e');
+      // If connectivity listener fails, just continue without it
     }
   }
+
+  Future<void> loadDataBasedOnConnectivity() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      bool hasConnection = connectivityResult != ConnectivityResult.none;
+      final categoryBox = Hive.box<HiveCategory>('categories');
+      final localCategories = categoryBox.values.toList();
+
+      if (localCategories.isNotEmpty) {
+        sortedCategories = localCategories
+            .map((cat) => product.Category(
+          id: cat.id,
+          name: cat.name,
+          image: cat.image,
+        ))
+            .toList();
+
+        displayedCategories = [
+          product.Category(name: 'All', image: Images.all, id: ""),
+          ...sortedCategories,
+        ];
+
+        setState(() => categoryLoad = false);
+
+        // Pick default category if none selected
+        if (selectedCatId == null || selectedCatId!.isEmpty) {
+          selectedCatId = "";
+          context.read<FoodCategoryBloc>().add(
+            FoodProductItem("", searchController.text), // "" means load all
+          );
+          // selectedCatId = sortedCategories.isNotEmpty
+          //     ? sortedCategories.first.id
+          //     : "";
+        }
+      }
+      if (hasConnection) {
+        // Online: fetch fresh data
+        context.read<FoodCategoryBloc>().add(FoodCategory());
+      } else {
+        // Offline: check if we have local data first
+        final categoryBox = Hive.box<HiveCategory>('categories');
+        final localCategories = categoryBox.values.toList();
+
+        if (localCategories.isNotEmpty) {
+          // Convert offline categories and update UI directly
+          setState(() {
+            sortedCategories = localCategories
+                .map((cat) =>
+                product.Category(
+                  id: cat.id,
+                  name: cat.name,
+                  image: cat.image,
+                ))
+                .toList();
+
+            displayedCategories = [
+              product.Category(name: 'All', image: Images.all, id: ""),
+              ...sortedCategories,
+            ];
+
+            categoryLoad = false;
+          });
+
+          // Load products for the selected category if available
+          if (selectedCatId != null) {
+            if (selectedCatId!.isEmpty) {
+              // Load ALL products from Hive
+              final allProducts = await loadProductsFromHive("");
+              if (allProducts.isNotEmpty) {
+                final offlineProductModel = product.GetProductByCatIdModel(
+                  success: true,
+                  rows: allProducts.map((hiveProduct) =>
+                      product.Rows(
+                        id: hiveProduct.id,
+                        name: hiveProduct.name,
+                        image: hiveProduct.image,
+                        basePrice: hiveProduct.basePrice,
+                        availableQuantity: hiveProduct.availableQuantity,
+                        addons: hiveProduct.addons?.map((hiveAddon) =>
+                            product.Addons(
+                              id: hiveAddon.id,
+                              name: hiveAddon.name,
+                              price: hiveAddon.price,
+                              isFree: hiveAddon.isFree,
+                              maxQuantity: hiveAddon.maxQuantity,
+                              isAvailable: hiveAddon.isAvailable,
+                              quantity: 0,
+                              isSelected: false,
+                            )).toList() ?? [],
+                        counter: 0,
+                      )).toList(),
+                  stockMaintenance: true,
+                  errorResponse: null,
+                );
+
+                context.read<FoodCategoryBloc>().add(
+                    FoodProductItemOffline(offlineProductModel));
+              }
+            }
+          }
+        }else {
+          // No offline data available, try to fetch
+          context.read<FoodCategoryBloc>().add(FoodCategory());
+        }
+      }
+    } catch (e) {
+      print('Error checking connectivity: $e');
+      // Fallback logic similar to above
+      final categoryBox = Hive.box<HiveCategory>('categories');
+      final localCategories = categoryBox.values.toList();
+debugPrint("localCate:$localCategories");
+      if (localCategories.isNotEmpty) {
+        setState(() {
+          sortedCategories = localCategories
+              .map((cat) => product.Category(
+                    id: cat.id,
+                    name: cat.name,
+                    image: cat.image,
+                  ))
+              .toList();
+
+          displayedCategories = [
+            product.Category(name: 'All', image: Images.all, id: ""),
+            ...sortedCategories,
+          ];
+
+          categoryLoad = false;
+        });
+      } else {
+        context.read<FoodCategoryBloc>().add(FoodCategory());
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -596,6 +748,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       printerService = MockPrinterService();
     }
     Hive.box<HiveCategory>('categories');
+    Hive.box<HiveProduct>('products');
+
+    // Set up connectivity listener to handle network changes
+    _setupConnectivityListener();
     if (widget.hasRefreshedOrder == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.foodKey?.currentState?.refreshHome();
@@ -606,8 +762,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       });
     } else {
       loadDataBasedOnConnectivity();
-      context.read<FoodCategoryBloc>().add(
-          FoodProductItem(selectedCatId.toString(), searchController.text));
       getDeviceInfo();
     }
     context.read<FoodCategoryBloc>().add(TableDine());
@@ -625,6 +779,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -632,16 +787,16 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   Widget build(BuildContext context) {
     var size = MediaQuery.of(context).size;
     Widget mainContainer() {
-      final sortedCategories = (getCategoryModel.data ?? [])
-          .map((data) => Category(
+      sortedCategories = (getCategoryModel.data ?? [])
+          .map((data) => product.Category(
                 id: data.id,
                 name: data.name,
                 image: data.image,
               ))
           .toList();
 
-      final List<Category> displayedCategories = [
-        Category(name: 'All', image: Images.all, id: ""),
+      displayedCategories = [
+        product.Category(name: 'All', image: Images.all, id: ""),
         ...sortedCategories,
       ];
       final List<String> paidItemIds = widget.isEditingOrder == true &&
@@ -6120,30 +6275,17 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
     return BlocBuilder<FoodCategoryBloc, dynamic>(
       buildWhen: ((previous, current) {
-        // if (current is category.GetCategoryModel) {
-        //   getCategoryModel = current;
-        //   if (getCategoryModel.success == true) {
-        //     setState(() {
-        //       categoryLoad = false;
-        //     });
-        //   }
-        //   if (getCategoryModel.errorResponse?.isUnauthorized == true) {
-        //     _handle401Error();
-        //     return true;
-        //   }
-        //   return true;
-        // }
         if (current is category.GetCategoryModel) {
           getCategoryModel = current;
 
-          if (getCategoryModel.success == true) {
+          if (getCategoryModel.success == true &&
+              getCategoryModel.data != null) {
             // ✅ Save to Hive for offline use
-            //Hive.openBox<HiveCategory>('categories');
             final categoryBox = Hive.box<HiveCategory>('categories');
             categoryBox.clear();
-            for (var cat in getCategoryModel.data ?? []) {
+            for (var cat in getCategoryModel.data!) {
               categoryBox.add(HiveCategory(
-                id: cat.id,
+                id: cat.id.toString(),
                 name: cat.name ?? '',
                 image: cat.image ?? '',
               ));
@@ -6151,6 +6293,25 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
             setState(() {
               categoryLoad = false;
+              sortedCategories = (getCategoryModel.data ?? [])
+                  .map((data) => product.Category(
+                        id: data.id,
+                        name: data.name,
+                        image: data.image,
+                      ))
+                  .toList();
+
+              displayedCategories = [
+                product.Category(name: 'All', image: Images.all, id: ""),
+                ...sortedCategories,
+              ];
+            });
+          } else if (getCategoryModel.success == false &&
+              getCategoryModel.data?.isEmpty == true) {
+            // Only show loading if we're actually loading (not when we have offline data)
+            setState(() {
+              categoryLoad =
+                  getCategoryModel.errorResponse != null ? false : true;
             });
           }
 
@@ -6158,20 +6319,29 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
             _handle401Error();
             return true;
           }
-
           return true;
         }
-        if (current is GetProductByCatIdModel) {
+        if (current is product.GetProductByCatIdModel) {
           getProductByCatIdModel = current;
-          if (getProductByCatIdModel.errorResponse?.isUnauthorized == true) {
-            _handle401Error();
-            return true;
-          }
-          if (getProductByCatIdModel.success == true) {
+
+          if (getProductByCatIdModel.success == true &&
+              getProductByCatIdModel.rows != null) {
+            // Save products to Hive for offline use (if we have selectedCatId)
+            if (selectedCatId != null && selectedCatId!.isNotEmpty) {
+              saveProductsToHive(
+                  getProductByCatIdModel.rows!, selectedCatId.toString());
+            }
+
             setState(() {
               categoryLoad = false;
             });
           }
+
+          if (getProductByCatIdModel.errorResponse?.isUnauthorized == true) {
+            _handle401Error();
+            return true;
+          }
+
           return true;
         }
         if (current is PostAddToBillingModel) {

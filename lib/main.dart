@@ -5,8 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:simple/Bloc/observer/observer.dart';
 import 'package:simple/Bloc/theme_cubit.dart';
-import 'package:simple/Offline/Database_helper/DB_Service.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/category_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/product_model.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:overlay_support/overlay_support.dart';
@@ -17,7 +17,9 @@ Future<void> main() async {
   // DatabaseFactoryHelper.init();
   await Hive.initFlutter();
   Hive.registerAdapter(HiveCategoryAdapter());
+  Hive.registerAdapter(HiveProductAdapter());
   await Hive.openBox<HiveCategory>('categories');
+  await Hive.openBox<HiveProduct>('products');
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
