@@ -1,9 +1,9 @@
 // hive_service.dart
 import 'package:hive/hive.dart';
 import 'package:simple/Api/apiProvider.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/hive_billing_session_model.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/hive_cart_model.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/hive_order_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_billing_session_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_cart_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_order_model.dart';
 import 'package:uuid/uuid.dart';
 
 class HiveService {

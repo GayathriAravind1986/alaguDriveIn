@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/hive_cart_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_cart_model.dart';
 
 part 'hive_order_model.g.dart';
 

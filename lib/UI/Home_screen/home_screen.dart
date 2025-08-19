@@ -28,7 +28,6 @@ import 'package:simple/ModelClass/Order/Post_generate_order_model.dart'
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart'
     as update;
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/product_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
@@ -45,7 +44,7 @@ import 'package:simple/UI/Home_screen/Widget/another_imin_printer/real_device_pr
 import 'package:simple/UI/Home_screen/Widget/category_card.dart';
 import 'package:simple/UI/IminHelper/printer_helper.dart';
 
-import '../../Offline/Hive_helper/LocalClass/category_model.dart';
+import '../../Offline/Hive_helper/LocalClass/Home/category_model.dart';
 
 class FoodOrderingScreen extends StatelessWidget {
   final GlobalKey<FoodOrderingScreenViewState>? foodKey;
@@ -97,9 +96,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   GetTableModel getTableModel = GetTableModel();
   update.UpdateGenerateOrderModel updateGenerateOrderModel =
       update.UpdateGenerateOrderModel();
-
-  /// offline initializer
-  final NetworkManager _networkManager = NetworkManager();
 
   TextEditingController searchController = TextEditingController();
   TextEditingController amountController = TextEditingController();
@@ -1247,10 +1243,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                               orElse: () => {},
                                                             )['qty'] ??
                                                             0;
-                                                    debugPrint(
-                                                        "availableQuantity:${p.availableQuantity}");
-                                                    debugPrint(
-                                                        "isStock:${p.isStock}");
                                                     return getProductByCatIdModel
                                                                 .stockMaintenance ==
                                                             true

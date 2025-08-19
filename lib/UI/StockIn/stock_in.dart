@@ -1,17 +1,23 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/StockIn/stock_in_bloc.dart';
-import 'package:simple/ModelClass/StockIn/getLocationModel.dart';
-import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart';
+import 'package:simple/ModelClass/StockIn/getLocationModel.dart' as location;
+import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart'
+    as supplier;
 import 'package:simple/ModelClass/StockIn/get_add_product_model.dart'
     as productModel;
 import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_stock_service.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/space.dart';
 import 'package:simple/UI/Authentication/login_screen.dart';
@@ -48,9 +54,9 @@ class StockViewView extends StatefulWidget {
 }
 
 class StockViewViewState extends State<StockViewView> {
-  GetLocationModel getLocationModel = GetLocationModel();
-  GetSupplierLocationModel getSupplierLocationModel =
-      GetSupplierLocationModel();
+  location.GetLocationModel getLocationModel = location.GetLocationModel();
+  supplier.GetSupplierLocationModel getSupplierLocationModel =
+      supplier.GetSupplierLocationModel();
   productModel.GetAddProductModel getAddProductModel =
       productModel.GetAddProductModel();
   SaveStockInModel saveStockInModel = SaveStockInModel();
@@ -244,9 +250,80 @@ class StockViewViewState extends State<StockViewView> {
     );
   }
 
+  StreamSubscription? _connectivitySubscription;
+  bool hasConnection = true;
+  void _setupConnectivityListener() {
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((dynamic result) async {
+      bool wasOffline = !hasConnection; // FIXED: Use class variable
+      hasConnection = result != ConnectivityResult.none;
+
+      if (wasOffline && hasConnection) {
+        // Just came back online - sync stock data
+        await syncStockWhenOnline();
+      } else if (!hasConnection) {
+        // Just went offline - trigger offline loading
+        await loadDataBasedOnConnectivity();
+      }
+    });
+  }
+
+  Future<void> loadDataBasedOnConnectivity() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    hasConnection = connectivityResult != ConnectivityResult.none;
+
+    setState(() {
+      stockLoad = true;
+    });
+
+    if (hasConnection) {
+      // 🔹 Online → trigger bloc events (this works fine)
+      context.read<StockInBloc>().add(StockInLocation());
+    } else {
+      // 🔹 Offline → trigger bloc events with offline flag
+      // This will make the bloc emit offline data and trigger BlocBuilder
+      context.read<StockInBloc>().add(StockInLocation());
+
+      // Alternative: You can also directly emit offline data if needed
+      // but using the bloc is better for consistency
+    }
+  }
+
+  Future<void> saveLocationToHive(location.Data? apiData) async {
+    if (apiData == null) return;
+
+    try {
+      final box = await Hive.openBox<HiveLocation>('location');
+      final hiveLocation = HiveLocation(
+        id: apiData.id,
+        locationName: apiData.locationName,
+        locationId: apiData.locationId,
+      );
+      await box.put('current_location', hiveLocation);
+      debugPrint("✅ Saved to Hive: ${hiveLocation.locationName}");
+    } catch (e) {
+      debugPrint("❌ Error saving to Hive: $e");
+    }
+  }
+
+  Future<void> syncStockWhenOnline() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      bool hasConnection = connectivityResult != ConnectivityResult.none;
+
+      if (hasConnection) {
+        // Fetch fresh data from API
+        context.read<StockInBloc>().add(StockInLocation());
+      }
+    } catch (e) {
+      debugPrint('Error syncing stock: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _setupConnectivityListener();
     if (widget.hasRefreshedStock == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.stockKey?.currentState?.refreshStock();
@@ -255,10 +332,7 @@ class StockViewViewState extends State<StockViewView> {
         });
       });
     } else {
-      context.read<StockInBloc>().add(StockInLocation());
-      setState(() {
-        stockLoad = true;
-      });
+      loadDataBasedOnConnectivity();
     }
   }
 
@@ -901,40 +975,79 @@ class StockViewViewState extends State<StockViewView> {
 
     return BlocBuilder<StockInBloc, dynamic>(
       buildWhen: ((previous, current) {
-        if (current is GetLocationModel) {
+        if (current is location.GetLocationModel) {
           getLocationModel = current;
           if (getLocationModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
             return true;
           }
           if (getLocationModel.success == true) {
-            locationId = getLocationModel.data?.locationId;
-            debugPrint("locationId:$locationId");
-            context
-                .read<StockInBloc>()
-                .add(StockInSupplier(locationId.toString()));
-            context
-                .read<StockInBloc>()
-                .add(StockInAddProduct(locationId.toString()));
+            if (getLocationModel.data != null) {
+              locationId = getLocationModel.data?.locationId ??
+                  getLocationModel.data?.id;
+              debugPrint("locationId: $locationId");
+
+              // Save to Hive
+              saveLocationToHive(getLocationModel.data);
+
+              // Continue with API calls...
+              if (hasConnection && locationId != null) {
+                context
+                    .read<StockInBloc>()
+                    .add(StockInSupplier(locationId.toString()));
+                context
+                    .read<StockInBloc>()
+                    .add(StockInAddProduct(locationId.toString()));
+              } else if (!hasConnection && locationId != null) {
+                context
+                    .read<StockInBloc>()
+                    .add(StockInSupplier(locationId.toString()));
+                context
+                    .read<StockInBloc>()
+                    .add(StockInAddProduct(locationId.toString()));
+              }
+            } else {
+              // Handle null data case
+              debugPrint("⚠️ Location data is null");
+              if (!hasConnection) {
+                showToast(
+                    "No offline location data available. Connect to internet first.",
+                    context,
+                    color: false);
+              }
+            }
             setState(() {
               stockLoad = false;
             });
           } else {
-            debugPrint("${getLocationModel.data?.locationName}");
+            debugPrint(
+                "Location fetch failed: ${getLocationModel.data?.locationName}");
             setState(() {
               stockLoad = false;
             });
-            showToast("No Location found", context, color: false);
+            if (hasConnection) {
+              showToast("No Location found", context, color: false);
+            } else {
+              showToast("No offline location data available", context,
+                  color: false);
+            }
           }
           return true;
         }
-        if (current is GetSupplierLocationModel) {
+
+        if (current is supplier.GetSupplierLocationModel) {
           getSupplierLocationModel = current;
+          debugPrint(
+              "Received suppliers: ${getSupplierLocationModel.data?.length ?? 0}");
+
           if (getSupplierLocationModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
             return true;
           }
           if (getSupplierLocationModel.success == true) {
+            if (hasConnection) {
+              saveSuppliersToHive(getSupplierLocationModel.data ?? []);
+            }
             setState(() {
               stockLoad = false;
             });
@@ -942,17 +1055,26 @@ class StockViewViewState extends State<StockViewView> {
             setState(() {
               stockLoad = false;
             });
-            showToast("No Supplier for this location", context, color: false);
+            if (hasConnection) {
+              showToast("No Supplier for this location", context, color: false);
+            }
           }
           return true;
         }
+
         if (current is productModel.GetAddProductModel) {
           getAddProductModel = current;
+          debugPrint(
+              "Received products: ${getAddProductModel.data?.length ?? 0}");
+
           if (getAddProductModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
             return true;
           }
           if (getAddProductModel.success == true) {
+            if (hasConnection) {
+              saveProductsToHive(getAddProductModel.data ?? []);
+            }
             setState(() {
               stockLoad = false;
             });
@@ -960,10 +1082,13 @@ class StockViewViewState extends State<StockViewView> {
             setState(() {
               stockLoad = false;
             });
-            showToast("No Product for this location", context, color: false);
+            if (hasConnection) {
+              showToast("No Product for this location", context, color: false);
+            }
           }
           return true;
         }
+
         if (current is SaveStockInModel) {
           saveStockInModel = current;
           if (saveStockInModel.errorResponse?.isUnauthorized == true) {
@@ -986,6 +1111,17 @@ class StockViewViewState extends State<StockViewView> {
           }
           return true;
         }
+
+        // FIXED: Handle generic responses (for offline mode)
+        if (current is Map && current['message'] != null) {
+          setState(() {
+            saveLoad = false;
+          });
+          showToast(current['message'], context,
+              color: current['success'] ?? false);
+          return true;
+        }
+
         return false;
       }),
       builder: (context, dynamic) {

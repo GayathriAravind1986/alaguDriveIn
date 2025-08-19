@@ -2,8 +2,8 @@ import 'package:hive/hive.dart';
 import 'package:simple/ModelClass/Table/Get_table_model.dart' as table;
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart'
     as stock;
-import 'package:simple/Offline/Hive_helper/LocalClass/hive_stock_model.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/hive_table_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_stock_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_table_model.dart';
 
 class HiveStockTableService {
   static const String _stockBox = 'stock_maintenance';

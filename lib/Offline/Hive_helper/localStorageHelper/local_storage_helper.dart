@@ -1,7 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
     as category;
-import 'package:simple/Offline/Hive_helper/LocalClass/category_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/category_model.dart';
 
 Future<void> saveCategoriesToHive(List<category.Data> categories) async {
   final box = await Hive.openBox<HiveCategory>('categories');
