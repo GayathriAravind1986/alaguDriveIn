@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -16,16 +15,21 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Category/category_bloc.dart';
-import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart';
+import 'package:simple/Bloc/Response/errorResponse.dart';
+import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart'
+    as billing;
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
     as category;
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
     as product;
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
-import 'package:simple/ModelClass/Order/Post_generate_order_model.dart';
-import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
+import 'package:simple/ModelClass/Order/Post_generate_order_model.dart'
+    as generate;
+import 'package:simple/ModelClass/Order/Update_generate_order_model.dart'
+    as update;
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/product_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
@@ -86,11 +90,13 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   category.GetCategoryModel getCategoryModel = category.GetCategoryModel();
   product.GetProductByCatIdModel getProductByCatIdModel =
       product.GetProductByCatIdModel();
-  PostAddToBillingModel postAddToBillingModel = PostAddToBillingModel();
-  PostGenerateOrderModel postGenerateOrderModel = PostGenerateOrderModel();
+  billing.PostAddToBillingModel postAddToBillingModel =
+      billing.PostAddToBillingModel();
+  generate.PostGenerateOrderModel postGenerateOrderModel =
+      generate.PostGenerateOrderModel();
   GetTableModel getTableModel = GetTableModel();
-  UpdateGenerateOrderModel updateGenerateOrderModel =
-      UpdateGenerateOrderModel();
+  update.UpdateGenerateOrderModel updateGenerateOrderModel =
+      update.UpdateGenerateOrderModel();
 
   /// offline initializer
   final NetworkManager _networkManager = NetworkManager();
@@ -99,6 +105,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   TextEditingController amountController = TextEditingController();
 
   List<product.Category> displayedCategories = [];
+  List<product.Rows> displayedProducts = [];
   List<product.Category> sortedCategories = [];
 
   List<TextEditingController> splitAmountControllers = [];
@@ -156,6 +163,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     });
   }
 
+  bool _hasConnection = true;
+  Timer? _searchDebounce;
   String? errorMessage;
   bool categoryLoad = false;
   bool orderLoad = false;
@@ -475,43 +484,54 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     }
   }
 
+  Timer? _debounceTimer;
+  bool _isLoadingData = false;
+  bool productLoad = false;
+
   void refreshHome() {
     if (!mounted || !context.mounted) return;
-    loadDataBasedOnConnectivity();
-    // context.read<FoodCategoryBloc>().add(FoodCategory());
-    // context
-    //     .read<FoodCategoryBloc>()
-    //     .add(FoodProductItem(selectedCatId.toString(), searchController.text));
-    setState(() {
-      categoryLoad = true;
-      resetCartState();
+
+    _debounceTimer?.cancel();
+
+    _debounceTimer = Timer(Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          categoryLoad = true;
+          productLoad = true;
+          selectedCatId = ""; // Reset to "All" category
+          displayedProducts = []; // Clear current products
+          resetCartState();
+        });
+
+        loadDataBasedOnConnectivity();
+      }
     });
   }
 
-  Future<void> getDeviceInfo() async {
-    final deviceInfoPlugin = DeviceInfoPlugin();
-    try {
-      if (Platform.isAndroid) {
-        AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
-        setState(() {
-          serialNumber = androidInfo.id ?? 'Unknown Android ID';
-          debugPrint("Device ID: $serialNumber");
-        });
-      } else if (Platform.isIOS) {
-        IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
-        setState(() {
-          serialNumber =
-              iosInfo.identifierForVendor ?? 'Unknown iOS Identifier';
-          debugPrint("Device ID: $serialNumber");
-        });
-      }
-    } catch (e) {
-      setState(() {
-        serialNumber = 'Error getting device info';
-        debugPrint("Device ID: $serialNumber");
-      });
-    }
-  }
+  // Future<void> getDeviceInfo() async {
+  //   final deviceInfoPlugin = DeviceInfoPlugin();
+  //   try {
+  //     if (Platform.isAndroid) {
+  //       AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
+  //       setState(() {
+  //         serialNumber = androidInfo.id ?? 'Unknown Android ID';
+  //         debugPrint("Device ID: $serialNumber");
+  //       });
+  //     } else if (Platform.isIOS) {
+  //       IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
+  //       setState(() {
+  //         serialNumber =
+  //             iosInfo.identifierForVendor ?? 'Unknown iOS Identifier';
+  //         debugPrint("Device ID: $serialNumber");
+  //       });
+  //     }
+  //   } catch (e) {
+  //     setState(() {
+  //       serialNumber = 'Error getting device info';
+  //       debugPrint("Device ID: $serialNumber");
+  //     });
+  //   }
+  // }
 
   void loadExistingOrder(GetViewOrderModel? order) {
     if (order == null || order.data == null) return;
@@ -573,116 +593,64 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   }
 
   StreamSubscription? _connectivitySubscription;
-
   void _setupConnectivityListener() {
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((dynamic result) {
+      bool hasConnection = false;
+      bool wasOffline = !hasConnection;
+      hasConnection = result != ConnectivityResult.none;
+
+      if (wasOffline && hasConnection) {
+        // Just came back online - sync stock data
+        syncStockWhenOnline();
+      } else if (!hasConnection) {
+        // Just went offline - ensure we have local data
+        if (selectedCatId != null) {
+          _loadProductsFromLocalAndUpdateUI(selectedCatId!);
+        }
+      }
+    });
+  }
+
+  /// offline code for category ,product
+  Future<void> _saveCategoriesAndPreloadProducts(
+      List<category.Data> categories) async {
     try {
-      _connectivitySubscription =
-          Connectivity().onConnectivityChanged.listen((dynamic result) {
-        bool hasConnection = false;
+      // Save categories to Hive
+      await saveCategoriesToHive(categories);
 
-        // Handle both old and new versions of connectivity_plus
-        if (result is List<ConnectivityResult>) {
-          // New version - returns List<ConnectivityResult>
-          hasConnection = result.any((r) => r != ConnectivityResult.none);
-        } else if (result is ConnectivityResult) {
-          // Old version - returns single ConnectivityResult
-          hasConnection = result != ConnectivityResult.none;
-        }
-
-        // Only reload if we go from offline to online and don't have recent data
-        if (hasConnection) {
-          // Check if we need to refresh data (optional - you might want to refresh on reconnection)
-          final categoryBox = Hive.box<HiveCategory>('categories');
-          if (categoryBox.isEmpty) {
-            loadDataBasedOnConnectivity();
-          }
-        }
-      });
+      debugPrint('Categories and products preloading completed');
     } catch (e) {
-      print('Error setting up connectivity listener: $e');
-      // If connectivity listener fails, just continue without it
+      debugPrint('Error saving categories and preloading products: $e');
     }
   }
 
-  Future<void> loadDataBasedOnConnectivity() async {
+// FIXED: New method to load products and update UI
+  Future<void> _loadProductsFromLocalAndUpdateUI(String categoryId) async {
     try {
-      final connectivityResult = await Connectivity().checkConnectivity();
-      bool hasConnection = connectivityResult != ConnectivityResult.none;
-      final categoryBox = Hive.box<HiveCategory>('categories');
-      final localCategories = categoryBox.values.toList();
+      setState(() {
+        productLoad = true;
+      });
 
-      if (localCategories.isNotEmpty) {
-        sortedCategories = localCategories
-            .map((cat) => product.Category(
-          id: cat.id,
-          name: cat.name,
-          image: cat.image,
-        ))
-            .toList();
+      final localProducts = await loadProductsFromHive(categoryId,
+          searchKey: searchController.text);
 
-        displayedCategories = [
-          product.Category(name: 'All', image: Images.all, id: ""),
-          ...sortedCategories,
-        ];
+      if (mounted) {
+        setState(() {
+          productLoad = false;
 
-        setState(() => categoryLoad = false);
-
-        // Pick default category if none selected
-        if (selectedCatId == null || selectedCatId!.isEmpty) {
-          selectedCatId = "";
-          context.read<FoodCategoryBloc>().add(
-            FoodProductItem("", searchController.text), // "" means load all
-          );
-          // selectedCatId = sortedCategories.isNotEmpty
-          //     ? sortedCategories.first.id
-          //     : "";
-        }
-      }
-      if (hasConnection) {
-        // Online: fetch fresh data
-        context.read<FoodCategoryBloc>().add(FoodCategory());
-      } else {
-        // Offline: check if we have local data first
-        final categoryBox = Hive.box<HiveCategory>('categories');
-        final localCategories = categoryBox.values.toList();
-
-        if (localCategories.isNotEmpty) {
-          // Convert offline categories and update UI directly
-          setState(() {
-            sortedCategories = localCategories
-                .map((cat) =>
-                product.Category(
-                  id: cat.id,
-                  name: cat.name,
-                  image: cat.image,
-                ))
-                .toList();
-
-            displayedCategories = [
-              product.Category(name: 'All', image: Images.all, id: ""),
-              ...sortedCategories,
-            ];
-
-            categoryLoad = false;
-          });
-
-          // Load products for the selected category if available
-          if (selectedCatId != null) {
-            if (selectedCatId!.isEmpty) {
-              // Load ALL products from Hive
-              final allProducts = await loadProductsFromHive("");
-              if (allProducts.isNotEmpty) {
-                final offlineProductModel = product.GetProductByCatIdModel(
-                  success: true,
-                  rows: allProducts.map((hiveProduct) =>
-                      product.Rows(
-                        id: hiveProduct.id,
-                        name: hiveProduct.name,
-                        image: hiveProduct.image,
-                        basePrice: hiveProduct.basePrice,
-                        availableQuantity: hiveProduct.availableQuantity,
-                        addons: hiveProduct.addons?.map((hiveAddon) =>
-                            product.Addons(
+          // Convert HiveProduct to product.Rows with proper stock handling
+          displayedProducts = localProducts
+              .map((hiveProduct) => product.Rows(
+                    id: hiveProduct.id,
+                    name: hiveProduct.name,
+                    image: hiveProduct.image,
+                    basePrice: hiveProduct.basePrice,
+                    availableQuantity: hiveProduct.availableQuantity,
+                    isStock: hiveProduct.isStock ??
+                        false, // Include isStock from Hive
+                    addons: hiveProduct.addons
+                        ?.map((hiveAddon) => product.Addons(
                               id: hiveAddon.id,
                               name: hiveAddon.name,
                               price: hiveAddon.price,
@@ -691,31 +659,254 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                               isAvailable: hiveAddon.isAvailable,
                               quantity: 0,
                               isSelected: false,
-                            )).toList() ?? [],
-                        counter: 0,
-                      )).toList(),
-                  stockMaintenance: true,
-                  errorResponse: null,
-                );
+                            ))
+                        .toList(),
+                    counter: 0,
+                  ))
+              .toList();
+        });
+      }
 
-                context.read<FoodCategoryBloc>().add(
-                    FoodProductItemOffline(offlineProductModel));
-              }
-            }
-          }
-        }else {
-          // No offline data available, try to fetch
-          context.read<FoodCategoryBloc>().add(FoodCategory());
+      debugPrint(
+          'Loaded ${displayedProducts.length} products from local storage for category: $categoryId');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          productLoad = false;
+          displayedProducts = [];
+        });
+      }
+      debugPrint('Error loading products from local storage: $e');
+    }
+  }
+
+  Future<void> syncStockWhenOnline() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      bool hasConnection = connectivityResult != ConnectivityResult.none;
+
+      if (hasConnection) {
+        // Fetch fresh data from API to update stock levels
+        context.read<FoodCategoryBloc>().add(FoodCategory());
+
+        // If a category is selected, also refresh its products
+        if (selectedCatId != null && selectedCatId!.isNotEmpty) {
+          context
+              .read<FoodCategoryBloc>()
+              .add(FoodProductItem(selectedCatId!, ""));
         }
       }
     } catch (e) {
-      print('Error checking connectivity: $e');
-      // Fallback logic similar to above
-      final categoryBox = Hive.box<HiveCategory>('categories');
-      final localCategories = categoryBox.values.toList();
-debugPrint("localCate:$localCategories");
-      if (localCategories.isNotEmpty) {
+      debugPrint('Error syncing stock: $e');
+    }
+  }
+
+// FIXED: Method to filter products based on search
+//   void _filterProducts(String searchText) {
+//     if (!mounted) return;
+//
+//     setState(() {
+//       if (searchText.isEmpty) {
+//         // If search is empty, reload all products for current category
+//         final categoryId = selectedCatId ?? "";
+//         context.read<FoodCategoryBloc>().add(FoodProductItem(categoryId, ""));
+//       } else {
+//         // Filter current products
+//         displayedProducts = (getProductByCatIdModel.rows ?? [])
+//             .where((product) =>
+//                 product.name
+//                     ?.toLowerCase()
+//                     .contains(searchText.toLowerCase()) ??
+//                 false)
+//             .toList();
+//       }
+//     });
+//   }
+  void _filterProducts(String searchText) {
+    if (!mounted) return;
+
+    // Cancel previous search if still active
+    if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
+
+    // Add debouncing to improve performance
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        if (searchText.isEmpty) {
+          // If search is empty, reload all products for current category
+          final categoryId = selectedCatId ?? "";
+          _loadProductsBasedOnConnectivity(categoryId);
+        } else {
+          // FIXED: Filter based on current connection status
+          if (_hasConnection && getProductByCatIdModel.rows != null) {
+            // Online: filter from API data
+            displayedProducts = (getProductByCatIdModel.rows ?? [])
+                .where((product) =>
+                    product.name
+                        ?.toLowerCase()
+                        .contains(searchText.toLowerCase()) ??
+                    false)
+                .toList();
+          } else {
+            // Offline: filter from local data or reload with search from Hive
+            _filterProductsOffline(searchText);
+          }
+        }
+      });
+    });
+  }
+
+// 4. NEW: Method to filter products offline
+  Future<void> _filterProductsOffline(String searchText) async {
+    try {
+      final categoryId = selectedCatId ?? "";
+
+      setState(() {
+        productLoad = true;
+      });
+
+      // Load products from Hive with search filter
+      final localProducts =
+          await loadProductsFromHive(categoryId, searchKey: searchText);
+
+      if (mounted) {
         setState(() {
+          productLoad = false;
+
+          displayedProducts = localProducts.map((hiveProduct) {
+            final counter = billingItems
+                .where((item) => item['_id'] == hiveProduct.id)
+                .fold(0, (sum, item) => sum + (item['qty'] as int));
+
+            return product.Rows(
+              id: hiveProduct.id,
+              name: hiveProduct.name,
+              image: hiveProduct.image,
+              basePrice: hiveProduct.basePrice,
+              availableQuantity: hiveProduct.availableQuantity,
+              isStock: hiveProduct.isStock ?? false,
+              addons: hiveProduct.addons
+                  ?.map((hiveAddon) => product.Addons(
+                        id: hiveAddon.id,
+                        name: hiveAddon.name,
+                        price: hiveAddon.price,
+                        isFree: hiveAddon.isFree,
+                        maxQuantity: hiveAddon.maxQuantity,
+                        isAvailable: hiveAddon.isAvailable,
+                        quantity: 0,
+                        isSelected: false,
+                      ))
+                  .toList(),
+              counter: counter,
+            );
+          }).toList();
+
+          // Update model for UI
+          // getProductByCatIdModel.rows = displayedProducts;
+          // getProductByCatIdModel.stockMaintenance = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          productLoad = false;
+        });
+      }
+      debugPrint('Error filtering products offline: $e');
+    }
+  }
+
+  Future<void> _loadProductsBasedOnConnectivity(String categoryId) async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    _hasConnection = connectivityResult != ConnectivityResult.none;
+
+    if (_hasConnection) {
+      // Online: fetch from API
+      context.read<FoodCategoryBloc>().add(FoodProductItem(categoryId, ""));
+    } else {
+      // Offline: load from local storage
+      await _loadProductsFromLocalAndUpdateUI(categoryId);
+    }
+  }
+
+  // Future<void> loadDataBasedOnConnectivity() async {
+  //   if (_isLoadingData) return;
+  //   _isLoadingData = true;
+  //
+  //   try {
+  //     final connectivityResult = await Connectivity().checkConnectivity();
+  //     bool hasConnection = connectivityResult != ConnectivityResult.none;
+  //
+  //     // Always load categories from local storage first for immediate UI
+  //     await _loadCategoriesFromLocal();
+  //
+  //     if (hasConnection) {
+  //       // Online: fetch fresh data from API
+  //       context.read<FoodCategoryBloc>().add(FoodCategory());
+  //     } else {
+  //       // Offline: load products from local storage
+  //       if (selectedCatId != null) {
+  //         await _loadProductsFromLocalAndUpdateUI(selectedCatId!);
+  //       }
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Error in loadDataBasedOnConnectivity: $e');
+  //     await _loadCategoriesFromLocal();
+  //   } finally {
+  //     _isLoadingData = false;
+  //   }
+  // }
+  Future<void> loadDataBasedOnConnectivity() async {
+    if (_isLoadingData) return;
+    _isLoadingData = true;
+
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      _hasConnection = connectivityResult !=
+          ConnectivityResult.none; // FIXED: Store connection status
+
+      // Always load categories from local storage first for immediate UI
+      await _loadCategoriesFromLocal();
+
+      if (_hasConnection) {
+        // Online: fetch fresh data from API
+        context.read<FoodCategoryBloc>().add(FoodCategory());
+
+        // Load products for selected category if any
+        if (selectedCatId != null && selectedCatId!.isNotEmpty) {
+          context
+              .read<FoodCategoryBloc>()
+              .add(FoodProductItem(selectedCatId!, ""));
+        }
+      } else {
+        // Offline: load products from local storage
+        if (selectedCatId != null) {
+          await _loadProductsFromLocalAndUpdateUI(selectedCatId!);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in loadDataBasedOnConnectivity: $e');
+      await _loadCategoriesFromLocal();
+
+      // Fallback: try to load offline data
+      if (selectedCatId != null) {
+        await _loadProductsFromLocalAndUpdateUI(selectedCatId!);
+      }
+    } finally {
+      _isLoadingData = false;
+    }
+  }
+
+// UPDATED: Your existing _loadCategoriesFromLocal method
+  Future<void> _loadCategoriesFromLocal() async {
+    try {
+      final localCategories = await loadCategoriesFromHive();
+
+      if (localCategories.isNotEmpty && mounted) {
+        setState(() {
+          categoryLoad = false;
+          sortedCategories.clear();
+          displayedCategories.clear();
+
           sortedCategories = localCategories
               .map((cat) => product.Category(
                     id: cat.id,
@@ -728,18 +919,33 @@ debugPrint("localCate:$localCategories");
             product.Category(name: 'All', image: Images.all, id: ""),
             ...sortedCategories,
           ];
-
-          categoryLoad = false;
+          selectedCatId ??= "";
         });
-      } else {
-        context.read<FoodCategoryBloc>().add(FoodCategory());
       }
+    } catch (e) {
+      debugPrint('Error loading categories from local: $e');
     }
+  }
+
+  void _setupSearchListener() {
+    searchController.addListener(() {
+      _filterProducts(searchController.text);
+    });
+  }
+
+  void onCategorySelected(String categoryId) {
+    setState(() {
+      selectedCatId = categoryId;
+      searchController.clear();
+    });
+
+    _loadProductsBasedOnConnectivity(categoryId);
   }
 
   @override
   void initState() {
     super.initState();
+    _setupSearchListener();
     if (kIsWeb) {
       printerService = MockPrinterService();
     } else if (Platform.isAndroid) {
@@ -747,22 +953,20 @@ debugPrint("localCate:$localCategories");
     } else {
       printerService = MockPrinterService();
     }
-    Hive.box<HiveCategory>('categories');
-    Hive.box<HiveProduct>('products');
 
     // Set up connectivity listener to handle network changes
     _setupConnectivityListener();
     if (widget.hasRefreshedOrder == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint("welcome from other page");
         widget.foodKey?.currentState?.refreshHome();
         setState(() {
           categoryLoad = true;
-          getDeviceInfo();
         });
       });
     } else {
+      debugPrint("welcome first");
       loadDataBasedOnConnectivity();
-      getDeviceInfo();
     }
     context.read<FoodCategoryBloc>().add(TableDine());
     setState(() {
@@ -779,6 +983,9 @@ debugPrint("localCate:$localCategories");
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _searchDebounce?.cancel();
+    searchController.dispose();
     _connectivitySubscription?.cancel();
     super.dispose();
   }
@@ -1040,320 +1247,361 @@ debugPrint("localCate:$localCategories");
                                                               orElse: () => {},
                                                             )['qty'] ??
                                                             0;
+                                                    debugPrint(
+                                                        "availableQuantity:${p.availableQuantity}");
+                                                    debugPrint(
+                                                        "isStock:${p.isStock}");
                                                     return getProductByCatIdModel
                                                                 .stockMaintenance ==
                                                             true
                                                         ? InkWell(
-                                                            onTap: (p.availableQuantity ??
-                                                                        0) >
-                                                                    0
-                                                                ? () {
-                                                                    setState(
-                                                                        () {
-                                                                      p.counter =
-                                                                          1;
-                                                                      if (p
-                                                                          .addons!
-                                                                          .isNotEmpty) {
-                                                                        showDialog(
-                                                                          context:
+                                                            onTap: () {
+                                                              setState(() {
+                                                                p.counter = 1;
+                                                                if (p.addons!
+                                                                    .isNotEmpty) {
+                                                                  showDialog(
+                                                                    context:
+                                                                        context,
+                                                                    builder:
+                                                                        (context2) {
+                                                                      return BlocProvider(
+                                                                        create: (context) =>
+                                                                            FoodCategoryBloc(),
+                                                                        child: BlocProvider
+                                                                            .value(
+                                                                          value: BlocProvider.of<FoodCategoryBloc>(
                                                                               context,
-                                                                          builder:
-                                                                              (context2) {
-                                                                            return BlocProvider(
-                                                                              create: (context) => FoodCategoryBloc(),
-                                                                              child: BlocProvider.value(
-                                                                                value: BlocProvider.of<FoodCategoryBloc>(context, listen: false),
-                                                                                child: StatefulBuilder(builder: (context, setState) {
-                                                                                  return Dialog(
-                                                                                    insetPadding: EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-                                                                                    shape: RoundedRectangleBorder(
-                                                                                      borderRadius: BorderRadius.circular(8),
-                                                                                    ),
-                                                                                    child: Container(
-                                                                                      constraints: BoxConstraints(
-                                                                                        maxWidth: size.width * 0.4,
-                                                                                        maxHeight: size.height * 0.6,
+                                                                              listen: false),
+                                                                          child:
+                                                                              StatefulBuilder(builder: (context, setState) {
+                                                                            return Dialog(
+                                                                              insetPadding: EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                                                                              shape: RoundedRectangleBorder(
+                                                                                borderRadius: BorderRadius.circular(8),
+                                                                              ),
+                                                                              child: Container(
+                                                                                constraints: BoxConstraints(
+                                                                                  maxWidth: size.width * 0.4,
+                                                                                  maxHeight: size.height * 0.6,
+                                                                                ),
+                                                                                padding: EdgeInsets.all(16),
+                                                                                child: SingleChildScrollView(
+                                                                                  child: Column(
+                                                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                                                    mainAxisSize: MainAxisSize.min,
+                                                                                    children: [
+                                                                                      ClipRRect(
+                                                                                          borderRadius: BorderRadius.circular(15.0),
+                                                                                          child: CachedNetworkImage(
+                                                                                            imageUrl: p.image!,
+                                                                                            width: size.width * 0.5,
+                                                                                            height: size.height * 0.2,
+                                                                                            fit: BoxFit.cover,
+                                                                                            errorWidget: (context, url, error) {
+                                                                                              return const Icon(
+                                                                                                Icons.error,
+                                                                                                size: 30,
+                                                                                                color: appHomeTextColor,
+                                                                                              );
+                                                                                            },
+                                                                                            progressIndicatorBuilder: (context, url, downloadProgress) => const SpinKitCircle(color: appPrimaryColor, size: 30),
+                                                                                          )),
+                                                                                      SizedBox(height: 16),
+                                                                                      Text(
+                                                                                        'Choose Add‑Ons for ${p.name}',
+                                                                                        style: MyTextStyle.f16(
+                                                                                          weight: FontWeight.bold,
+                                                                                          blackColor,
+                                                                                        ),
+                                                                                        textAlign: TextAlign.left,
                                                                                       ),
-                                                                                      padding: EdgeInsets.all(16),
-                                                                                      child: SingleChildScrollView(
-                                                                                        child: Column(
-                                                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                          mainAxisSize: MainAxisSize.min,
-                                                                                          children: [
-                                                                                            ClipRRect(
-                                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                                                child: CachedNetworkImage(
-                                                                                                  imageUrl: p.image!,
-                                                                                                  width: size.width * 0.5,
-                                                                                                  height: size.height * 0.2,
-                                                                                                  fit: BoxFit.cover,
-                                                                                                  errorWidget: (context, url, error) {
-                                                                                                    return const Icon(
-                                                                                                      Icons.error,
-                                                                                                      size: 30,
-                                                                                                      color: appHomeTextColor,
-                                                                                                    );
-                                                                                                  },
-                                                                                                  progressIndicatorBuilder: (context, url, downloadProgress) => const SpinKitCircle(color: appPrimaryColor, size: 30),
-                                                                                                )),
-                                                                                            SizedBox(height: 16),
-                                                                                            Text(
-                                                                                              'Choose Add‑Ons for ${p.name}',
-                                                                                              style: MyTextStyle.f16(
-                                                                                                weight: FontWeight.bold,
-                                                                                                blackColor,
+                                                                                      SizedBox(height: 12),
+                                                                                      Column(
+                                                                                        children: p.addons!.map((e) {
+                                                                                          return Padding(
+                                                                                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                                                                            child: Container(
+                                                                                              padding: const EdgeInsets.all(8),
+                                                                                              decoration: BoxDecoration(
+                                                                                                border: Border.all(color: blackColor),
+                                                                                                borderRadius: BorderRadius.circular(8),
                                                                                               ),
-                                                                                              textAlign: TextAlign.left,
-                                                                                            ),
-                                                                                            SizedBox(height: 12),
-                                                                                            Column(
-                                                                                              children: p.addons!.map((e) {
-                                                                                                return Padding(
-                                                                                                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                                                                                  child: Container(
-                                                                                                    padding: const EdgeInsets.all(8),
-                                                                                                    decoration: BoxDecoration(
-                                                                                                      border: Border.all(color: blackColor),
-                                                                                                      borderRadius: BorderRadius.circular(8),
-                                                                                                    ),
-                                                                                                    child: Row(
+                                                                                              child: Row(
+                                                                                                children: [
+                                                                                                  Expanded(
+                                                                                                    child: Column(
+                                                                                                      crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
-                                                                                                        Expanded(
-                                                                                                          child: Column(
-                                                                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                                            children: [
-                                                                                                              Text(
-                                                                                                                e.name ?? '',
-                                                                                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                                                                                              ),
-                                                                                                              const SizedBox(height: 4),
-                                                                                                              Text(
-                                                                                                                e.isFree == true ? "Free (Max: ${e.maxQuantity})" : "₹ ${e.price?.toStringAsFixed(2) ?? '0.00'} (Max: ${e.maxQuantity})",
-                                                                                                                style: TextStyle(color: Colors.grey.shade600),
-                                                                                                              ),
-                                                                                                            ],
-                                                                                                          ),
+                                                                                                        Text(
+                                                                                                          e.name ?? '',
+                                                                                                          style: const TextStyle(fontWeight: FontWeight.bold),
                                                                                                         ),
-                                                                                                        Row(
-                                                                                                          children: [
-                                                                                                            IconButton(
-                                                                                                              icon: const Icon(Icons.remove),
-                                                                                                              onPressed: (e.quantity) > 0
-                                                                                                                  ? () {
-                                                                                                                      setState(() {
-                                                                                                                        e.quantity = (e.quantity) - 1;
-                                                                                                                      });
-                                                                                                                    }
-                                                                                                                  : null,
-                                                                                                            ),
-                                                                                                            Text('${e.quantity}'),
-                                                                                                            IconButton(
-                                                                                                              icon: const Icon(Icons.add, color: Colors.brown),
-                                                                                                              onPressed: (e.quantity) < (e.maxQuantity ?? 1)
-                                                                                                                  ? () {
-                                                                                                                      setState(() {
-                                                                                                                        e.quantity = (e.quantity) + 1;
-                                                                                                                      });
-                                                                                                                    }
-                                                                                                                  : null,
-                                                                                                            ),
-                                                                                                          ],
-                                                                                                        )
+                                                                                                        const SizedBox(height: 4),
+                                                                                                        Text(
+                                                                                                          e.isFree == true ? "Free (Max: ${e.maxQuantity})" : "₹ ${e.price?.toStringAsFixed(2) ?? '0.00'} (Max: ${e.maxQuantity})",
+                                                                                                          style: TextStyle(color: Colors.grey.shade600),
+                                                                                                        ),
                                                                                                       ],
                                                                                                     ),
                                                                                                   ),
-                                                                                                );
-                                                                                              }).toList(),
+                                                                                                  Row(
+                                                                                                    children: [
+                                                                                                      IconButton(
+                                                                                                        icon: const Icon(Icons.remove),
+                                                                                                        onPressed: (e.quantity) > 0
+                                                                                                            ? () {
+                                                                                                                setState(() {
+                                                                                                                  e.quantity = (e.quantity) - 1;
+                                                                                                                });
+                                                                                                              }
+                                                                                                            : null,
+                                                                                                      ),
+                                                                                                      Text('${e.quantity}'),
+                                                                                                      IconButton(
+                                                                                                        icon: const Icon(Icons.add, color: Colors.brown),
+                                                                                                        onPressed: (e.quantity) < (e.maxQuantity ?? 1)
+                                                                                                            ? () {
+                                                                                                                setState(() {
+                                                                                                                  e.quantity = (e.quantity) + 1;
+                                                                                                                });
+                                                                                                              }
+                                                                                                            : null,
+                                                                                                      ),
+                                                                                                    ],
+                                                                                                  )
+                                                                                                ],
+                                                                                              ),
                                                                                             ),
-                                                                                            SizedBox(height: 20),
-                                                                                            Row(
-                                                                                              mainAxisAlignment: MainAxisAlignment.end,
-                                                                                              children: [
-                                                                                                ElevatedButton(
-                                                                                                  onPressed: () {
-                                                                                                    setState(() {
-                                                                                                      if (counter > 1 || counter == 1) {
-                                                                                                        counter--;
-                                                                                                      }
-                                                                                                    });
-                                                                                                    Navigator.of(context).pop();
-                                                                                                  },
-                                                                                                  style: ElevatedButton.styleFrom(
-                                                                                                    backgroundColor: greyColor.shade400,
-                                                                                                    minimumSize: Size(80, 40),
-                                                                                                    padding: EdgeInsets.all(20),
-                                                                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                                                                  ),
-                                                                                                  child: Text('Cancel', style: MyTextStyle.f14(blackColor)),
-                                                                                                ),
-                                                                                                SizedBox(width: 8),
-                                                                                                ElevatedButton(
-                                                                                                  onPressed: () {
-                                                                                                    // Fixed logic: Check available quantity considering editing context
-                                                                                                    final currentQtyInCart = billingItems.where((item) => item['_id'] == p.id).fold(0, (sum, item) => sum + (item['qty'] as int));
-
-                                                                                                    bool canAdd;
-                                                                                                    if (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") {
-                                                                                                      // For completed orders, get paid quantity
-                                                                                                      final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
-                                                                                                      // Allow adding up to availableQuantity + paidQuantity
-                                                                                                      canAdd = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
-                                                                                                    } else {
-                                                                                                      // Normal stock check for new orders or waitlist
-                                                                                                      canAdd = currentQtyInCart < (p.availableQuantity ?? 0);
-                                                                                                    }
-
-                                                                                                    if (!canAdd) {
-                                                                                                      showToast("Cannot add more items. Stock limit reached.", context, color: false);
-                                                                                                      return;
-                                                                                                    }
-
-                                                                                                    setState(() {
-                                                                                                      isSplitPayment = false;
-                                                                                                      if (widget.isEditingOrder != true) {
-                                                                                                        selectDineIn = true;
-                                                                                                      }
-                                                                                                      final index = billingItems.indexWhere((item) => item['_id'] == p.id);
-                                                                                                      if (index != -1) {
-                                                                                                        billingItems[index]['qty'] = billingItems[index]['qty'] + 1;
-                                                                                                      } else {
-                                                                                                        billingItems.add({
-                                                                                                          "_id": p.id,
-                                                                                                          "basePrice": p.basePrice,
-                                                                                                          "image": p.image,
-                                                                                                          "qty": 1,
-                                                                                                          "name": p.name,
-                                                                                                          "availableQuantity": p.availableQuantity,
-                                                                                                          "selectedAddons": p.addons!
-                                                                                                              .where((addon) => addon.quantity > 0)
-                                                                                                              .map((addon) => {
-                                                                                                                    "_id": addon.id,
-                                                                                                                    "price": addon.price,
-                                                                                                                    "quantity": addon.quantity,
-                                                                                                                    "name": addon.name,
-                                                                                                                    "isAvailable": addon.isAvailable,
-                                                                                                                    "maxQuantity": addon.maxQuantity,
-                                                                                                                    "isFree": addon.isFree,
-                                                                                                                  })
-                                                                                                              .toList()
-                                                                                                        });
-                                                                                                      }
-                                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
-
-                                                                                                      setState(() {
-                                                                                                        for (var addon in p.addons!) {
-                                                                                                          addon.isSelected = false;
-                                                                                                          addon.quantity = 0;
-                                                                                                        }
-                                                                                                      });
-                                                                                                      Navigator.of(context).pop();
-                                                                                                    });
-                                                                                                  },
-                                                                                                  style: ElevatedButton.styleFrom(
-                                                                                                    backgroundColor: appPrimaryColor,
-                                                                                                    minimumSize: Size(80, 40),
-                                                                                                    padding: EdgeInsets.all(20),
-                                                                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                                                                  ),
-                                                                                                  child: Text('Add to Bill', style: MyTextStyle.f14(whiteColor)),
-                                                                                                ),
-                                                                                              ],
-                                                                                            ),
-                                                                                          ],
-                                                                                        ),
+                                                                                          );
+                                                                                        }).toList(),
                                                                                       ),
-                                                                                    ),
-                                                                                  );
-                                                                                }),
+                                                                                      SizedBox(height: 20),
+                                                                                      Row(
+                                                                                        mainAxisAlignment: MainAxisAlignment.end,
+                                                                                        children: [
+                                                                                          ElevatedButton(
+                                                                                            onPressed: () {
+                                                                                              setState(() {
+                                                                                                if (counter > 1 || counter == 1) {
+                                                                                                  counter--;
+                                                                                                }
+                                                                                              });
+                                                                                              Navigator.of(context).pop();
+                                                                                            },
+                                                                                            style: ElevatedButton.styleFrom(
+                                                                                              backgroundColor: greyColor.shade400,
+                                                                                              minimumSize: Size(80, 40),
+                                                                                              padding: EdgeInsets.all(20),
+                                                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                                                            ),
+                                                                                            child: Text('Cancel', style: MyTextStyle.f14(blackColor)),
+                                                                                          ),
+                                                                                          SizedBox(width: 8),
+                                                                                          ElevatedButton(
+                                                                                            onPressed: () {
+                                                                                              final currentQtyInCart = billingItems.where((item) => item['_id'] == p.id).fold(0, (sum, item) => sum + (item['qty'] as int));
+
+                                                                                              bool canAdd;
+
+                                                                                              if (p.isStock == true) {
+                                                                                                if ((widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") || (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "WAITLIST")) {
+                                                                                                  final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
+                                                                                                  canAdd = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
+                                                                                                } else {
+                                                                                                  canAdd = currentQtyInCart < (p.availableQuantity ?? 0);
+                                                                                                }
+                                                                                              } else {
+                                                                                                canAdd = true;
+                                                                                              }
+                                                                                              if (!canAdd) {
+                                                                                                showToast("Cannot add more items. Stock limit reached.", context, color: false);
+                                                                                                return;
+                                                                                              }
+
+                                                                                              setState(() {
+                                                                                                isSplitPayment = false;
+                                                                                                if (widget.isEditingOrder != true) {
+                                                                                                  selectDineIn = true;
+                                                                                                }
+                                                                                                final index = billingItems.indexWhere((item) => item['_id'] == p.id);
+                                                                                                if (index != -1) {
+                                                                                                  billingItems[index]['qty'] = billingItems[index]['qty'] + 1;
+                                                                                                } else {
+                                                                                                  billingItems.add({
+                                                                                                    "_id": p.id,
+                                                                                                    "basePrice": p.basePrice,
+                                                                                                    "image": p.image,
+                                                                                                    "qty": 1,
+                                                                                                    "name": p.name,
+                                                                                                    "availableQuantity": p.availableQuantity,
+                                                                                                    "selectedAddons": p.addons!
+                                                                                                        .where((addon) => addon.quantity > 0)
+                                                                                                        .map((addon) => {
+                                                                                                              "_id": addon.id,
+                                                                                                              "price": addon.price,
+                                                                                                              "quantity": addon.quantity,
+                                                                                                              "name": addon.name,
+                                                                                                              "isAvailable": addon.isAvailable,
+                                                                                                              "maxQuantity": addon.maxQuantity,
+                                                                                                              "isFree": addon.isFree,
+                                                                                                            })
+                                                                                                        .toList()
+                                                                                                  });
+                                                                                                }
+                                                                                                context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+
+                                                                                                setState(() {
+                                                                                                  for (var addon in p.addons!) {
+                                                                                                    addon.isSelected = false;
+                                                                                                    addon.quantity = 0;
+                                                                                                  }
+                                                                                                });
+                                                                                                Navigator.of(context).pop();
+                                                                                              });
+                                                                                            },
+                                                                                            style: ElevatedButton.styleFrom(
+                                                                                              backgroundColor: appPrimaryColor,
+                                                                                              minimumSize: Size(80, 40),
+                                                                                              padding: EdgeInsets.all(20),
+                                                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                                                            ),
+                                                                                            child: Text('Add to Bill', style: MyTextStyle.f14(whiteColor)),
+                                                                                          ),
+                                                                                        ],
+                                                                                      ),
+                                                                                    ],
+                                                                                  ),
+                                                                                ),
                                                                               ),
                                                                             );
-                                                                          },
-                                                                        );
-                                                                      } else {
-                                                                        // Direct add without addons - Fixed stock check
-                                                                        final currentQtyInCart = billingItems
-                                                                            .where((item) =>
-                                                                                item['_id'] ==
-                                                                                p.id)
-                                                                            .fold(0, (sum, item) => sum + (item['qty'] as int));
+                                                                          }),
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                  );
+                                                                } else {
+                                                                  final currentQtyInCart = billingItems
+                                                                      .where((item) =>
+                                                                          item[
+                                                                              '_id'] ==
+                                                                          p.id)
+                                                                      .fold(
+                                                                          0,
+                                                                          (sum, item) =>
+                                                                              sum +
+                                                                              (item['qty'] as int));
+                                                                  bool canAdd;
 
-                                                                        bool
-                                                                            canAdd;
-                                                                        if (widget.isEditingOrder ==
+                                                                  if (p.isStock ==
+                                                                      true) {
+                                                                    if ((widget.isEditingOrder ==
                                                                                 true &&
                                                                             widget.existingOrder?.data?.orderStatus ==
-                                                                                "COMPLETED") {
-                                                                          // For completed orders, get paid quantity
-                                                                          final paidQty =
-                                                                              widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
-                                                                          // Allow adding up to availableQuantity + paidQuantity
-                                                                          canAdd =
-                                                                              currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
-                                                                        } else {
-                                                                          // Normal stock check for new orders or waitlist
-                                                                          canAdd =
-                                                                              currentQtyInCart < (p.availableQuantity ?? 0);
-                                                                        }
-
-                                                                        if (!canAdd) {
-                                                                          showToast(
-                                                                              "Cannot add more items. Stock limit reached.",
-                                                                              context,
-                                                                              color: false);
-                                                                          return;
-                                                                        }
-
-                                                                        setState(
-                                                                            () {
-                                                                          isSplitPayment =
-                                                                              false;
-                                                                          if (widget.isEditingOrder !=
-                                                                              true) {
-                                                                            selectDineIn =
-                                                                                true;
-                                                                          }
-                                                                          final index = billingItems.indexWhere((item) =>
-                                                                              item['_id'] ==
-                                                                              p.id);
-                                                                          if (index !=
-                                                                              -1) {
-                                                                            billingItems[index]['qty'] =
-                                                                                billingItems[index]['qty'] + 1;
-                                                                          } else {
-                                                                            billingItems.add({
-                                                                              "_id": p.id,
-                                                                              "basePrice": p.basePrice,
-                                                                              "image": p.image,
-                                                                              "qty": 1,
-                                                                              "name": p.name,
-                                                                              "availableQuantity": p.availableQuantity,
-                                                                              "selectedAddons": p.addons!
-                                                                                  .where((addon) => addon.quantity > 0)
-                                                                                  .map((addon) => {
-                                                                                        "_id": addon.id,
-                                                                                        "price": addon.price,
-                                                                                        "quantity": addon.quantity,
-                                                                                        "name": addon.name,
-                                                                                        "isAvailable": addon.isAvailable,
-                                                                                        "maxQuantity": addon.maxQuantity,
-                                                                                        "isFree": addon.isFree,
-                                                                                      })
-                                                                                  .toList()
-                                                                            });
-                                                                          }
-                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(
-                                                                              List.from(billingItems),
-                                                                              isDiscountApplied));
-                                                                        });
-                                                                      }
-                                                                    });
+                                                                                "COMPLETED") ||
+                                                                        (widget.isEditingOrder ==
+                                                                                true &&
+                                                                            widget.existingOrder?.data?.orderStatus ==
+                                                                                "WAITLIST")) {
+                                                                      final paidQty = widget
+                                                                              .existingOrder
+                                                                              ?.data
+                                                                              ?.items
+                                                                              ?.firstWhereOrNull((item) => item.product?.id == p.id)
+                                                                              ?.quantity ??
+                                                                          0;
+                                                                      canAdd = currentQtyInCart <
+                                                                          ((p.availableQuantity ?? 0) +
+                                                                              paidQty);
+                                                                    } else {
+                                                                      canAdd = currentQtyInCart <
+                                                                          (p.availableQuantity ??
+                                                                              0);
+                                                                    }
+                                                                  } else {
+                                                                    canAdd =
+                                                                        true;
                                                                   }
-                                                                : null, // Disable tap if no stock
+                                                                  if (!canAdd) {
+                                                                    showToast(
+                                                                        "Cannot add more items. Stock limit reached.",
+                                                                        context,
+                                                                        color:
+                                                                            false);
+                                                                    return;
+                                                                  }
+
+                                                                  setState(() {
+                                                                    isSplitPayment =
+                                                                        false;
+                                                                    if (widget
+                                                                            .isEditingOrder !=
+                                                                        true) {
+                                                                      selectDineIn =
+                                                                          true;
+                                                                    }
+                                                                    final index =
+                                                                        billingItems.indexWhere((item) =>
+                                                                            item['_id'] ==
+                                                                            p.id);
+                                                                    if (index !=
+                                                                        -1) {
+                                                                      billingItems[
+                                                                              index]
+                                                                          [
+                                                                          'qty'] = billingItems[index]
+                                                                              [
+                                                                              'qty'] +
+                                                                          1;
+                                                                    } else {
+                                                                      billingItems
+                                                                          .add({
+                                                                        "_id": p
+                                                                            .id,
+                                                                        "basePrice":
+                                                                            p.basePrice,
+                                                                        "image":
+                                                                            p.image,
+                                                                        "qty":
+                                                                            1,
+                                                                        "name":
+                                                                            p.name,
+                                                                        "availableQuantity":
+                                                                            p.availableQuantity,
+                                                                        "selectedAddons": p
+                                                                            .addons!
+                                                                            .where((addon) =>
+                                                                                addon.quantity >
+                                                                                0)
+                                                                            .map((addon) =>
+                                                                                {
+                                                                                  "_id": addon.id,
+                                                                                  "price": addon.price,
+                                                                                  "quantity": addon.quantity,
+                                                                                  "name": addon.name,
+                                                                                  "isAvailable": addon.isAvailable,
+                                                                                  "maxQuantity": addon.maxQuantity,
+                                                                                  "isFree": addon.isFree,
+                                                                                })
+                                                                            .toList()
+                                                                      });
+                                                                    }
+                                                                    context
+                                                                        .read<
+                                                                            FoodCategoryBloc>()
+                                                                        .add(AddToBilling(
+                                                                            List.from(billingItems),
+                                                                            isDiscountApplied));
+                                                                  });
+                                                                }
+                                                              });
+                                                            },
                                                             child: Opacity(
                                                               opacity: (p.availableQuantity ??
-                                                                          0) >
-                                                                      0
+                                                                              0) >
+                                                                          0 ||
+                                                                      p.isStock ==
+                                                                          false
                                                                   ? 1.0
                                                                   : 0.5, // Blur effect for out of stock
                                                               child: Card(
@@ -1422,36 +1670,39 @@ debugPrint("localCate:$localCategories");
                                                                       verticalSpace(
                                                                           height:
                                                                               5),
-                                                                      SizedBox(
-                                                                        width: size.width *
-                                                                            0.25,
-                                                                        child:
-                                                                            FittedBox(
-                                                                          fit: BoxFit
-                                                                              .scaleDown,
+                                                                      if (p.isStock ==
+                                                                          true)
+                                                                        SizedBox(
+                                                                          width:
+                                                                              size.width * 0.25,
                                                                           child:
-                                                                              Row(
-                                                                            children: [
-                                                                              Text(
-                                                                                'Available: ',
-                                                                                style: MyTextStyle.f12(greyColor, weight: FontWeight.w500),
-                                                                                maxLines: 1,
-                                                                                overflow: TextOverflow.ellipsis,
-                                                                              ),
-                                                                              Text(
-                                                                                '${p.availableQuantity ?? 0}',
-                                                                                style: MyTextStyle.f12((p.availableQuantity ?? 0) > 0 ? greyColor : redColor, weight: FontWeight.w500),
-                                                                                maxLines: 1,
-                                                                                overflow: TextOverflow.ellipsis,
-                                                                              ),
-                                                                            ],
+                                                                              FittedBox(
+                                                                            fit:
+                                                                                BoxFit.scaleDown,
+                                                                            child:
+                                                                                Row(
+                                                                              children: [
+                                                                                Text(
+                                                                                  'Available: ',
+                                                                                  style: MyTextStyle.f12(greyColor, weight: FontWeight.w500),
+                                                                                  maxLines: 1,
+                                                                                  overflow: TextOverflow.ellipsis,
+                                                                                ),
+                                                                                Text(
+                                                                                  '${p.availableQuantity ?? 0}',
+                                                                                  style: MyTextStyle.f12((p.availableQuantity ?? 0) > 0 ? greyColor : redColor, weight: FontWeight.w500),
+                                                                                  maxLines: 1,
+                                                                                  overflow: TextOverflow.ellipsis,
+                                                                                ),
+                                                                              ],
+                                                                            ),
                                                                           ),
                                                                         ),
-                                                                      ),
                                                                       // Show "Out of Stock" message if no stock
-                                                                      if ((p.availableQuantity ??
-                                                                              0) <=
-                                                                          0) ...[
+                                                                      if ((p.availableQuantity ?? 0) <=
+                                                                              0 &&
+                                                                          p.isStock ==
+                                                                              true) ...[
                                                                         verticalSpace(
                                                                             height:
                                                                                 5),
@@ -1474,17 +1725,19 @@ debugPrint("localCate:$localCategories");
                                                                           ),
                                                                         ),
                                                                       ],
-                                                                      if (counter ==
-                                                                              0 &&
-                                                                          (p.availableQuantity ?? 0) >
-                                                                              0)
+                                                                      if (counter == 0 &&
+                                                                              (p.availableQuantity ?? 0) >
+                                                                                  0 ||
+                                                                          p.isStock ==
+                                                                              false)
                                                                         verticalSpace(
                                                                             height:
                                                                                 5),
-                                                                      if (counter ==
-                                                                              0 &&
-                                                                          (p.availableQuantity ?? 0) >
-                                                                              0)
+                                                                      if (counter == 0 &&
+                                                                              (p.availableQuantity ?? 0) >
+                                                                                  0 ||
+                                                                          p.isStock ==
+                                                                              false)
                                                                         SizedBox(
                                                                           width:
                                                                               size.width * 0.25,
@@ -1566,19 +1819,24 @@ debugPrint("localCate:$localCategories");
                                                                                   style: MyTextStyle.f16(blackColor),
                                                                                 ),
                                                                               ),
-                                                                              // Fixed: Check if we can add more based on available quantity and editing context
                                                                               Builder(builder: (context) {
                                                                                 final currentQtyInCart = billingItems.where((item) => item['_id'] == p.id).fold(0, (sum, item) => sum + (item['qty'] as int));
 
                                                                                 bool canAddMore;
-                                                                                if (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") {
-                                                                                  // For completed orders, get paid quantity
-                                                                                  final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
-                                                                                  // Allow adding up to availableQuantity + paidQuantity
-                                                                                  canAddMore = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
+
+                                                                                if (p.isStock == true) {
+                                                                                  // ✅ Stock is enforced
+                                                                                  if ((widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") || (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "WAITLIST")) {
+                                                                                    // For completed/waitlist orders, include paidQty
+                                                                                    final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
+                                                                                    canAddMore = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
+                                                                                  } else {
+                                                                                    // Normal case: respect available quantity
+                                                                                    canAddMore = (p.availableQuantity ?? 0) > 0 && currentQtyInCart < (p.availableQuantity ?? 0);
+                                                                                  }
                                                                                 } else {
-                                                                                  // Normal stock check for new orders or waitlist
-                                                                                  canAddMore = currentQtyInCart < (p.availableQuantity ?? 0);
+                                                                                  // ✅ Stock is NOT enforced → allow infinite
+                                                                                  canAddMore = true;
                                                                                 }
 
                                                                                 return CircleAvatar(
@@ -1625,7 +1883,157 @@ debugPrint("localCate:$localCategories");
                                                                                               context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
                                                                                             });
                                                                                           }
-                                                                                        : null,
+                                                                                        : () {
+                                                                                            // Show message if stock enforced and qty = 0
+                                                                                            if (p.isStock == true && (p.availableQuantity ?? 0) == 0) {
+                                                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                                                const SnackBar(content: Text("Out of stock")),
+                                                                                              );
+                                                                                            }
+                                                                                          },
+                                                                                  ),
+                                                                                );
+                                                                              }),
+                                                                            ],
+                                                                          ),
+                                                                        ),
+                                                                      if (counter !=
+                                                                              0 &&
+                                                                          p.isStock ==
+                                                                              false)
+                                                                        verticalSpace(
+                                                                            height:
+                                                                                10),
+                                                                      if (counter !=
+                                                                              0 &&
+                                                                          p.isStock ==
+                                                                              false)
+                                                                        Padding(
+                                                                          padding: const EdgeInsets
+                                                                              .only(
+                                                                              left: 5.0,
+                                                                              right: 5.0),
+                                                                          child:
+                                                                              Row(
+                                                                            mainAxisAlignment:
+                                                                                MainAxisAlignment.start,
+                                                                            children: [
+                                                                              Expanded(
+                                                                                child: Text(
+                                                                                  '₹ ${p.basePrice}',
+                                                                                  style: MyTextStyle.f14(blackColor, weight: FontWeight.w600),
+                                                                                  maxLines: 1,
+                                                                                  overflow: TextOverflow.ellipsis,
+                                                                                ),
+                                                                              ),
+                                                                              horizontalSpace(width: 5),
+                                                                              CircleAvatar(
+                                                                                radius: 16,
+                                                                                backgroundColor: greyColor200,
+                                                                                child: IconButton(
+                                                                                  icon: const Icon(Icons.remove, size: 16, color: blackColor),
+                                                                                  onPressed: () {
+                                                                                    setState(() {
+                                                                                      isSplitPayment = false;
+                                                                                      if (widget.isEditingOrder != true) {
+                                                                                        selectDineIn = true;
+                                                                                      }
+                                                                                      final index = billingItems.indexWhere((item) => item['_id'] == p.id);
+                                                                                      if (index != -1 && billingItems[index]['qty'] > 1) {
+                                                                                        billingItems[index]['qty'] = billingItems[index]['qty'] - 1;
+                                                                                      } else {
+                                                                                        billingItems.removeWhere((item) => item['_id'] == p.id);
+                                                                                        if (billingItems.isEmpty || billingItems == []) {
+                                                                                          isDiscountApplied = false;
+                                                                                          widget.isEditingOrder = false;
+                                                                                          tableId = null;
+                                                                                          selectedValue = null;
+                                                                                        }
+                                                                                      }
+                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                    });
+                                                                                  },
+                                                                                ),
+                                                                              ),
+                                                                              Padding(
+                                                                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                                                                child: Text(
+                                                                                  "$counter",
+                                                                                  style: MyTextStyle.f16(blackColor),
+                                                                                ),
+                                                                              ),
+                                                                              Builder(builder: (context) {
+                                                                                final currentQtyInCart = billingItems.where((item) => item['_id'] == p.id).fold(0, (sum, item) => sum + (item['qty'] as int));
+
+                                                                                bool canAddMore;
+
+                                                                                if (p.isStock == true) {
+                                                                                  // ✅ Stock is enforced
+                                                                                  if ((widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") || (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "WAITLIST")) {
+                                                                                    // For completed/waitlist orders, include paidQty
+                                                                                    final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
+                                                                                    canAddMore = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
+                                                                                  } else {
+                                                                                    // Normal case: respect available quantity
+                                                                                    canAddMore = (p.availableQuantity ?? 0) > 0 && currentQtyInCart < (p.availableQuantity ?? 0);
+                                                                                  }
+                                                                                } else {
+                                                                                  // ✅ Stock is NOT enforced → allow infinite
+                                                                                  canAddMore = true;
+                                                                                }
+
+                                                                                return CircleAvatar(
+                                                                                  radius: 16,
+                                                                                  backgroundColor: canAddMore ? appPrimaryColor : greyColor,
+                                                                                  child: IconButton(
+                                                                                    icon: Icon(
+                                                                                      Icons.add,
+                                                                                      size: 16,
+                                                                                      color: canAddMore ? whiteColor : blackColor,
+                                                                                    ),
+                                                                                    onPressed: canAddMore
+                                                                                        ? () {
+                                                                                            setState(() {
+                                                                                              isSplitPayment = false;
+                                                                                              if (widget.isEditingOrder != true) {
+                                                                                                selectDineIn = true;
+                                                                                              }
+                                                                                              final index = billingItems.indexWhere((item) => item['_id'] == p.id);
+                                                                                              if (index != -1) {
+                                                                                                billingItems[index]['qty'] = billingItems[index]['qty'] + 1;
+                                                                                              } else {
+                                                                                                billingItems.add({
+                                                                                                  "_id": p.id,
+                                                                                                  "basePrice": p.basePrice,
+                                                                                                  "image": p.image,
+                                                                                                  "qty": 1,
+                                                                                                  "name": p.name,
+                                                                                                  "availableQuantity": p.availableQuantity,
+                                                                                                  "selectedAddons": p.addons!
+                                                                                                      .where((addon) => addon.quantity > 0)
+                                                                                                      .map((addon) => {
+                                                                                                            "_id": addon.id,
+                                                                                                            "price": addon.price,
+                                                                                                            "quantity": addon.quantity,
+                                                                                                            "name": addon.name,
+                                                                                                            "isAvailable": addon.isAvailable,
+                                                                                                            "maxQuantity": addon.maxQuantity,
+                                                                                                            "isFree": addon.isFree,
+                                                                                                          })
+                                                                                                      .toList()
+                                                                                                });
+                                                                                              }
+                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                            });
+                                                                                          }
+                                                                                        : () {
+                                                                                            // Show message if stock enforced and qty = 0
+                                                                                            if (p.isStock == true && (p.availableQuantity ?? 0) == 0) {
+                                                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                                                const SnackBar(content: Text("Out of stock")),
+                                                                                              );
+                                                                                            }
+                                                                                          },
                                                                                   ),
                                                                                 );
                                                                               }),
@@ -2805,37 +3213,34 @@ debugPrint("localCate:$localCategories");
                                                               final availableQty =
                                                                   e.availableQuantity ??
                                                                       0;
-                                                              bool canAddMore;
-                                                              if (widget.isEditingOrder ==
-                                                                      true &&
-                                                                  widget
-                                                                          .existingOrder
-                                                                          ?.data
-                                                                          ?.orderStatus ==
-                                                                      "COMPLETED") {
-                                                                canAddMore =
-                                                                    currentQty <
-                                                                        (availableQty +
-                                                                            paidQty);
-                                                              } else {
-                                                                canAddMore =
-                                                                    currentQty <
-                                                                        availableQty;
-                                                              }
 
-                                                              final bool disableDecrement = widget
-                                                                          .isEditingOrder ==
-                                                                      true &&
-                                                                  widget
-                                                                          .existingOrder
-                                                                          ?.data
-                                                                          ?.orderStatus ==
-                                                                      "COMPLETED" &&
-                                                                  paidItemIds
-                                                                      .contains(e
-                                                                          .id) &&
-                                                                  currentQty <=
-                                                                      paidQty;
+                                                              bool canAddMore;
+
+                                                              if (e.isStock ==
+                                                                  true) {
+                                                                // ✅ Stock is enforced
+                                                                if ((widget.isEditingOrder ==
+                                                                            true &&
+                                                                        widget.existingOrder?.data?.orderStatus ==
+                                                                            "COMPLETED") ||
+                                                                    (widget.isEditingOrder ==
+                                                                            true &&
+                                                                        widget.existingOrder?.data?.orderStatus ==
+                                                                            "WAITLIST")) {
+                                                                  canAddMore =
+                                                                      currentQty <
+                                                                          (availableQty +
+                                                                              paidQty);
+                                                                } else {
+                                                                  canAddMore =
+                                                                      currentQty <
+                                                                          availableQty;
+                                                                }
+                                                              } else {
+                                                                // ✅ Stock not enforced → infinite allowed
+                                                                canAddMore =
+                                                                    true;
+                                                              }
 
                                                               return Padding(
                                                                 padding: const EdgeInsets
@@ -2897,7 +3302,15 @@ debugPrint("localCate:$localCategories");
                                                                                   children: [
                                                                                     Text("${e.name}", style: MyTextStyle.f12(blackColor, weight: FontWeight.bold)),
                                                                                     Text("x ${e.qty}", style: MyTextStyle.f12(blackColor, weight: FontWeight.bold)),
-                                                                                    if (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") Text("Available: $availableQty (+ $paidQty paid)", style: MyTextStyle.f10(availableQty > 0 ? greyColor : redColor, weight: FontWeight.w400)) else Text("Available: $availableQty", style: MyTextStyle.f10(availableQty > 0 ? greyColor : redColor, weight: FontWeight.w400)),
+                                                                                    e.isStock == true
+                                                                                        ? Text(
+                                                                                            (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") ? "Available: $availableQty (+ $paidQty paid)" : "Available: $availableQty",
+                                                                                            style: MyTextStyle.f10(
+                                                                                              availableQty > 0 ? greyColor : redColor,
+                                                                                              weight: FontWeight.w400,
+                                                                                            ),
+                                                                                          )
+                                                                                        : const SizedBox.shrink(),
                                                                                   ],
                                                                                 ),
                                                                               ),
@@ -2974,7 +3387,13 @@ debugPrint("localCate:$localCategories");
                                                                                               context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
                                                                                             });
                                                                                           }
-                                                                                        : null,
+                                                                                        : () {
+                                                                                            if (e.isStock == true && availableQty == 0) {
+                                                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                                                const SnackBar(content: Text("Out of stock")),
+                                                                                              );
+                                                                                            }
+                                                                                          },
                                                                                   ),
                                                                                   IconButton(
                                                                                     icon: Icon(Icons.delete, color: redColor, size: 20),
@@ -3006,10 +3425,15 @@ debugPrint("localCate:$localCategories");
                                                                                 color: Colors.orange.withOpacity(0.1),
                                                                                 borderRadius: BorderRadius.circular(4),
                                                                               ),
-                                                                              child: Text(
-                                                                                widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED" ? 'Maximum limit reached (Available: $availableQty + Paid: $paidQty)' : 'Maximum stock limit reached',
-                                                                                style: MyTextStyle.f10(Colors.orange, weight: FontWeight.bold),
-                                                                              ),
+                                                                              child: (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "WAITLIST")
+                                                                                  ? Text(
+                                                                                      'Maximum stock limit reached',
+                                                                                      style: MyTextStyle.f10(orangeColor, weight: FontWeight.bold),
+                                                                                    )
+                                                                                  : Text(
+                                                                                      ((widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED")) ? 'Maximum limit reached (Available: $availableQty + Paid: $paidQty)' : 'Maximum stock limit reached',
+                                                                                      style: MyTextStyle.f10(orangeColor, weight: FontWeight.bold),
+                                                                                    ),
                                                                             ),
                                                                           ],
                                                                           Column(
@@ -3097,7 +3521,6 @@ debugPrint("localCate:$localCategories");
                                                               );
                                                             }).toList(),
                                                           ),
-                                                          // Rest of your cart page code remains the same...
                                                           Divider(
                                                               color:
                                                                   greyColor200,
@@ -6281,15 +6704,7 @@ debugPrint("localCate:$localCategories");
           if (getCategoryModel.success == true &&
               getCategoryModel.data != null) {
             // ✅ Save to Hive for offline use
-            final categoryBox = Hive.box<HiveCategory>('categories');
-            categoryBox.clear();
-            for (var cat in getCategoryModel.data!) {
-              categoryBox.add(HiveCategory(
-                id: cat.id.toString(),
-                name: cat.name ?? '',
-                image: cat.image ?? '',
-              ));
-            }
+            _saveCategoriesAndPreloadProducts(getCategoryModel.data!);
 
             setState(() {
               categoryLoad = false;
@@ -6305,13 +6720,19 @@ debugPrint("localCate:$localCategories");
                 product.Category(name: 'All', image: Images.all, id: ""),
                 ...sortedCategories,
               ];
+
+              // FIXED: Set default category to "All" if none selected
+              selectedCatId ??= "";
             });
-          } else if (getCategoryModel.success == false &&
-              getCategoryModel.data?.isEmpty == true) {
-            // Only show loading if we're actually loading (not when we have offline data)
+
+            // FIXED: Load products for selected category after categories are loaded
+            final categoryId = selectedCatId ?? "";
+            context
+                .read<FoodCategoryBloc>()
+                .add(FoodProductItem(categoryId, searchController.text));
+          } else if (getCategoryModel.success == false) {
             setState(() {
-              categoryLoad =
-                  getCategoryModel.errorResponse != null ? false : true;
+              categoryLoad = false;
             });
           }
 
@@ -6321,19 +6742,36 @@ debugPrint("localCate:$localCategories");
           }
           return true;
         }
+
         if (current is product.GetProductByCatIdModel) {
           getProductByCatIdModel = current;
 
           if (getProductByCatIdModel.success == true &&
               getProductByCatIdModel.rows != null) {
-            // Save products to Hive for offline use (if we have selectedCatId)
-            if (selectedCatId != null && selectedCatId!.isNotEmpty) {
-              saveProductsToHive(
-                  getProductByCatIdModel.rows!, selectedCatId.toString());
-            }
-
             setState(() {
               categoryLoad = false;
+
+              displayedProducts = getProductByCatIdModel.rows!
+                  .map((row) => product.Rows(
+                        id: row.id,
+                        name: row.name,
+                        image: row.image,
+                        basePrice: row.basePrice,
+                        availableQuantity: row.availableQuantity,
+                        addons: row.addons,
+                        counter: row.counter ?? 0,
+                      ))
+                  .toList();
+            });
+
+            if (searchController.text.isNotEmpty) {
+              _filterProducts(searchController.text);
+            }
+          } else if (getProductByCatIdModel.success == false) {
+            setState(() {
+              categoryLoad = false;
+              productLoad = false;
+              displayedProducts = [];
             });
           }
 
@@ -6344,7 +6782,8 @@ debugPrint("localCate:$localCategories");
 
           return true;
         }
-        if (current is PostAddToBillingModel) {
+
+        if (current is billing.PostAddToBillingModel) {
           postAddToBillingModel = current;
           if (postAddToBillingModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
@@ -6352,7 +6791,7 @@ debugPrint("localCate:$localCategories");
           }
           return true;
         }
-        if (current is PostGenerateOrderModel) {
+        if (current is generate.PostGenerateOrderModel) {
           postGenerateOrderModel = current;
           if (postGenerateOrderModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
@@ -6391,7 +6830,7 @@ debugPrint("localCate:$localCategories");
           }
           return true;
         }
-        if (current is UpdateGenerateOrderModel) {
+        if (current is update.UpdateGenerateOrderModel) {
           updateGenerateOrderModel = current;
           if (updateGenerateOrderModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();

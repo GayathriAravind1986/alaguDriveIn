@@ -22,8 +22,8 @@ class HiveProductAdapter extends TypeAdapter<HiveProduct> {
       image: fields[2] as String?,
       basePrice: fields[3] as double?,
       availableQuantity: fields[4] as int?,
-      categoryId: fields[5] as String?,
-      addons: (fields[6] as List?)?.cast<HiveAddon>(),
+      addons: (fields[5] as List?)?.cast<HiveAddon>(),
+      isStock: fields[6] as bool?,
     );
   }
 
@@ -42,9 +42,9 @@ class HiveProductAdapter extends TypeAdapter<HiveProduct> {
       ..writeByte(4)
       ..write(obj.availableQuantity)
       ..writeByte(5)
-      ..write(obj.categoryId)
+      ..write(obj.addons)
       ..writeByte(6)
-      ..write(obj.addons);
+      ..write(obj.isStock);
   }
 
   @override

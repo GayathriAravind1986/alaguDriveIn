@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'product_model.g.dart'; // This will be generated
 
-@HiveType(typeId: 1) // Use different typeId from categories
+@HiveType(typeId: 1)
 class HiveProduct extends HiveObject {
   @HiveField(0)
   String? id;
@@ -20,10 +20,11 @@ class HiveProduct extends HiveObject {
   int? availableQuantity;
 
   @HiveField(5)
-  String? categoryId;
-
-  @HiveField(6)
   List<HiveAddon>? addons;
+
+  // Add isStock field
+  @HiveField(6)
+  bool? isStock;
 
   HiveProduct({
     this.id,
@@ -31,8 +32,8 @@ class HiveProduct extends HiveObject {
     this.image,
     this.basePrice,
     this.availableQuantity,
-    this.categoryId,
     this.addons,
+    this.isStock, // Include in constructor
   });
 }
 

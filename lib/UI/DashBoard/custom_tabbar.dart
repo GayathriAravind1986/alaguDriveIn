@@ -58,11 +58,17 @@ class _DashBoardState extends State<DashBoard> {
       GlobalKey<ReportViewViewState>();
   final GlobalKey<StockViewViewState> stockKey =
       GlobalKey<StockViewViewState>();
+
   int selectedIndex = 0;
   bool orderLoad = false;
-  bool hasRefreshedOrder = false;
-  bool hasRefreshedReport = false;
-  bool hasRefreshedStock = false;
+
+  // FIXED: Better state management for refresh flags
+  Map<int, bool> tabRefreshStates = {
+    0: false, // Home
+    1: false, // Orders
+    2: false, // Reports
+    3: false, // Stock
+  };
 
   @override
   void initState() {
@@ -102,7 +108,7 @@ class _DashBoardState extends State<DashBoard> {
     if (stockKeyState != null) {
       stockKeyState.refreshStock();
     } else {
-      debugPrint("reportKeyState is NULL — check if key is assigned properly");
+      debugPrint("stockKeyState is NULL — check if key is assigned properly");
     }
   }
 
@@ -116,36 +122,38 @@ class _DashBoardState extends State<DashBoard> {
             setState(() {
               selectedIndex = index;
             });
-            if (index == 0 && !hasRefreshedOrder) {
-              hasRefreshedOrder = true;
-              hasRefreshedReport = false;
-              hasRefreshedStock = false;
-              WidgetsBinding.instance
-                  .addPostFrameCallback((_) => _refreshHome());
-            }
-            if (index == 1) {
-              hasRefreshedOrder = false;
-              hasRefreshedReport = false;
-              hasRefreshedStock = false;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _refreshOrders();
-              });
-            }
-            if (index == 2 && !hasRefreshedReport) {
-              hasRefreshedOrder = false;
-              hasRefreshedReport = true;
-              hasRefreshedStock = false;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _refreshReport();
-              });
-            }
-            if (index == 3 && !hasRefreshedStock) {
-              hasRefreshedOrder = false;
-              hasRefreshedReport = false;
-              hasRefreshedStock = true;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _refreshStock();
-              });
+
+            // FIXED: Simplified tab refresh logic
+            switch (index) {
+              case 0: // Home tab
+                if (!tabRefreshStates[0]!) {
+                  tabRefreshStates[0] = true;
+                  _resetOtherTabStates(0);
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _refreshHome());
+                }
+                break;
+              case 1: // Orders tab
+                _resetOtherTabStates(1);
+                WidgetsBinding.instance
+                    .addPostFrameCallback((_) => _refreshOrders());
+                break;
+              case 2: // Reports tab
+                if (!tabRefreshStates[2]!) {
+                  tabRefreshStates[2] = true;
+                  _resetOtherTabStates(2);
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _refreshReport());
+                }
+                break;
+              case 3: // Stock tab
+                if (!tabRefreshStates[3]!) {
+                  tabRefreshStates[3] = true;
+                  _resetOtherTabStates(3);
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _refreshStock());
+                }
+                break;
             }
           },
           onLogout: () {
@@ -155,60 +163,222 @@ class _DashBoardState extends State<DashBoard> {
         body: IndexedStack(
           index: selectedIndex,
           children: [
-            hasRefreshedOrder == true
-                ? BlocProvider(
-                    create: (_) => FoodCategoryBloc(),
-                    child: FoodOrderingScreenView(
+            // FIXED: Use consistent widget based on refresh state
+            BlocProvider(
+              create: (_) => FoodCategoryBloc(),
+              child: tabRefreshStates[0]!
+                  ? FoodOrderingScreenView(
                       key: foodKey,
                       existingOrder: widget.existingOrder,
                       isEditingOrder: widget.isEditingOrder,
-                      hasRefreshedOrder: hasRefreshedOrder,
-                    ))
-                : BlocProvider(
-                    create: (_) => FoodCategoryBloc(),
-                    child: FoodOrderingScreen(
+                      hasRefreshedOrder: tabRefreshStates[0]!,
+                    )
+                  : FoodOrderingScreen(
                       key: foodKey,
                       existingOrder: widget.existingOrder,
                       isEditingOrder: widget.isEditingOrder,
-                      hasRefreshedOrder: hasRefreshedOrder,
+                      hasRefreshedOrder: tabRefreshStates[0]!,
                     ),
-                  ),
+            ),
             OrdersTabbedScreen(
               key: PageStorageKey('OrdersTabbedScreen'),
               orderAllKey: orderAllTabKey,
             ),
-            hasRefreshedReport == true
-                ? BlocProvider(
-                    create: (_) => ReportTodayBloc(),
-                    child: ReportViewView(
+            BlocProvider(
+              create: (_) => ReportTodayBloc(),
+              child: tabRefreshStates[2]!
+                  ? ReportViewView(
                       key: reportKey,
-                      hasRefreshedReport: hasRefreshedReport,
-                    ))
-                : BlocProvider(
-                    create: (_) => ReportTodayBloc(),
-                    child: ReportView(
+                      hasRefreshedReport: tabRefreshStates[2]!,
+                    )
+                  : ReportView(
                       key: reportKey,
-                      hasRefreshedReport: hasRefreshedReport,
+                      hasRefreshedReport: tabRefreshStates[2]!,
                     ),
-                  ),
-            hasRefreshedStock == true
-                ? BlocProvider(
-                    create: (_) => StockInBloc(),
-                    child: StockViewView(
+            ),
+            BlocProvider(
+              create: (_) => StockInBloc(),
+              child: tabRefreshStates[3]!
+                  ? StockViewView(
                       key: stockKey,
-                      hasRefreshedStock: hasRefreshedStock,
-                    ))
-                : BlocProvider(
-                    create: (_) => StockInBloc(),
-                    child: StockView(
+                      hasRefreshedStock: tabRefreshStates[3]!,
+                    )
+                  : StockView(
                       key: stockKey,
-                      hasRefreshedStock: hasRefreshedStock,
+                      hasRefreshedStock: tabRefreshStates[3]!,
                     ),
-                  ),
+            ),
           ],
         ),
       ),
     );
+    // final GlobalKey<OrderViewViewState> orderAllTabKey =
+    //     GlobalKey<OrderViewViewState>();
+    // final GlobalKey<FoodOrderingScreenViewState> foodKey =
+    //     GlobalKey<FoodOrderingScreenViewState>();
+    // final GlobalKey<ReportViewViewState> reportKey =
+    //     GlobalKey<ReportViewViewState>();
+    // final GlobalKey<StockViewViewState> stockKey =
+    //     GlobalKey<StockViewViewState>();
+    // int selectedIndex = 0;
+    // bool orderLoad = false;
+    // bool hasRefreshedOrder = false;
+    // bool hasRefreshedReport = false;
+    // bool hasRefreshedStock = false;
+    //
+    // @override
+    // void initState() {
+    //   super.initState();
+    //   if (widget.selectTab != null) {
+    //     selectedIndex = widget.selectTab!;
+    //   }
+    // }
+    //
+    // void _refreshOrders() {
+    //   final orderAllTabState = orderAllTabKey.currentState;
+    //   if (orderAllTabState != null) {
+    //     orderAllTabState.refreshOrders();
+    //   }
+    // }
+    //
+    // void _refreshHome() {
+    //   final foodKeyState = foodKey.currentState;
+    //   if (foodKeyState != null) {
+    //     foodKeyState.refreshHome();
+    //   } else {
+    //     debugPrint("foodKeyState is NULL — check if key is assigned properly");
+    //   }
+    // }
+    //
+    // void _refreshReport() {
+    //   final reportKeyState = reportKey.currentState;
+    //   if (reportKeyState != null) {
+    //     reportKeyState.refreshReport();
+    //   } else {
+    //     debugPrint("reportKeyState is NULL — check if key is assigned properly");
+    //   }
+    // }
+    //
+    // void _refreshStock() {
+    //   final stockKeyState = stockKey.currentState;
+    //   if (stockKeyState != null) {
+    //     stockKeyState.refreshStock();
+    //   } else {
+    //     debugPrint("reportKeyState is NULL — check if key is assigned properly");
+    //   }
+    // }
+    //
+    // Widget mainContainer() {
+    //   return SafeArea(
+    //     child: Scaffold(
+    //       backgroundColor: Colors.white,
+    //       appBar: CustomAppBar(
+    //         selectedIndex: selectedIndex,
+    //         onTabSelected: (index) {
+    //           setState(() {
+    //             selectedIndex = index;
+    //           });
+    //           if (index == 0 && !hasRefreshedOrder) {
+    //             hasRefreshedOrder = true;
+    //             hasRefreshedReport = false;
+    //             hasRefreshedStock = false;
+    //             WidgetsBinding.instance
+    //                 .addPostFrameCallback((_) => _refreshHome());
+    //           }
+    //           if (index == 1) {
+    //             hasRefreshedOrder = false;
+    //             hasRefreshedReport = false;
+    //             hasRefreshedStock = false;
+    //             WidgetsBinding.instance.addPostFrameCallback((_) {
+    //               _refreshOrders();
+    //             });
+    //           }
+    //           if (index == 2 && !hasRefreshedReport) {
+    //             hasRefreshedOrder = false;
+    //             hasRefreshedReport = true;
+    //             hasRefreshedStock = false;
+    //             WidgetsBinding.instance.addPostFrameCallback((_) {
+    //               _refreshReport();
+    //             });
+    //           }
+    //           if (index == 3 && !hasRefreshedStock) {
+    //             hasRefreshedOrder = false;
+    //             hasRefreshedReport = false;
+    //             hasRefreshedStock = true;
+    //             WidgetsBinding.instance.addPostFrameCallback((_) {
+    //               _refreshStock();
+    //             });
+    //           }
+    //         },
+    //         onLogout: () {
+    //           showLogoutDialog(context);
+    //         },
+    //       ),
+    //       body: IndexedStack(
+    //         index: selectedIndex,
+    //         children: [
+    //           hasRefreshedOrder == true
+    //               ? BlocProvider(
+    //                   create: (_) => FoodCategoryBloc(),
+    //                   child: FoodOrderingScreenView(
+    //                     key: foodKey,
+    //                     existingOrder: widget.existingOrder,
+    //                     isEditingOrder: widget.isEditingOrder,
+    //                     hasRefreshedOrder: hasRefreshedOrder,
+    //                   ))
+    //               : BlocProvider(
+    //                   create: (_) => FoodCategoryBloc(),
+    //                   child: FoodOrderingScreen(
+    //                     key: foodKey,
+    //                     existingOrder: widget.existingOrder,
+    //                     isEditingOrder: widget.isEditingOrder,
+    //                     hasRefreshedOrder: hasRefreshedOrder,
+    //                   ),
+    //                 ),
+    //           OrdersTabbedScreen(
+    //             key: PageStorageKey('OrdersTabbedScreen'),
+    //             orderAllKey: orderAllTabKey,
+    //           ),
+    //           hasRefreshedReport == true
+    //               ? BlocProvider(
+    //                   create: (_) => ReportTodayBloc(),
+    //                   child: ReportViewView(
+    //                     key: reportKey,
+    //                     hasRefreshedReport: hasRefreshedReport,
+    //                   ))
+    //               : BlocProvider(
+    //                   create: (_) => ReportTodayBloc(),
+    //                   child: ReportView(
+    //                     key: reportKey,
+    //                     hasRefreshedReport: hasRefreshedReport,
+    //                   ),
+    //                 ),
+    //           hasRefreshedStock == true
+    //               ? BlocProvider(
+    //                   create: (_) => StockInBloc(),
+    //                   child: StockViewView(
+    //                     key: stockKey,
+    //                     hasRefreshedStock: hasRefreshedStock,
+    //                   ))
+    //               : BlocProvider(
+    //                   create: (_) => StockInBloc(),
+    //                   child: StockView(
+    //                     key: stockKey,
+    //                     hasRefreshedStock: hasRefreshedStock,
+    //                   ),
+    //                 ),
+    //         ],
+    //       ),
+    //     ),
+    //   );
+  }
+
+  void _resetOtherTabStates(int currentTab) {
+    for (int i = 0; i < 4; i++) {
+      if (i != currentTab) {
+        tabRefreshStates[i] = false;
+      }
+    }
   }
 
   @override

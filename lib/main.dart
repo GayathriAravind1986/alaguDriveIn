@@ -6,6 +6,12 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:simple/Bloc/observer/observer.dart';
 import 'package:simple/Bloc/theme_cubit.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/category_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/hive_billing_session_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/hive_cart_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/hive_order_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/hive_selected_addons_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/hive_stock_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/hive_table_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/product_model.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
@@ -14,12 +20,25 @@ import 'package:simple/UI/SplashScreen/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // DatabaseFactoryHelper.init();
   await Hive.initFlutter();
   Hive.registerAdapter(HiveCategoryAdapter());
   Hive.registerAdapter(HiveProductAdapter());
+  Hive.registerAdapter(HiveCartItemAdapter());
+  Hive.registerAdapter(HiveSelectedAddonAdapter());
+  Hive.registerAdapter(HiveOrderAdapter());
+  Hive.registerAdapter(HiveBillingSessionAdapter());
+  Hive.registerAdapter(HiveStockMaintenanceAdapter());
+  Hive.registerAdapter(HiveTableAdapter());
+
+  // Open all boxes
   await Hive.openBox<HiveCategory>('categories');
-  await Hive.openBox<HiveProduct>('products');
+  await Hive.openBox<HiveCartItem>('cart_items');
+  await Hive.openBox<HiveOrder>('orders');
+  await Hive.openBox<HiveBillingSession>('billing_session');
+  await Hive.openBox<HiveStockMaintenance>('stock_maintenance');
+  await Hive.openBox<HiveTable>('tables');
+  await Hive.openBox('app_state');
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
