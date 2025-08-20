@@ -252,18 +252,20 @@ class StockViewViewState extends State<StockViewView> {
 
   StreamSubscription? _connectivitySubscription;
   bool hasConnection = true;
+
   void _setupConnectivityListener() {
     _connectivitySubscription =
         Connectivity().onConnectivityChanged.listen((dynamic result) async {
-      bool wasOffline = !hasConnection; // FIXED: Use class variable
+      bool wasOffline = !hasConnection;
       hasConnection = result != ConnectivityResult.none;
 
+      debugPrint("🌐 Connectivity changed: $hasConnection");
+
       if (wasOffline && hasConnection) {
-        // Just came back online - sync stock data
+        debugPrint("📶 Back online - syncing data");
         await syncStockWhenOnline();
       } else if (!hasConnection) {
-        // Just went offline - trigger offline loading
-        await loadDataBasedOnConnectivity();
+        debugPrint("📴 Went offline - will use cached data");
       }
     });
   }
@@ -276,17 +278,10 @@ class StockViewViewState extends State<StockViewView> {
       stockLoad = true;
     });
 
-    if (hasConnection) {
-      // 🔹 Online → trigger bloc events (this works fine)
-      context.read<StockInBloc>().add(StockInLocation());
-    } else {
-      // 🔹 Offline → trigger bloc events with offline flag
-      // This will make the bloc emit offline data and trigger BlocBuilder
-      context.read<StockInBloc>().add(StockInLocation());
+    // Always trigger the location event - the bloc will handle online/offline
+    context.read<StockInBloc>().add(StockInLocation());
 
-      // Alternative: You can also directly emit offline data if needed
-      // but using the bloc is better for consistency
-    }
+    // Don't trigger other events here - let the BlocBuilder handle the sequence
   }
 
   Future<void> saveLocationToHive(location.Data? apiData) async {
@@ -320,20 +315,30 @@ class StockViewViewState extends State<StockViewView> {
     }
   }
 
+  Future<void> checkInitialConnectivity() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    setState(() {
+      hasConnection = connectivityResult != ConnectivityResult.none;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _setupConnectivityListener();
-    if (widget.hasRefreshedStock == true) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        widget.stockKey?.currentState?.refreshStock();
-        setState(() {
-          stockLoad = true;
+    checkInitialConnectivity().then((_) {
+      _setupConnectivityListener();
+
+      if (widget.hasRefreshedStock == true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          widget.stockKey?.currentState?.refreshStock();
+          setState(() {
+            stockLoad = true;
+          });
         });
-      });
-    } else {
-      loadDataBasedOnConnectivity();
-    }
+      } else {
+        loadDataBasedOnConnectivity();
+      }
+    });
   }
 
   Future<void> _pickDate() async {
@@ -981,55 +986,47 @@ class StockViewViewState extends State<StockViewView> {
             _handle401Error();
             return true;
           }
-          if (getLocationModel.success == true) {
-            if (getLocationModel.data != null) {
-              locationId = getLocationModel.data?.locationId ??
-                  getLocationModel.data?.id;
-              debugPrint("locationId: $locationId");
 
-              // Save to Hive
+          if (getLocationModel.success == true &&
+              getLocationModel.data != null) {
+            locationId =
+                getLocationModel.data?.locationId ?? getLocationModel.data?.id;
+            debugPrint("locationId: $locationId");
+
+            // Save to Hive only if online
+            if (hasConnection) {
               saveLocationToHive(getLocationModel.data);
-
-              // Continue with API calls...
-              if (hasConnection && locationId != null) {
-                context
-                    .read<StockInBloc>()
-                    .add(StockInSupplier(locationId.toString()));
-                context
-                    .read<StockInBloc>()
-                    .add(StockInAddProduct(locationId.toString()));
-              } else if (!hasConnection && locationId != null) {
-                context
-                    .read<StockInBloc>()
-                    .add(StockInSupplier(locationId.toString()));
-                context
-                    .read<StockInBloc>()
-                    .add(StockInAddProduct(locationId.toString()));
-              }
-            } else {
-              // Handle null data case
-              debugPrint("⚠️ Location data is null");
-              if (!hasConnection) {
-                showToast(
-                    "No offline location data available. Connect to internet first.",
-                    context,
-                    color: false);
-              }
             }
+
+            // Continue with API calls for both online and offline
+            if (locationId != null) {
+              // Add a small delay to ensure location is processed
+              Future.delayed(Duration(milliseconds: 100), () {
+                context
+                    .read<StockInBloc>()
+                    .add(StockInSupplier(locationId.toString()));
+                context
+                    .read<StockInBloc>()
+                    .add(StockInAddProduct(locationId.toString()));
+              });
+            }
+
             setState(() {
               stockLoad = false;
             });
           } else {
-            debugPrint(
-                "Location fetch failed: ${getLocationModel.data?.locationName}");
+            debugPrint("⚠️ Location data is null or fetch failed");
             setState(() {
               stockLoad = false;
             });
-            if (hasConnection) {
-              showToast("No Location found", context, color: false);
-            } else {
-              showToast("No offline location data available", context,
+
+            if (!hasConnection) {
+              showToast(
+                  "No offline location data available. Connect to internet first.",
+                  context,
                   color: false);
+            } else {
+              showToast("No Location found", context, color: false);
             }
           }
           return true;

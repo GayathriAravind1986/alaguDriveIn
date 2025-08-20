@@ -10,12 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Category/category_bloc.dart';
-import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart'
     as billing;
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
@@ -30,7 +28,6 @@ import 'package:simple/ModelClass/Order/Update_generate_order_model.dart'
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
-import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/image.dart';
 import 'package:simple/Reusable/space.dart';
@@ -43,8 +40,6 @@ import 'package:simple/UI/Home_screen/Widget/another_imin_printer/mock_imin_prin
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/real_device_printer.dart';
 import 'package:simple/UI/Home_screen/Widget/category_card.dart';
 import 'package:simple/UI/IminHelper/printer_helper.dart';
-
-import '../../Offline/Hive_helper/LocalClass/Home/category_model.dart';
 
 class FoodOrderingScreen extends StatelessWidget {
   final GlobalKey<FoodOrderingScreenViewState>? foodKey;
@@ -207,7 +202,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
           child: CircularProgressIndicator(),
         ),
       );
-      printerService.init();
 
       List<Map<String, dynamic>> items = postGenerateOrderModel.order!.items!
           .map((e) => {
@@ -284,8 +278,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                 await captureMonochromeReceipt(receiptKey);
 
                             if (imageBytes != null) {
+                              await printerService.init();
                               await printerService.printBitmap(imageBytes);
-                              await Future.delayed(Duration(seconds: 3));
+                              //await Future.delayed(Duration(seconds: 3));
                               await printerService.fullCut();
                               Navigator.pop(context);
                             }
@@ -348,7 +343,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
           child: CircularProgressIndicator(),
         ),
       );
-      await printerService.init();
+
       List<Map<String, dynamic>> items = updateGenerateOrderModel.order!.items!
           .map((e) => {
                 'name': e.name,
@@ -425,8 +420,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                 await captureMonochromeReceipt(receiptKey);
 
                             if (imageBytes != null) {
+                              await printerService.init();
                               await printerService.printBitmap(imageBytes);
-                              await Future.delayed(Duration(seconds: 3));
+                              //await Future.delayed(Duration(seconds: 3));
                               await printerService.fullCut();
                               Navigator.pop(context);
                             }

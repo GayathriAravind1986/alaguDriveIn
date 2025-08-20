@@ -36,63 +36,52 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
       final connectivity = await Connectivity().checkConnectivity();
       bool hasConnection = connectivity != ConnectivityResult.none;
 
+      debugPrint("🔍 StockInLocation - hasConnection: $hasConnection");
+
       if (hasConnection) {
         // ✅ Online → API
         await ApiProvider().getLocationAPI().then((value) async {
-          if (value.success == true) {
-            if (value.data != null) {
-              // Pass Data object directly - saveLocationToHive handles the conversion
-              await saveLocationToHive(value.data!);
-            }
+          if (value.success == true && value.data != null) {
+            await saveLocationToHive(value.data!);
           }
           emit(value);
         }).catchError((error) {
+          debugPrint("❌ Location API Error: $error");
           emit(error);
         });
       } else {
-        // ✅ Offline → Hive
-        // final hiveLocation = await loadLocationFromHive();
-        // final offlineLocationModel = location.GetLocationModel(
-        //   success: hiveLocation != null,
-        //   data: hiveLocation != null
-        //       ? location.Data(
-        //           id: hiveLocation.id,
-        //           locationId: hiveLocation.locationId,
-        //           locationName: hiveLocation.locationName,
-        //         )
-        //       : null,
-        // );
-        // emit(offlineLocationModel);
-        final hiveLocation = await loadLocationFromHive();
-        debugPrint("🔍 Offline - Loaded from Hive: $hiveLocation");
-        debugPrint("🔍 Offline - HiveLocation id: ${hiveLocation?.id}");
-        debugPrint(
-            "🔍 Offline - HiveLocation locationId: ${hiveLocation?.locationId}");
-        debugPrint(
-            "🔍 Offline - HiveLocation locationName: ${hiveLocation?.locationName}");
+        // 📱 Offline → Hive
+        try {
+          final hiveLocation = await loadLocationFromHive();
+          debugPrint(
+              "🔍 Offline - Loaded from Hive: ${hiveLocation?.locationName}");
 
-        final offlineLocationModel = location.GetLocationModel(
-          success: hiveLocation != null,
-          data: hiveLocation != null
-              ? location.Data(
-                  id: hiveLocation.id,
-                  locationId: hiveLocation.locationId,
-                  locationName: hiveLocation.locationName,
-                )
-              : null,
-        );
+          final offlineLocationModel = location.GetLocationModel(
+            success: hiveLocation != null,
+            data: hiveLocation != null
+                ? location.Data(
+                    id: hiveLocation.id,
+                    locationId: hiveLocation.locationId,
+                    locationName: hiveLocation.locationName,
+                  )
+                : null,
+          );
 
-        debugPrint(
-            "🔍 Offline - Created Data object: ${offlineLocationModel.data}");
-        debugPrint(
-            "🔍 Offline - Data locationName: ${offlineLocationModel.data?.locationName}");
-        emit(offlineLocationModel);
+          emit(offlineLocationModel);
+        } catch (e) {
+          debugPrint("❌ Error loading offline location: $e");
+          emit(location.GetLocationModel(success: false, data: null));
+        }
       }
     });
-    // 🔹 Supplier
+
+// 5. Fix supplier and product bloc events
     on<StockInSupplier>((event, emit) async {
       final connectivity = await Connectivity().checkConnectivity();
       bool hasConnection = connectivity != ConnectivityResult.none;
+
+      debugPrint(
+          "🔍 StockInSupplier - hasConnection: $hasConnection, locationId: ${event.locationId}");
 
       if (hasConnection) {
         await ApiProvider()
@@ -103,24 +92,34 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
           }
           emit(value);
         }).catchError((error) {
+          debugPrint("❌ Supplier API Error: $error");
           emit(error);
         });
       } else {
-        final hiveSuppliers = await loadSuppliersFromHive();
-        final offlineSupplierModel = supplier.GetSupplierLocationModel(
-          success: hiveSuppliers.isNotEmpty,
-          data: hiveSuppliers
-              .map((e) => supplier.Data(id: e.id, name: e.name))
-              .toList(),
-        );
-        emit(offlineSupplierModel); // FIXED: Emit the offline model
+        try {
+          final hiveSuppliers = await loadSuppliersFromHive();
+          debugPrint("🔍 Offline - Loaded suppliers: ${hiveSuppliers.length}");
+
+          final offlineSupplierModel = supplier.GetSupplierLocationModel(
+            success: hiveSuppliers.isNotEmpty,
+            data: hiveSuppliers
+                .map((e) => supplier.Data(id: e.id, name: e.name))
+                .toList(),
+          );
+          emit(offlineSupplierModel);
+        } catch (e) {
+          debugPrint("❌ Error loading offline suppliers: $e");
+          emit(supplier.GetSupplierLocationModel(success: false, data: []));
+        }
       }
     });
 
-    // 🔹 Add Product
     on<StockInAddProduct>((event, emit) async {
       final connectivity = await Connectivity().checkConnectivity();
       bool hasConnection = connectivity != ConnectivityResult.none;
+
+      debugPrint(
+          "🔍 StockInAddProduct - hasConnection: $hasConnection, locationId: ${event.locationId}");
 
       if (hasConnection) {
         await ApiProvider()
@@ -131,17 +130,25 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
           }
           emit(value);
         }).catchError((error) {
+          debugPrint("❌ Product API Error: $error");
           emit(error);
         });
       } else {
-        final hiveProducts = await loadProductsFromHive();
-        final offlineProductModel = productModel.GetAddProductModel(
-          success: hiveProducts.isNotEmpty,
-          data: hiveProducts
-              .map((e) => productModel.Data(id: e.id, name: e.name))
-              .toList(),
-        );
-        emit(offlineProductModel); // FIXED: Emit the offline model
+        try {
+          final hiveProducts = await loadProductsFromHive();
+          debugPrint("🔍 Offline - Loaded products: ${hiveProducts.length}");
+
+          final offlineProductModel = productModel.GetAddProductModel(
+            success: hiveProducts.isNotEmpty,
+            data: hiveProducts
+                .map((e) => productModel.Data(id: e.id, name: e.name))
+                .toList(),
+          );
+          emit(offlineProductModel);
+        } catch (e) {
+          debugPrint("❌ Error loading offline products: $e");
+          emit(productModel.GetAddProductModel(success: false, data: []));
+        }
       }
     });
 
