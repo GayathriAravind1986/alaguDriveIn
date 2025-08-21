@@ -255,19 +255,31 @@ class StockViewViewState extends State<StockViewView> {
 
   void _setupConnectivityListener() {
     _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((dynamic result) async {
-      bool wasOffline = !hasConnection;
+        Connectivity().onConnectivityChanged.listen((dynamic result) {
+      final wasConnected = hasConnection;
       hasConnection = result != ConnectivityResult.none;
 
-      debugPrint("🌐 Connectivity changed: $hasConnection");
+      debugPrint("🔄 Connectivity changed: $wasConnected → $hasConnection");
 
-      if (wasOffline && hasConnection) {
-        debugPrint("📶 Back online - syncing data");
-        await syncStockWhenOnline();
-      } else if (!hasConnection) {
-        debugPrint("📴 Went offline - will use cached data");
+      if (!wasConnected && hasConnection) {
+        // Just came online - sync with server
+        debugPrint("🔄 Coming online - syncing data");
+        syncStockWhenOnline();
+      } else if (wasConnected && !hasConnection) {
+        // Just went offline - load offline data
+        debugPrint("🔄 Going offline - loading offline data");
+        loadOfflineData();
       }
     });
+  }
+
+  Future<void> loadOfflineData() async {
+    setState(() {
+      stockLoad = true;
+    });
+
+    // Trigger location load from offline storage
+    context.read<StockInBloc>().add(StockInLocation());
   }
 
   Future<void> loadDataBasedOnConnectivity() async {
@@ -284,22 +296,22 @@ class StockViewViewState extends State<StockViewView> {
     // Don't trigger other events here - let the BlocBuilder handle the sequence
   }
 
-  Future<void> saveLocationToHive(location.Data? apiData) async {
-    if (apiData == null) return;
-
-    try {
-      final box = await Hive.openBox<HiveLocation>('location');
-      final hiveLocation = HiveLocation(
-        id: apiData.id,
-        locationName: apiData.locationName,
-        locationId: apiData.locationId,
-      );
-      await box.put('current_location', hiveLocation);
-      debugPrint("✅ Saved to Hive: ${hiveLocation.locationName}");
-    } catch (e) {
-      debugPrint("❌ Error saving to Hive: $e");
-    }
-  }
+  // Future<void> saveLocationToHiveUI(location.Data? apiData) async {
+  //   if (apiData == null) return;
+  //
+  //   try {
+  //     final box = await Hive.openBox<HiveLocation>('location');
+  //     final hiveLocation = HiveLocation(
+  //       id: apiData.id,
+  //       locationName: apiData.locationName,
+  //       locationId: apiData.locationId,
+  //     );
+  //     await box.put('current_location', hiveLocation);
+  //     debugPrint("✅ Saved to Hive: ${hiveLocation.locationName}");
+  //   } catch (e) {
+  //     debugPrint("❌ Error saving to Hive: $e");
+  //   }
+  // }
 
   Future<void> syncStockWhenOnline() async {
     try {
@@ -307,8 +319,15 @@ class StockViewViewState extends State<StockViewView> {
       bool hasConnection = connectivityResult != ConnectivityResult.none;
 
       if (hasConnection) {
+        setState(() {
+          stockLoad = true;
+        });
+
         // Fetch fresh data from API
         context.read<StockInBloc>().add(StockInLocation());
+
+        // Show sync message
+        showToast("Syncing with server...", context, color: true);
       }
     } catch (e) {
       debugPrint('Error syncing stock: $e');
@@ -380,6 +399,7 @@ class StockViewViewState extends State<StockViewView> {
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -594,385 +614,402 @@ class StockViewViewState extends State<StockViewView> {
     Widget mainContainer() {
       return Padding(
         padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Text("Stock In",
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              ),
-              verticalSpace(height: 10),
-              Row(
-                children: [
-                  // Date Picker
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _pickDate,
-                      child: AbsorbPointer(
-                        child: TextFormField(
-                          decoration: InputDecoration(
-                            labelText: 'Date',
-                            labelStyle: TextStyle(color: appPrimaryColor),
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide(color: greyColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide:
-                                  BorderSide(color: appPrimaryColor, width: 2),
-                            ),
-                            suffixIcon: Icon(Icons.calendar_today),
-                          ),
-                          controller: TextEditingController(
-                            text: DateFormat('dd/MM/yyyy').format(selectedDate),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  getLocationModel.data?.locationName != null
-                      ? Expanded(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            if (hasConnection) {
+              await syncStockWhenOnline();
+            } else {
+              await loadOfflineData();
+            }
+          },
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Text("Stock In",
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+                verticalSpace(height: 10),
+                Row(
+                  children: [
+                    // Date Picker
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _pickDate,
+                        child: AbsorbPointer(
                           child: TextFormField(
-                            enabled: false,
-                            initialValue: getLocationModel.data!.locationName!,
                             decoration: InputDecoration(
-                              labelText: 'Location',
+                              labelText: 'Date',
                               labelStyle: TextStyle(color: appPrimaryColor),
                               border: OutlineInputBorder(
                                 borderSide: BorderSide(color: greyColor),
                               ),
-                              disabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: greyColor),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                    color: appPrimaryColor, width: 2),
                               ),
+                              suffixIcon: Icon(Icons.calendar_today),
+                            ),
+                            controller: TextEditingController(
+                              text:
+                                  DateFormat('dd/MM/yyyy').format(selectedDate),
                             ),
                           ),
-                        )
-                      : SizedBox.shrink(), // or show a loading indicator
-                ],
-              ),
-              verticalSpace(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Supplier *',
-                        labelStyle: TextStyle(
-                            color: showSupplierError
-                                ? redColor
-                                : (selectedSupplier != null
-                                    ? appPrimaryColor
-                                    : greyColor)),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: showSupplierError ? redColor : greyColor),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    getLocationModel.data?.locationName != null
+                        ? Expanded(
+                            child: TextFormField(
+                              enabled: false,
+                              initialValue:
+                                  getLocationModel.data!.locationName!,
+                              decoration: InputDecoration(
+                                labelText: 'Location',
+                                labelStyle: TextStyle(color: appPrimaryColor),
+                                border: OutlineInputBorder(
+                                  borderSide: BorderSide(color: greyColor),
+                                ),
+                                disabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: greyColor),
+                                ),
+                              ),
+                            ),
+                          )
+                        : SizedBox.shrink(), // or show a loading indicator
+                  ],
+                ),
+                verticalSpace(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Supplier *',
+                          labelStyle: TextStyle(
                               color: showSupplierError
                                   ? redColor
-                                  : appPrimaryColor,
-                              width: 2),
+                                  : (selectedSupplier != null
+                                      ? appPrimaryColor
+                                      : greyColor)),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color:
+                                    showSupplierError ? redColor : greyColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: showSupplierError
+                                    ? redColor
+                                    : appPrimaryColor,
+                                width: 2),
+                          ),
+                          errorText:
+                              showSupplierError ? supplierErrorText : null,
                         ),
-                        errorText: showSupplierError ? supplierErrorText : null,
-                      ),
-                      value: selectedSupplier,
-                      items: (getSupplierLocationModel.data ?? [])
-                          .map<DropdownMenuItem<String>>(
-                              (sup) => DropdownMenuItem<String>(
-                                    value: sup.id,
-                                    child: Text(sup.name ?? 'No Name'),
-                                  ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedSupplier = value;
-                          showSupplierError = false;
-                          supplierErrorText = null;
-                        });
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Tax Type *',
-                        labelStyle: TextStyle(
-                            color: showTaxTypeError
-                                ? redColor
-                                : (selectedTax != null
-                                    ? appPrimaryColor
-                                    : greyColor)),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: showTaxTypeError ? redColor : greyColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color:
-                                  showTaxTypeError ? redColor : appPrimaryColor,
-                              width: 2),
-                        ),
-                        errorText: showTaxTypeError ? taxTypeErrorText : null,
-                      ),
-                      value: selectedTax,
-                      items: taxType
-                          .map((tax) => DropdownMenuItem(
-                                value: tax,
-                                child: Text(tax),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedTax = value;
-                          showTaxTypeError = false;
-                          taxTypeErrorText = null;
-                          calculateTotals();
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              verticalSpace(height: 10),
-              DropdownButtonFormField<String>(
-                  key: productDropdownKey,
-                  decoration: InputDecoration(
-                    hint: const Text("Add Product *"),
-                    labelText: 'Add Product *',
-                    labelStyle: TextStyle(
-                      color: showProductError
-                          ? redColor
-                          : (selectedProduct != null
-                              ? appPrimaryColor
-                              : greyColor),
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: showProductError ? redColor : greyColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: showProductError ? redColor : appPrimaryColor,
-                          width: 2),
-                    ),
-                  ),
-                  value: selectedProduct,
-                  items: (getAddProductModel.data ?? [])
-                      .map<DropdownMenuItem<String>>(
-                        (pro) => DropdownMenuItem<String>(
-                          value: pro.id,
-                          child: Text(pro.name ?? 'No Name'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      try {
-                        selectedProductObj = getAddProductModel.data
-                            ?.firstWhere((product) => product.id == value);
-                      } on StateError {
-                        selectedProduct = null;
-                        selectedProductObj = null;
-                        productDropdownKey = UniqueKey();
-                      }
-                      final dropdownItems = (getAddProductModel.data ?? [])
-                          .where((pro) => !selectedProducts
-                              .any((selected) => selected.id == pro.id))
-                          .toList();
-
-                      if (selectedProduct != null &&
-                          dropdownItems
-                              .every((item) => item.id != selectedProduct)) {
-                        selectedProduct = null;
-                        selectedProductObj = null;
-                        productDropdownKey = UniqueKey();
-                      }
-                      if (value != null &&
-                          selectedProductObj != null &&
-                          !_isProductAlreadyAdded(value)) {
-                        selectedProducts.add(ProductRowModel(
-                          id: selectedProductObj?.id ?? '',
-                          name: selectedProductObj?.name ?? 'No Name',
-                        ));
-                        selectedProduct = null;
-                        selectedProductObj = null;
-                        productDropdownKey = UniqueKey();
-                        showProductError = false;
-                        productErrorText = null;
-                      } else {
-                        selectedProduct = value;
-                      }
-                      calculateTotals();
-                    });
-                  }),
-              if (showProductError && productErrorText != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0, left: 12.0),
-                  child: Text(
-                    productErrorText!,
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              SizedBox(height: 16),
-              if (selectedProducts.isNotEmpty)
-                Column(
-                  children: selectedProducts
-                      .asMap()
-                      .entries
-                      .map((entry) => buildProductRow(entry.key, entry.value))
-                      .toList(),
-                ),
-              verticalSpace(height: 15),
-              Row(
-                children: [
-                  // Subtotal
-                  Expanded(
-                    child: TextFormField(
-                      controller: subtotalController,
-                      decoration: InputDecoration(
-                        labelText: 'Subtotal',
-                        labelStyle: TextStyle(color: appPrimaryColor),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: greyColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide:
-                              BorderSide(color: appPrimaryColor, width: 2),
-                        ),
-                      ),
-                      keyboardType:
-                          TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  // Tax Amount
-                  Expanded(
-                    child: TextFormField(
-                      controller: taxController,
-                      decoration: InputDecoration(
-                        labelText: 'Tax Amount',
-                        labelStyle: TextStyle(color: appPrimaryColor),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: greyColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide:
-                              BorderSide(color: appPrimaryColor, width: 2),
-                        ),
-                      ),
-                      keyboardType:
-                          TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  // Total Amount
-                  Expanded(
-                    child: TextFormField(
-                      controller: totalController,
-                      decoration: InputDecoration(
-                        labelText: 'Total Amount',
-                        labelStyle: TextStyle(color: appPrimaryColor),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: greyColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide:
-                              BorderSide(color: appPrimaryColor, width: 2),
-                        ),
-                      ),
-                      keyboardType:
-                          TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  // Final Amount
-                  Expanded(
-                    child: TextFormField(
-                      controller: finalController,
-                      decoration: InputDecoration(
-                        labelText: 'Final Amount',
-                        labelStyle: TextStyle(color: appPrimaryColor),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: greyColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide:
-                              BorderSide(color: appPrimaryColor, width: 2),
-                        ),
-                      ),
-                      keyboardType:
-                          TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                ],
-              ),
-              verticalSpace(height: size.height * 0.1),
-              saveLoad
-                  ? SpinKitCircle(color: appPrimaryColor, size: 30)
-                  : Center(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          if (!validateForm()) {
-                            return; // Stop if validation fails
-                          }
-
-                          debugPrint("Validation passed, saving...");
+                        value: selectedSupplier,
+                        items: (getSupplierLocationModel.data ?? [])
+                            .map<DropdownMenuItem<String>>(
+                                (sup) => DropdownMenuItem<String>(
+                                      value: sup.id,
+                                      child: Text(sup.name ?? 'No Name'),
+                                    ))
+                            .toList(),
+                        onChanged: (value) {
                           setState(() {
-                            saveLoad = true;
+                            selectedSupplier = value;
+                            showSupplierError = false;
+                            supplierErrorText = null;
                           });
-
-                          try {
-                            final payload = buildStockInPayload(
-                              date: selectedDate,
-                              supplierId: selectedSupplier ?? '',
-                              taxType: selectedTax ?? '',
-                              locationId: getLocationModel.data?.id ?? '',
-                              products: selectedProducts,
-                              finalAmount:
-                                  double.tryParse(finalController.text) ?? 0.0,
-                              subtotal:
-                                  double.tryParse(subtotalController.text) ??
-                                      0.0,
-                              taxAmount:
-                                  double.tryParse(taxController.text) ?? 0.0,
-                              totalAmount:
-                                  double.tryParse(totalController.text) ?? 0.0,
-                            );
-
-                            debugPrint(
-                                "📦 Sending StockIn payload: ${jsonEncode(payload)}");
-                            context
-                                .read<StockInBloc>()
-                                .add(SaveStockIn(jsonEncode(payload)));
-                          } catch (e) {
-                            setState(() {
-                              saveLoad = false;
-                            });
-                            showValidationSnackBar(
-                                'An error occurred while saving: $e');
-                          }
                         },
-                        label: const Text("Save"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: greenColor,
-                          foregroundColor: whiteColor,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 40, vertical: 20),
-                          minimumSize: Size(size.width * 0.25, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Tax Type *',
+                          labelStyle: TextStyle(
+                              color: showTaxTypeError
+                                  ? redColor
+                                  : (selectedTax != null
+                                      ? appPrimaryColor
+                                      : greyColor)),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: showTaxTypeError ? redColor : greyColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: showTaxTypeError
+                                    ? redColor
+                                    : appPrimaryColor,
+                                width: 2),
+                          ),
+                          errorText: showTaxTypeError ? taxTypeErrorText : null,
+                        ),
+                        value: selectedTax,
+                        items: taxType
+                            .map((tax) => DropdownMenuItem(
+                                  value: tax,
+                                  child: Text(tax),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedTax = value;
+                            showTaxTypeError = false;
+                            taxTypeErrorText = null;
+                            calculateTotals();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                verticalSpace(height: 10),
+                DropdownButtonFormField<String>(
+                    key: productDropdownKey,
+                    decoration: InputDecoration(
+                      hint: const Text("Add Product *"),
+                      labelText: 'Add Product *',
+                      labelStyle: TextStyle(
+                        color: showProductError
+                            ? redColor
+                            : (selectedProduct != null
+                                ? appPrimaryColor
+                                : greyColor),
+                      ),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color: showProductError ? redColor : greyColor),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color:
+                                showProductError ? redColor : appPrimaryColor,
+                            width: 2),
+                      ),
+                    ),
+                    value: selectedProduct,
+                    items: (getAddProductModel.data ?? [])
+                        .map<DropdownMenuItem<String>>(
+                          (pro) => DropdownMenuItem<String>(
+                            value: pro.id,
+                            child: Text(pro.name ?? 'No Name'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        try {
+                          selectedProductObj = getAddProductModel.data
+                              ?.firstWhere((product) => product.id == value);
+                        } on StateError {
+                          selectedProduct = null;
+                          selectedProductObj = null;
+                          productDropdownKey = UniqueKey();
+                        }
+                        final dropdownItems = (getAddProductModel.data ?? [])
+                            .where((pro) => !selectedProducts
+                                .any((selected) => selected.id == pro.id))
+                            .toList();
+
+                        if (selectedProduct != null &&
+                            dropdownItems
+                                .every((item) => item.id != selectedProduct)) {
+                          selectedProduct = null;
+                          selectedProductObj = null;
+                          productDropdownKey = UniqueKey();
+                        }
+                        if (value != null &&
+                            selectedProductObj != null &&
+                            !_isProductAlreadyAdded(value)) {
+                          selectedProducts.add(ProductRowModel(
+                            id: selectedProductObj?.id ?? '',
+                            name: selectedProductObj?.name ?? 'No Name',
+                          ));
+                          selectedProduct = null;
+                          selectedProductObj = null;
+                          productDropdownKey = UniqueKey();
+                          showProductError = false;
+                          productErrorText = null;
+                        } else {
+                          selectedProduct = value;
+                        }
+                        calculateTotals();
+                      });
+                    }),
+                if (showProductError && productErrorText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                    child: Text(
+                      productErrorText!,
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                SizedBox(height: 16),
+                if (selectedProducts.isNotEmpty)
+                  Column(
+                    children: selectedProducts
+                        .asMap()
+                        .entries
+                        .map((entry) => buildProductRow(entry.key, entry.value))
+                        .toList(),
+                  ),
+                verticalSpace(height: 15),
+                Row(
+                  children: [
+                    // Subtotal
+                    Expanded(
+                      child: TextFormField(
+                        controller: subtotalController,
+                        decoration: InputDecoration(
+                          labelText: 'Subtotal',
+                          labelStyle: TextStyle(color: appPrimaryColor),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: greyColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide:
+                                BorderSide(color: appPrimaryColor, width: 2),
+                          ),
+                        ),
+                        keyboardType:
+                            TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    // Tax Amount
+                    Expanded(
+                      child: TextFormField(
+                        controller: taxController,
+                        decoration: InputDecoration(
+                          labelText: 'Tax Amount',
+                          labelStyle: TextStyle(color: appPrimaryColor),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: greyColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide:
+                                BorderSide(color: appPrimaryColor, width: 2),
+                          ),
+                        ),
+                        keyboardType:
+                            TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    // Total Amount
+                    Expanded(
+                      child: TextFormField(
+                        controller: totalController,
+                        decoration: InputDecoration(
+                          labelText: 'Total Amount',
+                          labelStyle: TextStyle(color: appPrimaryColor),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: greyColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide:
+                                BorderSide(color: appPrimaryColor, width: 2),
+                          ),
+                        ),
+                        keyboardType:
+                            TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    // Final Amount
+                    Expanded(
+                      child: TextFormField(
+                        controller: finalController,
+                        decoration: InputDecoration(
+                          labelText: 'Final Amount',
+                          labelStyle: TextStyle(color: appPrimaryColor),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: greyColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide:
+                                BorderSide(color: appPrimaryColor, width: 2),
+                          ),
+                        ),
+                        keyboardType:
+                            TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                  ],
+                ),
+                verticalSpace(height: size.height * 0.1),
+                saveLoad
+                    ? SpinKitCircle(color: appPrimaryColor, size: 30)
+                    : Center(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (!validateForm()) {
+                              return; // Stop if validation fails
+                            }
+
+                            debugPrint("Validation passed, saving...");
+                            setState(() {
+                              saveLoad = true;
+                            });
+
+                            try {
+                              final payload = buildStockInPayload(
+                                date: selectedDate,
+                                supplierId: selectedSupplier ?? '',
+                                taxType: selectedTax ?? '',
+                                locationId: getLocationModel.data?.id ?? '',
+                                products: selectedProducts,
+                                finalAmount:
+                                    double.tryParse(finalController.text) ??
+                                        0.0,
+                                subtotal:
+                                    double.tryParse(subtotalController.text) ??
+                                        0.0,
+                                taxAmount:
+                                    double.tryParse(taxController.text) ?? 0.0,
+                                totalAmount:
+                                    double.tryParse(totalController.text) ??
+                                        0.0,
+                              );
+
+                              debugPrint(
+                                  "📦 Sending StockIn payload: ${jsonEncode(payload)}");
+                              context
+                                  .read<StockInBloc>()
+                                  .add(SaveStockIn(jsonEncode(payload)));
+                            } catch (e) {
+                              setState(() {
+                                saveLoad = false;
+                              });
+                              showValidationSnackBar(
+                                  'An error occurred while saving: $e');
+                            }
+                          },
+                          label: const Text("Save"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: greenColor,
+                            foregroundColor: whiteColor,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 40, vertical: 20),
+                            minimumSize: Size(size.width * 0.25, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -982,6 +1019,7 @@ class StockViewViewState extends State<StockViewView> {
       buildWhen: ((previous, current) {
         if (current is location.GetLocationModel) {
           getLocationModel = current;
+
           if (getLocationModel.errorResponse?.isUnauthorized == true) {
             _handle401Error();
             return true;
@@ -993,36 +1031,35 @@ class StockViewViewState extends State<StockViewView> {
                 getLocationModel.data?.locationId ?? getLocationModel.data?.id;
             debugPrint("locationId: $locationId");
 
-            // Save to Hive only if online
+            // Save to Hive only when online
             if (hasConnection) {
-              saveLocationToHive(getLocationModel.data);
+              saveLocationToHive(getLocationModel.data!);
             }
 
-            // Continue with API calls for both online and offline
-            if (locationId != null) {
-              // Add a small delay to ensure location is processed
-              Future.delayed(Duration(milliseconds: 100), () {
+            // Load suppliers and products with slight delay
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
                 context
                     .read<StockInBloc>()
                     .add(StockInSupplier(locationId.toString()));
                 context
                     .read<StockInBloc>()
                     .add(StockInAddProduct(locationId.toString()));
-              });
-            }
+              }
+            });
 
-            setState(() {
-              stockLoad = false;
-            });
+            setState(() => stockLoad = false);
+
+            // Show appropriate message
+            if (!hasConnection) {
+              showToast("Loaded offline data", context, color: true);
+            }
           } else {
-            debugPrint("⚠️ Location data is null or fetch failed");
-            setState(() {
-              stockLoad = false;
-            });
+            debugPrint("⚠️ No location found (online or offline)");
+            setState(() => stockLoad = false);
 
             if (!hasConnection) {
-              showToast(
-                  "No offline location data available. Connect to internet first.",
+              showToast("No offline data available. Connect to internet first.",
                   context,
                   color: false);
             } else {
@@ -1032,55 +1069,29 @@ class StockViewViewState extends State<StockViewView> {
           return true;
         }
 
+        // Handle Supplier Response
         if (current is supplier.GetSupplierLocationModel) {
           getSupplierLocationModel = current;
-          debugPrint(
-              "Received suppliers: ${getSupplierLocationModel.data?.length ?? 0}");
 
-          if (getSupplierLocationModel.errorResponse?.isUnauthorized == true) {
-            _handle401Error();
-            return true;
-          }
-          if (getSupplierLocationModel.success == true) {
-            if (hasConnection) {
-              saveSuppliersToHive(getSupplierLocationModel.data ?? []);
-            }
-            setState(() {
-              stockLoad = false;
-            });
-          } else {
-            setState(() {
-              stockLoad = false;
-            });
-            if (hasConnection) {
-              showToast("No Supplier for this location", context, color: false);
+          if (getSupplierLocationModel.success == true &&
+              getSupplierLocationModel.data != null) {
+            // Save to Hive only when online
+            if (hasConnection && getSupplierLocationModel.data!.isNotEmpty) {
+              saveSuppliersToHive(getSupplierLocationModel.data!);
             }
           }
           return true;
         }
 
+        // Handle Product Response
         if (current is productModel.GetAddProductModel) {
           getAddProductModel = current;
-          debugPrint(
-              "Received products: ${getAddProductModel.data?.length ?? 0}");
 
-          if (getAddProductModel.errorResponse?.isUnauthorized == true) {
-            _handle401Error();
-            return true;
-          }
-          if (getAddProductModel.success == true) {
-            if (hasConnection) {
-              saveProductsToHive(getAddProductModel.data ?? []);
-            }
-            setState(() {
-              stockLoad = false;
-            });
-          } else {
-            setState(() {
-              stockLoad = false;
-            });
-            if (hasConnection) {
-              showToast("No Product for this location", context, color: false);
+          if (getAddProductModel.success == true &&
+              getAddProductModel.data != null) {
+            // Save to Hive only when online
+            if (hasConnection && getAddProductModel.data!.isNotEmpty) {
+              saveProductsToHive(getAddProductModel.data!);
             }
           }
           return true;

@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:simple/Api/apiProvider.dart';
+import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/StockIn/getLocationModel.dart' as location;
 import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart'
     as supplier;
@@ -9,6 +10,8 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_stock_service.dart';
 import 'package:simple/ModelClass/StockIn/get_add_product_model.dart'
     as productModel;
+
+import '../Response/errorResponse.dart';
 
 abstract class StockInEvent {}
 
@@ -40,15 +43,37 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
 
       if (hasConnection) {
         // ✅ Online → API
-        await ApiProvider().getLocationAPI().then((value) async {
-          if (value.success == true && value.data != null) {
-            await saveLocationToHive(value.data!);
+        try {
+          final apiResult = await ApiProvider().getLocationAPI();
+          if (apiResult.success == true && apiResult.data != null) {
+            await saveLocationToHive(apiResult.data!);
           }
-          emit(value);
-        }).catchError((error) {
+          emit(apiResult);
+        } catch (error) {
           debugPrint("❌ Location API Error: $error");
-          emit(error);
-        });
+          // If API fails, try offline data as fallback
+          final hiveLocation = await loadLocationFromHive();
+          if (hiveLocation != null) {
+            final offlineLocationModel = location.GetLocationModel(
+              success: true,
+              data: location.Data(
+                id: hiveLocation.id,
+                locationId: hiveLocation.locationId,
+                locationName: hiveLocation.locationName,
+              ),
+            );
+            emit(offlineLocationModel);
+          } else {
+            emit(location.GetLocationModel(
+              success: false,
+              data: null,
+              errorResponse: ErrorResponse(
+                message: "Failed to load location from Hive",
+                statusCode: 500,
+              ),
+            ));
+          }
+        }
       } else {
         // 📱 Offline → Hive
         try {
@@ -56,18 +81,20 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
           debugPrint(
               "🔍 Offline - Loaded from Hive: ${hiveLocation?.locationName}");
 
-          final offlineLocationModel = location.GetLocationModel(
-            success: hiveLocation != null,
-            data: hiveLocation != null
-                ? location.Data(
-                    id: hiveLocation.id,
-                    locationId: hiveLocation.locationId,
-                    locationName: hiveLocation.locationName,
-                  )
-                : null,
-          );
-
-          emit(offlineLocationModel);
+          if (hiveLocation != null) {
+            final offlineLocationModel = location.GetLocationModel(
+              success: true,
+              data: location.Data(
+                id: hiveLocation.id,
+                locationId: hiveLocation.locationId,
+                locationName: hiveLocation.locationName,
+              ),
+            );
+            emit(offlineLocationModel);
+          } else {
+            debugPrint("⚠️ No location found in Hive");
+            emit(location.GetLocationModel(success: false, data: null));
+          }
         } catch (e) {
           debugPrint("❌ Error loading offline location: $e");
           emit(location.GetLocationModel(success: false, data: null));

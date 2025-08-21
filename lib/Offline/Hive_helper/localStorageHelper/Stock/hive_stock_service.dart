@@ -39,38 +39,50 @@ Future<void> saveSuppliersToHive(List<supplier.Data> suppliers) async {
 
 // Locations
 Future<void> saveLocationToHive(location.Data apiData) async {
-  final box = Hive.box<HiveLocation>('location');
-  final hiveLocation = HiveLocation(
-    id: apiData.id,
-    locationId: apiData.locationId,
-    locationName: apiData.locationName,
-  );
-  await box.put('current_location', hiveLocation);
+  try {
+    final box = await Hive.openBox<HiveLocation>('location');
+    final hiveLocation = HiveLocation(
+      id: apiData.id,
+      locationName: apiData.locationName,
+      locationId: apiData.locationId,
+    );
+    await box.put('current_location', hiveLocation);
+    debugPrint("✅ Saved to Hive: ${hiveLocation.locationName}");
+  } catch (e) {
+    debugPrint("❌ Error saving to Hive: $e");
+  }
 }
 
-Future<List<HiveProductStock>> loadProductsFromHive() async {
+Future<HiveLocation?> loadLocationFromHive() async {
   try {
-    if (!Hive.isBoxOpen('products')) {
-      await Hive.openBox<HiveProductStock>('products');
+    Box<HiveLocation> box;
+
+    if (!Hive.isBoxOpen('location')) {
+      box = await Hive.openBox<HiveLocation>('location');
+    } else {
+      box = Hive.box<HiveLocation>('location');
     }
 
-    final box = Hive.box<HiveProductStock>('products');
-    final products = box.values.toList();
-    debugPrint("🔍 Loaded ${products.length} products from Hive");
-    return products;
+    final location = box.get('current_location');
+    debugPrint(
+        "🔍 Loading from Hive: ${location?.locationName} (ID: ${location?.locationId})");
+    return location;
   } catch (e) {
-    debugPrint("❌ Error loading products from Hive: $e");
-    return [];
+    debugPrint("❌ Error loading location from Hive: $e");
+    return null;
   }
 }
 
 Future<List<HiveSupplier>> loadSuppliersFromHive() async {
   try {
+    Box<HiveSupplier> box;
+
     if (!Hive.isBoxOpen('suppliers')) {
-      await Hive.openBox<HiveSupplier>('suppliers');
+      box = await Hive.openBox<HiveSupplier>('suppliers');
+    } else {
+      box = Hive.box<HiveSupplier>('suppliers');
     }
 
-    final box = Hive.box<HiveSupplier>('suppliers');
     final suppliers = box.values.toList();
     debugPrint("🔍 Loaded ${suppliers.length} suppliers from Hive");
     return suppliers;
@@ -80,19 +92,21 @@ Future<List<HiveSupplier>> loadSuppliersFromHive() async {
   }
 }
 
-Future<HiveLocation?> loadLocationFromHive() async {
+Future<List<HiveProductStock>> loadProductsFromHive() async {
   try {
-    // Ensure box is opened
-    if (!Hive.isBoxOpen('location')) {
-      await Hive.openBox<HiveLocation>('location');
+    Box<HiveProductStock> box;
+
+    if (!Hive.isBoxOpen('products')) {
+      box = await Hive.openBox<HiveProductStock>('products');
+    } else {
+      box = Hive.box<HiveProductStock>('products');
     }
 
-    final box = Hive.box<HiveLocation>('location');
-    final location = box.get('current_location');
-    debugPrint("🔍 Loading from Hive: ${location?.locationName}");
-    return location;
+    final products = box.values.toList();
+    debugPrint("🔍 Loaded ${products.length} products from Hive");
+    return products;
   } catch (e) {
-    debugPrint("❌ Error loading from Hive: $e");
-    return null;
+    debugPrint("❌ Error loading products from Hive: $e");
+    return [];
   }
 }
