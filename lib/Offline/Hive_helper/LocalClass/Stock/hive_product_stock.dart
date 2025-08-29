@@ -1,8 +1,8 @@
 import 'package:hive/hive.dart';
 
-part 'hive_product_stock.g.dart';
+// part 'hive_product_stock.g.dart';
 
-@HiveType(typeId: 13)
+@HiveType(typeId: 3)
 class HiveProductStock extends HiveObject {
   @HiveField(0)
   String? id;

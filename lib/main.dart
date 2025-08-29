@@ -12,19 +12,30 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_order_model.dart
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_selected_addons_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_stock_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_table_model.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
+// NOTE: Removed 'hide HiveProduct' to ensure consistent typing
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart' hide HiveProduct;
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_stock.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
+// NOTE: Removed 'hide HiveSupplier' to ensure consistent typing
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart' hide HiveSupplier;
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:simple/UI/SplashScreen/splash_screen.dart';
 
+// Import the adapter files
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
+
+
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
+
   try {
+    // Register all adapters before opening any boxes.
+    // Ensure all adapters are registered only once.
     Hive.registerAdapter(HiveCategoryAdapter());
     Hive.registerAdapter(HiveProductAdapter());
     Hive.registerAdapter(HiveCartItemAdapter());
@@ -35,12 +46,15 @@ Future<void> main() async {
     Hive.registerAdapter(HiveTableAdapter());
     Hive.registerAdapter(HiveLocationAdapter());
     Hive.registerAdapter(HiveSupplierAdapter());
-    Hive.registerAdapter(HiveProductStockAdapter());
+    // Note: If you have a separate adapter for HiveProductStock, you would register it here.
+    // Hive.registerAdapter(HiveProductStockAdapter());
+
   } catch (e) {
     debugPrint("Hive adapter registration error: $e");
   }
-  // Open all boxes
+
   try {
+    // Open all the necessary boxes.
     await Hive.openBox<HiveCategory>('categories');
     await Hive.openBox<HiveCartItem>('cart_items');
     await Hive.openBox<HiveOrder>('orders');
@@ -48,9 +62,10 @@ Future<void> main() async {
     await Hive.openBox<HiveStockMaintenance>('stock_maintenance');
     await Hive.openBox<HiveTable>('tables');
     await Hive.openBox<HiveLocation>('location');
-    await Hive.openBox<HiveSupplier>('suppliers');
-    await Hive.openBox<HiveProductStock>('products');
+    await Hive.openBox<HiveSupplier>('suppliers_box');
+    await Hive.openBox<HiveProduct>('products_box');
     await Hive.openBox('app_state');
+
   } catch (e) {
     debugPrint("Hive openBox error: $e");
   }

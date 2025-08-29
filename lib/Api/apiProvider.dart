@@ -699,7 +699,6 @@ class ApiProvider {
   }
 
   /// Save StockIn - Post API Integration
-
   Future<SaveStockInModel> postSaveStockInAPI(
       final String stockInPayloadJson) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
