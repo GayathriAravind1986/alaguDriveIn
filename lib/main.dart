@@ -28,50 +28,30 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapte
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
 
 
-// IMPORTANT: Move all `openBox` calls into this initialization function.
-Future<void> _initHive() async {
-  // Hive initialization
-  await Hive.initFlutter();
-
-  // Register adapters
-  Hive.registerAdapter(HiveLocationAdapter());
-  Hive.registerAdapter(HiveSupplierAdapter());
-  Hive.registerAdapter(HiveProductAdapter());
-
-  // Open all required boxes and wait for them to finish.
-  // The 'suppliers_box' and 'products_box' are opened for StockIn.
-  await Hive.openBox<HiveSupplier>('suppliers_box');
-  await Hive.openBox<HiveProduct>('products_box');
-  await Hive.openBox<HiveLocation>('location');
-
-  // The 'login_box' and 'user_box' from your other files
-  await Hive.openBox<String>('login_box');
-  await Hive.openBox<String>('user_box');
-  await Hive.openBox<String>('Offline_box');
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  await _initHive();
 
-  // try {
-  //   Hive.registerAdapter(HiveCategoryAdapter());
-  //   Hive.registerAdapter(HiveProductAdapter());
-  //   Hive.registerAdapter(HiveCartItemAdapter());
-  //   Hive.registerAdapter(HiveSelectedAddonAdapter());
-  //   Hive.registerAdapter(HiveOrderAdapter());
-  //   Hive.registerAdapter(HiveBillingSessionAdapter());
-  //   Hive.registerAdapter(HiveStockMaintenanceAdapter());
-  //   Hive.registerAdapter(HiveTableAdapter());
-  //   Hive.registerAdapter(HiveLocationAdapter());
-  //   Hive.registerAdapter(HiveSupplierAdapter());
-  //   // Note: If you have a separate adapter for HiveProductStock, you would register it here.
-  //   // Hive.registerAdapter(HiveProductStockAdapter());
-  //
-  // } catch (e) {
-  //   debugPrint("Hive adapter registration error: $e");
-  // }
+  try {
+    // Register all adapters before opening any boxes.
+    // Ensure all adapters are registered only once.
+    Hive.registerAdapter(HiveCategoryAdapter());
+    Hive.registerAdapter(HiveProductAdapter());
+    Hive.registerAdapter(HiveCartItemAdapter());
+    Hive.registerAdapter(HiveSelectedAddonAdapter());
+    Hive.registerAdapter(HiveOrderAdapter());
+    Hive.registerAdapter(HiveBillingSessionAdapter());
+    Hive.registerAdapter(HiveStockMaintenanceAdapter());
+    Hive.registerAdapter(HiveTableAdapter());
+    Hive.registerAdapter(HiveLocationAdapter());
+    Hive.registerAdapter(HiveSupplierAdapter());
+    // Note: If you have a separate adapter for HiveProductStock, you would register it here.
+    // Hive.registerAdapter(HiveProductStockAdapter());
+
+  } catch (e) {
+    debugPrint("Hive adapter registration error: $e");
+  }
 
   try {
     // Open all the necessary boxes.

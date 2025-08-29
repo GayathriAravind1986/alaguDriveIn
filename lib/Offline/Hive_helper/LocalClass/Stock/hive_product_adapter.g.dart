@@ -2,7 +2,7 @@
 import 'package:hive/hive.dart';
 import 'hive_product_stock.dart';
 
-// part of 'hive_product_stock.dart';
+import 'hive_product_stock.dart';
 
 
 class HiveProductStockAdapter extends TypeAdapter<HiveProductStock> {

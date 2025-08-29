@@ -1,6 +1,6 @@
 import 'package:hive/hive.dart';
 
-// part 'hive_supplier_adapter.g.dart';
+// part 'hive_product_adapter.g.dart';
 
 @HiveType(typeId: 2)
 class HiveSupplier {
