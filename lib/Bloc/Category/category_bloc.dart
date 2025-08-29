@@ -21,6 +21,7 @@ import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart'
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_table_stock.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
+import 'package:simple/UI/Home_screen/home_screen.dart';
 
 abstract class FoodCategoryEvent {}
 
@@ -46,7 +47,8 @@ class FoodProductItemOffline extends FoodCategoryEvent {
 class AddToBilling extends FoodCategoryEvent {
   List<Map<String, dynamic>> billingItems;
   bool? isDiscount;
-  AddToBilling(this.billingItems, this.isDiscount);
+  final OrderType? orderType;
+  AddToBilling(this.billingItems, this.isDiscount, this.orderType);
 }
 
 class GenerateOrder extends FoodCategoryEvent {
@@ -248,8 +250,11 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         if (hasConnection) {
           // Online: Try API first
           try {
-            final value = await ApiProvider()
-                .postAddToBillingAPI(event.billingItems, event.isDiscount);
+            final value = await ApiProvider().postAddToBillingAPI(
+              event.billingItems,
+              event.isDiscount,
+              event.orderType?.apiValue,
+            );
 
             // Save to Hive for offline access
             await HiveService.saveCartItems(event.billingItems);

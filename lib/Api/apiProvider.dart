@@ -252,13 +252,16 @@ class ApiProvider {
 
   /// Add to Billing - Post API Integration
   Future<PostAddToBillingModel> postAddToBillingAPI(
-      List<Map<String, dynamic>> billingItems, bool? isDiscount) async {
+      List<Map<String, dynamic>> billingItems,
+      bool? isDiscount,
+      String? orderType) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
     try {
       final dataMap = {
         "items": billingItems,
-        "isApplicableDiscount": isDiscount
+        "isApplicableDiscount": isDiscount,
+        "orderType": orderType
       };
       var data = json.encode(dataMap);
       var dio = Dio();

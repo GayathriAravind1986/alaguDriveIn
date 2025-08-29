@@ -80,6 +80,48 @@ class FoodOrderingScreenView extends StatefulWidget {
   FoodOrderingScreenViewState createState() => FoodOrderingScreenViewState();
 }
 
+enum OrderType {
+  line,
+  parcel,
+  ac
+  // , hd, swiggy
+}
+
+extension OrderTypeX on OrderType {
+  String get apiValue {
+    switch (this) {
+      case OrderType.line:
+        return "LINE";
+      case OrderType.parcel:
+        return "PARCEL";
+      case OrderType.ac:
+        return "AC";
+      // case OrderType.hd:
+      //   return "HD";
+      // case OrderType.swiggy:
+      //   return "SWIGGY";
+    }
+  }
+
+  // 👇 to convert back from API string
+  static OrderType fromApi(String value) {
+    switch (value) {
+      case "LINE":
+        return OrderType.line;
+      case "PARCEL":
+        return OrderType.parcel;
+      case "AC":
+        return OrderType.ac;
+      // case "HD":
+      //   return OrderType.hd;
+      // case "SWIGGY":
+      //   return OrderType.swiggy;
+      default:
+        return OrderType.line;
+    }
+  }
+}
+
 class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   category.GetCategoryModel getCategoryModel = category.GetCategoryModel();
   product.GetProductByCatIdModel getProductByCatIdModel =
@@ -105,7 +147,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
   String selectedCategory = "All";
   String? selectedCatId = "";
-  bool selectDineIn = true;
+  OrderType? selectedOrderType = OrderType.line;
 
   bool isSplitPayment = false;
   bool splitChange = false;
@@ -133,7 +175,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   }
 
   dynamic selectedValue;
+  dynamic selectedValueWaiter;
   dynamic tableId;
+  dynamic waiterId;
 
   bool showTipField = false;
   final TextEditingController tipController = TextEditingController();
@@ -531,7 +575,25 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     final data = order.data!;
 
     setState(() {
-      selectDineIn = data.orderType == 'DINE-IN';
+      switch (data.orderType) {
+        case 'LINE':
+          selectedOrderType = OrderType.line;
+          break;
+        case 'PARCEL':
+          selectedOrderType = OrderType.parcel;
+          break;
+        case 'AC':
+          selectedOrderType = OrderType.ac;
+          break;
+        // case 'HD':
+        //   selectedOrderType = OrderType.hd;
+        //   break;
+        // case 'SWIGGY':
+        //   selectedOrderType = OrderType.swiggy;
+        //   break;
+        default:
+          selectedOrderType = OrderType.line;
+      }
       tableId = data.tableNo;
       selectedValue = data.tableName;
       isCartLoaded = true;
@@ -562,7 +624,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
           }).toList() ??
           [];
       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems),
-          widget.existingOrder?.data!.isDiscountApplied));
+          widget.existingOrder?.data!.isDiscountApplied, selectedOrderType));
     });
   }
 
@@ -571,7 +633,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       billingItems.clear();
       tableId = null;
       selectedValue = null;
-      selectDineIn = true;
+      selectedOrderType = OrderType.line;
       isSplitPayment = false;
       amountController.clear();
       selectedFullPaymentMethod = "";
@@ -580,7 +642,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       if (billingItems.isEmpty || billingItems == []) {
         isDiscountApplied = false;
       }
-      context.read<FoodCategoryBloc>().add(AddToBilling([], isDiscountApplied));
+      context
+          .read<FoodCategoryBloc>()
+          .add(AddToBilling([], isDiscountApplied, selectedOrderType));
     });
   }
 
@@ -1410,7 +1474,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                               setState(() {
                                                                                                 isSplitPayment = false;
                                                                                                 if (widget.isEditingOrder != true) {
-                                                                                                  selectDineIn = true;
+                                                                                                  selectedOrderType = OrderType.line;
                                                                                                 }
                                                                                                 final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                                 if (index != -1) {
@@ -1437,7 +1501,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                         .toList()
                                                                                                   });
                                                                                                 }
-                                                                                                context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                debugPrint("billingItemsProduct:${List.from(billingItems)}");
+                                                                                                context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
 
                                                                                                 setState(() {
                                                                                                   for (var addon in p.addons!) {
@@ -1525,8 +1590,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                     if (widget
                                                                             .isEditingOrder !=
                                                                         true) {
-                                                                      selectDineIn =
-                                                                          true;
+                                                                      selectedOrderType =
+                                                                          OrderType
+                                                                              .line;
                                                                     }
                                                                     final index =
                                                                         billingItems.indexWhere((item) =>
@@ -1574,12 +1640,13 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             .toList()
                                                                       });
                                                                     }
-                                                                    context
-                                                                        .read<
-                                                                            FoodCategoryBloc>()
-                                                                        .add(AddToBilling(
-                                                                            List.from(billingItems),
-                                                                            isDiscountApplied));
+                                                                    debugPrint(
+                                                                        "billingItemsProduct:${List.from(billingItems)}");
+                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                        List.from(
+                                                                            billingItems),
+                                                                        isDiscountApplied,
+                                                                        selectedOrderType));
                                                                   });
                                                                 }
                                                               });
@@ -1591,7 +1658,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                       p.isStock ==
                                                                           false
                                                                   ? 1.0
-                                                                  : 0.5, // Blur effect for out of stock
+                                                                  : 0.5,
                                                               child: Card(
                                                                 color:
                                                                     whiteColor,
@@ -1686,7 +1753,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             ),
                                                                           ),
                                                                         ),
-                                                                      // Show "Out of Stock" message if no stock
                                                                       if ((p.availableQuantity ?? 0) <=
                                                                               0 &&
                                                                           p.isStock ==
@@ -1781,7 +1847,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                     setState(() {
                                                                                       isSplitPayment = false;
                                                                                       if (widget.isEditingOrder != true) {
-                                                                                        selectDineIn = true;
+                                                                                        selectedOrderType = OrderType.line;
                                                                                       }
                                                                                       final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                       if (index != -1 && billingItems[index]['qty'] > 1) {
@@ -1792,10 +1858,12 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                           isDiscountApplied = false;
                                                                                           widget.isEditingOrder = false;
                                                                                           tableId = null;
+                                                                                          waiterId = null;
                                                                                           selectedValue = null;
+                                                                                          selectedValueWaiter = null;
                                                                                         }
                                                                                       }
-                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                     });
                                                                                   },
                                                                                 ),
@@ -1813,17 +1881,13 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                 bool canAddMore;
 
                                                                                 if (p.isStock == true) {
-                                                                                  // ✅ Stock is enforced
                                                                                   if ((widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") || (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "WAITLIST")) {
-                                                                                    // For completed/waitlist orders, include paidQty
                                                                                     final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
                                                                                     canAddMore = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
                                                                                   } else {
-                                                                                    // Normal case: respect available quantity
                                                                                     canAddMore = (p.availableQuantity ?? 0) > 0 && currentQtyInCart < (p.availableQuantity ?? 0);
                                                                                   }
                                                                                 } else {
-                                                                                  // ✅ Stock is NOT enforced → allow infinite
                                                                                   canAddMore = true;
                                                                                 }
 
@@ -1841,7 +1905,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                             setState(() {
                                                                                               isSplitPayment = false;
                                                                                               if (widget.isEditingOrder != true) {
-                                                                                                selectDineIn = true;
+                                                                                                selectedOrderType = OrderType.line;
                                                                                               }
                                                                                               final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                               if (index != -1) {
@@ -1868,11 +1932,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                       .toList()
                                                                                                 });
                                                                                               }
-                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                             });
                                                                                           }
                                                                                         : () {
-                                                                                            // Show message if stock enforced and qty = 0
                                                                                             if (p.isStock == true && (p.availableQuantity ?? 0) == 0) {
                                                                                               ScaffoldMessenger.of(context).showSnackBar(
                                                                                                 const SnackBar(content: Text("Out of stock")),
@@ -1924,7 +1987,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                     setState(() {
                                                                                       isSplitPayment = false;
                                                                                       if (widget.isEditingOrder != true) {
-                                                                                        selectDineIn = true;
+                                                                                        selectedOrderType = OrderType.line;
                                                                                       }
                                                                                       final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                       if (index != -1 && billingItems[index]['qty'] > 1) {
@@ -1935,10 +1998,12 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                           isDiscountApplied = false;
                                                                                           widget.isEditingOrder = false;
                                                                                           tableId = null;
+                                                                                          waiterId = null;
                                                                                           selectedValue = null;
+                                                                                          selectedValueWaiter = null;
                                                                                         }
                                                                                       }
-                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                     });
                                                                                   },
                                                                                 ),
@@ -1956,17 +2021,13 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                 bool canAddMore;
 
                                                                                 if (p.isStock == true) {
-                                                                                  // ✅ Stock is enforced
                                                                                   if ((widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "COMPLETED") || (widget.isEditingOrder == true && widget.existingOrder?.data?.orderStatus == "WAITLIST")) {
-                                                                                    // For completed/waitlist orders, include paidQty
                                                                                     final paidQty = widget.existingOrder?.data?.items?.firstWhereOrNull((item) => item.product?.id == p.id)?.quantity ?? 0;
                                                                                     canAddMore = currentQtyInCart < ((p.availableQuantity ?? 0) + paidQty);
                                                                                   } else {
-                                                                                    // Normal case: respect available quantity
                                                                                     canAddMore = (p.availableQuantity ?? 0) > 0 && currentQtyInCart < (p.availableQuantity ?? 0);
                                                                                   }
                                                                                 } else {
-                                                                                  // ✅ Stock is NOT enforced → allow infinite
                                                                                   canAddMore = true;
                                                                                 }
 
@@ -1984,7 +2045,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                             setState(() {
                                                                                               isSplitPayment = false;
                                                                                               if (widget.isEditingOrder != true) {
-                                                                                                selectDineIn = true;
+                                                                                                selectedOrderType = OrderType.line;
                                                                                               }
                                                                                               final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                               if (index != -1) {
@@ -2011,11 +2072,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                       .toList()
                                                                                                 });
                                                                                               }
-                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                             });
                                                                                           }
                                                                                         : () {
-                                                                                            // Show message if stock enforced and qty = 0
                                                                                             if (p.isStock == true && (p.availableQuantity ?? 0) == 0) {
                                                                                               ScaffoldMessenger.of(context).showSnackBar(
                                                                                                 const SnackBar(content: Text("Out of stock")),
@@ -2187,7 +2247,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                               setState(() {
                                                                                                 isSplitPayment = false;
                                                                                                 if (widget.isEditingOrder != true) {
-                                                                                                  selectDineIn = true;
+                                                                                                  selectedOrderType = OrderType.line;
                                                                                                 }
                                                                                                 final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                                 if (index != -1) {
@@ -2213,7 +2273,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                         .toList()
                                                                                                   });
                                                                                                 }
-                                                                                                context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
 
                                                                                                 setState(() {
                                                                                                   for (var addon in p.addons!) {
@@ -2251,8 +2311,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                     if (widget
                                                                             .isEditingOrder !=
                                                                         true) {
-                                                                      selectDineIn =
-                                                                          true;
+                                                                      selectedOrderType =
+                                                                          OrderType
+                                                                              .line;
                                                                     }
                                                                     final index =
                                                                         billingItems.indexWhere((item) =>
@@ -2298,12 +2359,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             .toList()
                                                                       });
                                                                     }
-                                                                    context
-                                                                        .read<
-                                                                            FoodCategoryBloc>()
-                                                                        .add(AddToBilling(
-                                                                            List.from(billingItems),
-                                                                            isDiscountApplied));
+                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                        List.from(
+                                                                            billingItems),
+                                                                        isDiscountApplied,
+                                                                        selectedOrderType));
                                                                   });
                                                                 }
                                                               });
@@ -2435,15 +2495,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                               backgroundColor: greyColor200,
                                                                               child: IconButton(
                                                                                 icon: const Icon(Icons.remove, size: 16, color: blackColor),
-                                                                                onPressed
-                                                                                    // :
-                                                                                    // disableDecrement
-                                                                                    //     ? null
-                                                                                    : () {
+                                                                                onPressed: () {
                                                                                   setState(() {
                                                                                     isSplitPayment = false;
                                                                                     if (widget.isEditingOrder != true) {
-                                                                                      selectDineIn = true;
+                                                                                      selectedOrderType = OrderType.line;
                                                                                     }
                                                                                     final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                     if (index != -1 && billingItems[index]['qty'] > 1) {
@@ -2454,11 +2510,13 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                         isDiscountApplied = false;
                                                                                         widget.isEditingOrder = false;
                                                                                         tableId = null;
+                                                                                        waiterId = null;
                                                                                         selectedValue = null;
+                                                                                        selectedValueWaiter = null;
                                                                                       }
                                                                                     }
 
-                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                   });
                                                                                 },
                                                                               ),
@@ -2479,7 +2537,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                   setState(() {
                                                                                     isSplitPayment = false;
                                                                                     if (widget.isEditingOrder != true) {
-                                                                                      selectDineIn = true;
+                                                                                      selectedOrderType = OrderType.line;
                                                                                     }
                                                                                     final index = billingItems.indexWhere((item) => item['_id'] == p.id);
                                                                                     if (index != -1) {
@@ -2505,7 +2563,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                             .toList()
                                                                                       });
                                                                                     }
-                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                   });
                                                                                 },
                                                                               ),
@@ -2932,90 +2990,340 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                   onTap: () {
                                                                     setState(
                                                                         () {
-                                                                      selectDineIn =
-                                                                          true;
+                                                                      selectedOrderType =
+                                                                          OrderType
+                                                                              .line;
                                                                       if (widget
                                                                               .isEditingOrder !=
                                                                           true) {
                                                                         selectedValue =
                                                                             null;
+                                                                        selectedValueWaiter =
+                                                                            null;
                                                                         tableId =
+                                                                            null;
+                                                                        waiterId =
                                                                             null;
                                                                       }
                                                                       isSplitPayment =
                                                                           false;
+                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                          List.from(
+                                                                              billingItems),
+                                                                          isDiscountApplied,
+                                                                          selectedOrderType));
                                                                     });
                                                                   },
                                                                   child:
                                                                       Container(
-                                                                    padding: EdgeInsets
+                                                                    padding: const EdgeInsets
                                                                         .symmetric(
-                                                                            vertical:
-                                                                                8),
-                                                                    decoration: BoxDecoration(
-                                                                        color: selectDineIn ==
-                                                                                true
-                                                                            ? appPrimaryColor
-                                                                            : whiteColor,
-                                                                        borderRadius:
-                                                                            BorderRadius.circular(30)),
+                                                                        vertical:
+                                                                            8),
+                                                                    constraints:
+                                                                        const BoxConstraints(
+                                                                            minWidth:
+                                                                                70),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: selectedOrderType ==
+                                                                              OrderType.line
+                                                                          ? appPrimaryColor
+                                                                          : whiteColor,
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                              30),
+                                                                    ),
                                                                     child:
                                                                         Center(
-                                                                      child: Text(
-                                                                          "Dine In",
-                                                                          style: MyTextStyle.f14(selectDineIn == true
+                                                                      child:
+                                                                          Text(
+                                                                        "Line",
+                                                                        style: MyTextStyle
+                                                                            .f12(
+                                                                          selectedOrderType == OrderType.line
                                                                               ? whiteColor
-                                                                              : blackColor)),
+                                                                              : blackColor,
+                                                                        ),
+                                                                      ),
                                                                     ),
                                                                   ),
                                                                 ),
                                                               ),
+                                                              const SizedBox(
+                                                                  width: 8),
                                                               Expanded(
                                                                 child: InkWell(
                                                                   onTap: () {
                                                                     setState(
                                                                         () {
-                                                                      selectDineIn =
-                                                                          false;
+                                                                      selectedOrderType =
+                                                                          OrderType
+                                                                              .parcel;
                                                                       if (widget
                                                                               .isEditingOrder !=
                                                                           true) {
                                                                         selectedValue =
                                                                             null;
+                                                                        selectedValueWaiter =
+                                                                            null;
                                                                         tableId =
+                                                                            null;
+                                                                        waiterId =
                                                                             null;
                                                                       }
                                                                       isSplitPayment =
                                                                           false;
+                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                          List.from(
+                                                                              billingItems),
+                                                                          isDiscountApplied,
+                                                                          selectedOrderType));
                                                                     });
                                                                   },
                                                                   child:
                                                                       Container(
-                                                                    padding: EdgeInsets
-                                                                        .symmetric(
-                                                                            vertical:
-                                                                                8),
-                                                                    decoration: BoxDecoration(
-                                                                        color: selectDineIn ==
-                                                                                false
-                                                                            ? appPrimaryColor
-                                                                            : whiteColor,
-                                                                        borderRadius:
-                                                                            BorderRadius.circular(30)),
-                                                                    child: Center(
-                                                                        child: Text(
-                                                                            "Take Away",
-                                                                            style: MyTextStyle.f14(selectDineIn == false
-                                                                                ? whiteColor
-                                                                                : blackColor))),
+                                                                    alignment:
+                                                                        Alignment
+                                                                            .center,
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .symmetric(
+                                                                      vertical:
+                                                                          8,
+                                                                    ),
+                                                                    constraints:
+                                                                        const BoxConstraints(
+                                                                            minWidth:
+                                                                                70),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: selectedOrderType ==
+                                                                              OrderType.parcel
+                                                                          ? appPrimaryColor
+                                                                          : whiteColor,
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                              30),
+                                                                    ),
+                                                                    child:
+                                                                        Center(
+                                                                      child:
+                                                                          Text(
+                                                                        "Parcel",
+                                                                        style: MyTextStyle
+                                                                            .f12(
+                                                                          selectedOrderType == OrderType.parcel
+                                                                              ? whiteColor
+                                                                              : blackColor,
+                                                                        ),
+                                                                      ),
+                                                                    ),
                                                                   ),
                                                                 ),
                                                               ),
-                                                              SizedBox(
-                                                                  width: 16),
+                                                              const SizedBox(
+                                                                  width: 2),
+                                                              Expanded(
+                                                                child: InkWell(
+                                                                  onTap: () {
+                                                                    setState(
+                                                                        () {
+                                                                      selectedOrderType =
+                                                                          OrderType
+                                                                              .ac;
+                                                                      if (widget
+                                                                              .isEditingOrder !=
+                                                                          true) {
+                                                                        selectedValue =
+                                                                            null;
+                                                                        selectedValueWaiter =
+                                                                            null;
+                                                                        tableId =
+                                                                            null;
+                                                                        waiterId =
+                                                                            null;
+                                                                      }
+                                                                      isSplitPayment =
+                                                                          false;
+                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                          List.from(
+                                                                              billingItems),
+                                                                          isDiscountApplied,
+                                                                          selectedOrderType));
+                                                                    });
+                                                                  },
+                                                                  child:
+                                                                      Container(
+                                                                    padding: const EdgeInsets
+                                                                        .symmetric(
+                                                                        vertical:
+                                                                            8),
+                                                                    constraints:
+                                                                        const BoxConstraints(
+                                                                            minWidth:
+                                                                                70),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: selectedOrderType ==
+                                                                              OrderType.ac
+                                                                          ? appPrimaryColor
+                                                                          : whiteColor,
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                              30),
+                                                                    ),
+                                                                    child:
+                                                                        Center(
+                                                                      child:
+                                                                          Text(
+                                                                        "AC",
+                                                                        style: MyTextStyle
+                                                                            .f12(
+                                                                          selectedOrderType == OrderType.ac
+                                                                              ? whiteColor
+                                                                              : blackColor,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              // Expanded(
+                                                              //   child: InkWell(
+                                                              //     onTap: () {
+                                                              //       setState(
+                                                              //               () {
+                                                              //             selectedOrderType =
+                                                              //                 OrderType
+                                                              //                     .hd;
+                                                              //             if (widget
+                                                              //                 .isEditingOrder !=
+                                                              //                 true) {
+                                                              //               selectedValue =
+                                                              //               null;
+                                                              //               selectedValueWaiter =
+                                                              //               null;
+                                                              //               tableId =
+                                                              //               null;
+                                                              //               waiterId =
+                                                              //               null;
+                                                              //             }
+                                                              //             isSplitPayment =
+                                                              //             false;
+                                                              //             context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                              //                 List.from(
+                                                              //                     billingItems),
+                                                              //                 isDiscountApplied,
+                                                              //                 selectedOrderType));
+                                                              //           });
+                                                              //     },
+                                                              //     child:
+                                                              //     Container(
+                                                              //       padding: const EdgeInsets
+                                                              //           .symmetric(
+                                                              //           vertical:
+                                                              //           8),
+                                                              //       constraints:
+                                                              //       const BoxConstraints(
+                                                              //           minWidth:
+                                                              //           70),
+                                                              //       decoration:
+                                                              //       BoxDecoration(
+                                                              //         color: selectedOrderType ==
+                                                              //             OrderType.hd
+                                                              //             ? appPrimaryColor
+                                                              //             : whiteColor,
+                                                              //         borderRadius:
+                                                              //         BorderRadius.circular(
+                                                              //             30),
+                                                              //       ),
+                                                              //       child:
+                                                              //       Center(
+                                                              //         child:
+                                                              //         Text(
+                                                              //           "HD",
+                                                              //           style: MyTextStyle
+                                                              //               .f12(
+                                                              //             selectedOrderType == OrderType.hd
+                                                              //                 ? whiteColor
+                                                              //                 : blackColor,
+                                                              //           ),
+                                                              //         ),
+                                                              //       ),
+                                                              //     ),
+                                                              //   ),
+                                                              // ),
+                                                              // Expanded(
+                                                              //   child: InkWell(
+                                                              //     onTap: () {
+                                                              //       setState(
+                                                              //               () {
+                                                              //             selectedOrderType =
+                                                              //                 OrderType
+                                                              //                     .swiggy;
+                                                              //             if (widget
+                                                              //                 .isEditingOrder !=
+                                                              //                 true) {
+                                                              //               selectedValue =
+                                                              //               null;
+                                                              //               selectedValueWaiter =
+                                                              //               null;
+                                                              //               tableId =
+                                                              //               null;
+                                                              //               waiterId =
+                                                              //               null;
+                                                              //             }
+                                                              //             isSplitPayment =
+                                                              //             false;
+                                                              //             context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                              //                 List.from(
+                                                              //                     billingItems),
+                                                              //                 isDiscountApplied,
+                                                              //                 selectedOrderType));
+                                                              //           });
+                                                              //     },
+                                                              //     child:
+                                                              //     Container(
+                                                              //       padding: const EdgeInsets
+                                                              //           .symmetric(
+                                                              //           vertical:
+                                                              //           8),
+                                                              //       constraints:
+                                                              //       const BoxConstraints(
+                                                              //           minWidth:
+                                                              //           70),
+                                                              //       decoration:
+                                                              //       BoxDecoration(
+                                                              //         color: selectedOrderType ==
+                                                              //             OrderType.swiggy
+                                                              //             ? appPrimaryColor
+                                                              //             : whiteColor,
+                                                              //         borderRadius:
+                                                              //         BorderRadius.circular(
+                                                              //             30),
+                                                              //       ),
+                                                              //       child:
+                                                              //       Center(
+                                                              //         child:
+                                                              //         Text(
+                                                              //           "Swiggy",
+                                                              //           style: MyTextStyle
+                                                              //               .f12(
+                                                              //             selectedOrderType == OrderType.swiggy
+                                                              //                 ? whiteColor
+                                                              //                 : blackColor,
+                                                              //           ),
+                                                              //         ),
+                                                              //       ),
+                                                              //     ),
+                                                              //   ),
+                                                              // ),
+                                                              const SizedBox(
+                                                                  width: 8),
                                                               Text(
                                                                 "Bills",
-                                                                style: MyTextStyle.f14(
+                                                                style: MyTextStyle.f13(
                                                                     blackColor,
                                                                     weight:
                                                                         FontWeight
@@ -3028,10 +3336,15 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                         .clear();
                                                                     selectedValue =
                                                                         null;
+                                                                    selectedValueWaiter =
+                                                                        null;
                                                                     tableId =
                                                                         null;
-                                                                    selectDineIn =
-                                                                        true;
+                                                                    waiterId =
+                                                                        null;
+                                                                    selectedOrderType =
+                                                                        OrderType
+                                                                            .line;
                                                                     isCompleteOrder =
                                                                         false;
                                                                     isSplitPayment =
@@ -3044,9 +3357,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                         false;
                                                                     balance = 0;
                                                                     if (billingItems
-                                                                            .isEmpty ||
-                                                                        billingItems ==
-                                                                            []) {
+                                                                        .isEmpty) {
                                                                       isDiscountApplied =
                                                                           false;
                                                                     }
@@ -3054,10 +3365,12 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                   context
                                                                       .read<
                                                                           FoodCategoryBloc>()
-                                                                      .add(AddToBilling(
-                                                                          List.from(
-                                                                              billingItems),
-                                                                          isDiscountApplied));
+                                                                      .add(
+                                                                        AddToBilling(
+                                                                            List.from(billingItems),
+                                                                            isDiscountApplied,
+                                                                            selectedOrderType),
+                                                                      );
                                                                 },
                                                                 icon: const Icon(
                                                                     Icons
@@ -3066,105 +3379,229 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                             ],
                                                           ),
                                                           SizedBox(height: 10),
-                                                          if (selectDineIn ==
-                                                              true)
-                                                            Text(
-                                                              'Choose Table',
-                                                              style: MyTextStyle
-                                                                  .f14(
-                                                                blackColor,
-                                                                weight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                            ),
-                                                          if (selectDineIn ==
-                                                              true)
-                                                            Container(
-                                                              margin:
-                                                                  const EdgeInsets
-                                                                      .all(10),
-                                                              child:
-                                                                  DropdownButtonFormField<
-                                                                      String>(
-                                                                value: (getTableModel.data?.any((item) =>
-                                                                            item.name ==
-                                                                            selectedValue) ??
-                                                                        false)
-                                                                    ? selectedValue
-                                                                    : null,
-                                                                icon:
-                                                                    const Icon(
-                                                                  Icons
-                                                                      .arrow_drop_down,
-                                                                  color:
-                                                                      appPrimaryColor,
-                                                                ),
-                                                                isExpanded:
-                                                                    true,
-                                                                decoration:
-                                                                    InputDecoration(
-                                                                  border:
-                                                                      OutlineInputBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius
-                                                                            .circular(8),
-                                                                    borderSide:
-                                                                        const BorderSide(
-                                                                      color:
-                                                                          appPrimaryColor,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                items: getTableModel
-                                                                    .data
-                                                                    ?.map(
-                                                                        (item) {
-                                                                  return DropdownMenuItem<
-                                                                      String>(
-                                                                    value: item
-                                                                        .name,
+                                                          if (selectedOrderType ==
+                                                                  OrderType
+                                                                      .line ||
+                                                              selectedOrderType ==
+                                                                  OrderType.ac)
+                                                            Row(
+                                                              children: [
+                                                                Expanded(
+                                                                  child:
+                                                                      Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            10.0),
                                                                     child: Text(
-                                                                      "Table ${item.name}",
+                                                                      'Select Table',
                                                                       style: MyTextStyle
                                                                           .f14(
                                                                         blackColor,
                                                                         weight:
-                                                                            FontWeight.normal,
+                                                                            FontWeight.bold,
                                                                       ),
                                                                     ),
-                                                                  );
-                                                                }).toList(),
-                                                                onChanged: (String?
-                                                                    newValue) {
-                                                                  if (newValue !=
-                                                                      null) {
-                                                                    setState(
-                                                                        () {
-                                                                      selectedValue =
-                                                                          newValue;
-                                                                      final selectedItem = getTableModel
-                                                                          .data
-                                                                          ?.firstWhere((item) =>
-                                                                              item.name ==
-                                                                              newValue);
-                                                                      tableId = selectedItem
-                                                                          ?.id
-                                                                          .toString();
-                                                                    });
-                                                                  }
-                                                                },
-                                                                hint: Text(
-                                                                  '-- Select Table --',
-                                                                  style:
-                                                                      MyTextStyle
-                                                                          .f14(
-                                                                    blackColor,
-                                                                    weight: FontWeight
-                                                                        .normal,
                                                                   ),
                                                                 ),
-                                                              ),
+                                                                Expanded(
+                                                                  child:
+                                                                      Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            10.0),
+                                                                    child: Text(
+                                                                      'Select Waiter',
+                                                                      style: MyTextStyle
+                                                                          .f14(
+                                                                        blackColor,
+                                                                        weight:
+                                                                            FontWeight.bold,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          if (selectedOrderType ==
+                                                                  OrderType
+                                                                      .line ||
+                                                              selectedOrderType ==
+                                                                  OrderType.ac)
+                                                            Row(
+                                                              children: [
+                                                                Expanded(
+                                                                  child:
+                                                                      Container(
+                                                                    margin:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            10),
+                                                                    child: DropdownButtonFormField<
+                                                                        String>(
+                                                                      value: (getTableModel.data?.any((item) => item.name == selectedValue) ??
+                                                                              false)
+                                                                          ? selectedValue
+                                                                          : null,
+                                                                      icon:
+                                                                          const Icon(
+                                                                        Icons
+                                                                            .arrow_drop_down,
+                                                                        color:
+                                                                            appPrimaryColor,
+                                                                      ),
+                                                                      isExpanded:
+                                                                          true,
+                                                                      decoration:
+                                                                          InputDecoration(
+                                                                        border:
+                                                                            OutlineInputBorder(
+                                                                          borderRadius:
+                                                                              BorderRadius.circular(8),
+                                                                          borderSide:
+                                                                              const BorderSide(
+                                                                            color:
+                                                                                appPrimaryColor,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      items: getTableModel
+                                                                          .data
+                                                                          ?.map(
+                                                                              (item) {
+                                                                        return DropdownMenuItem<
+                                                                            String>(
+                                                                          value:
+                                                                              item.name,
+                                                                          child:
+                                                                              Text(
+                                                                            "Table ${item.name}",
+                                                                            style:
+                                                                                MyTextStyle.f14(
+                                                                              blackColor,
+                                                                              weight: FontWeight.normal,
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      }).toList(),
+                                                                      onChanged:
+                                                                          (String?
+                                                                              newValue) {
+                                                                        if (newValue !=
+                                                                            null) {
+                                                                          setState(
+                                                                              () {
+                                                                            selectedValue =
+                                                                                newValue;
+                                                                            final selectedItem = getTableModel.data?.firstWhere((item) =>
+                                                                                item.name ==
+                                                                                newValue);
+                                                                            tableId =
+                                                                                selectedItem?.id.toString();
+                                                                          });
+                                                                        }
+                                                                      },
+                                                                      hint:
+                                                                          Text(
+                                                                        '-- Select Table --',
+                                                                        style: MyTextStyle
+                                                                            .f14(
+                                                                          blackColor,
+                                                                          weight:
+                                                                              FontWeight.normal,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Expanded(
+                                                                  child:
+                                                                      Container(
+                                                                    margin:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            10),
+                                                                    child: DropdownButtonFormField<
+                                                                        String>(
+                                                                      value: (getWaiterModel.data?.any((item) => item.name == selectedValueWaiter) ??
+                                                                              false)
+                                                                          ? selectedValueWaiter
+                                                                          : null,
+                                                                      icon:
+                                                                          const Icon(
+                                                                        Icons
+                                                                            .arrow_drop_down,
+                                                                        color:
+                                                                            appPrimaryColor,
+                                                                      ),
+                                                                      isExpanded:
+                                                                          true,
+                                                                      decoration:
+                                                                          InputDecoration(
+                                                                        border:
+                                                                            OutlineInputBorder(
+                                                                          borderRadius:
+                                                                              BorderRadius.circular(8),
+                                                                          borderSide:
+                                                                              const BorderSide(
+                                                                            color:
+                                                                                appPrimaryColor,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      items: getWaiterModel
+                                                                          .data
+                                                                          ?.map(
+                                                                              (item) {
+                                                                        return DropdownMenuItem<
+                                                                            String>(
+                                                                          value:
+                                                                              item.name,
+                                                                          child:
+                                                                              Text(
+                                                                            "${item.name}",
+                                                                            style:
+                                                                                MyTextStyle.f14(
+                                                                              blackColor,
+                                                                              weight: FontWeight.normal,
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      }).toList(),
+                                                                      onChanged:
+                                                                          (String?
+                                                                              newValue) {
+                                                                        if (newValue !=
+                                                                            null) {
+                                                                          setState(
+                                                                              () {
+                                                                            selectedValueWaiter =
+                                                                                newValue;
+                                                                            final selectedItem = getWaiterModel.data?.firstWhere((item) =>
+                                                                                item.name ==
+                                                                                newValue);
+                                                                            waiterId =
+                                                                                selectedItem?.id.toString();
+                                                                            debugPrint("waitername:$selectedValueWaiter");
+                                                                            debugPrint("waiterId:$waiterId");
+                                                                          });
+                                                                        }
+                                                                      },
+                                                                      hint:
+                                                                          Text(
+                                                                        '-- Select Waiter --',
+                                                                        style: MyTextStyle
+                                                                            .f14(
+                                                                          blackColor,
+                                                                          weight:
+                                                                              FontWeight.normal,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
                                                           Divider(),
                                                           Column(
@@ -3206,7 +3643,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                               if (e.isStock ==
                                                                   true) {
-                                                                // ✅ Stock is enforced
                                                                 if ((widget.isEditingOrder ==
                                                                             true &&
                                                                         widget.existingOrder?.data?.orderStatus ==
@@ -3225,7 +3661,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           availableQty;
                                                                 }
                                                               } else {
-                                                                // ✅ Stock not enforced → infinite allowed
                                                                 canAddMore =
                                                                     true;
                                                               }
@@ -3313,7 +3748,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                       setState(() {
                                                                                         isSplitPayment = false;
                                                                                         if (widget.isEditingOrder != true) {
-                                                                                          selectDineIn = true;
+                                                                                          selectedOrderType = OrderType.line;
                                                                                         }
                                                                                         final index = billingItems.indexWhere((item) => item['_id'] == e.id);
                                                                                         if (index != -1 && billingItems[index]['qty'] > 1) {
@@ -3324,10 +3759,12 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                             isDiscountApplied = false;
                                                                                             widget.isEditingOrder = false;
                                                                                             tableId = null;
+                                                                                            waiterId = null;
                                                                                             selectedValue = null;
+                                                                                            selectedValueWaiter = null;
                                                                                           }
                                                                                         }
-                                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                       });
                                                                                     },
                                                                                   ),
@@ -3372,7 +3809,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                       : []
                                                                                                 });
                                                                                               }
-                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                              context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                             });
                                                                                           }
                                                                                         : () {
@@ -3394,9 +3831,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                           isDiscountApplied = false;
                                                                                           widget.isEditingOrder = false;
                                                                                           tableId = null;
+                                                                                          waiterId = null;
                                                                                           selectedValue = null;
+                                                                                          selectedValueWaiter = null;
                                                                                         }
-                                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                       });
                                                                                     },
                                                                                   ),
@@ -3404,7 +3843,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                               ),
                                                                             ],
                                                                           ),
-                                                                          // Show stock warning with better messaging for editing
                                                                           if (!canAddMore) ...[
                                                                             Container(
                                                                               margin: EdgeInsets.only(top: 4),
@@ -3457,9 +3895,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                       isDiscountApplied = false;
                                                                                                       widget.isEditingOrder = false;
                                                                                                       tableId = null;
+                                                                                                      waiterId = null;
                                                                                                       selectedValue = null;
+                                                                                                      selectedValueWaiter = null;
                                                                                                     }
-                                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                                   });
                                                                                                 } else {
                                                                                                   setState(() {
@@ -3468,9 +3908,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                       isDiscountApplied = false;
                                                                                                       widget.isEditingOrder = false;
                                                                                                       tableId = null;
+                                                                                                      waiterId = null;
                                                                                                       selectedValue = null;
+                                                                                                      selectedValueWaiter = null;
                                                                                                     }
-                                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                                   });
                                                                                                 }
                                                                                               },
@@ -3485,7 +3927,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                                 setState(() {
                                                                                                   addonsList[addonIndex]['quantity'] = addonsList[addonIndex]['quantity'] + 1;
-                                                                                                  context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                  context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                                 });
                                                                                               },
                                                                                             ),
@@ -4000,8 +4442,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                 ],
                                                                               ),
                                                                             ),
-
-                                                                          // "Add Another" link
                                                                           Align(
                                                                             alignment:
                                                                                 Alignment.centerLeft,
@@ -4055,76 +4495,101 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                           !isSplitPayment
                                                               ? Row(
                                                                   children: [
-                                                                    Expanded(
-                                                                      child: orderLoad
-                                                                          ? SpinKitCircle(color: appPrimaryColor, size: 30)
-                                                                          : ElevatedButton(
-                                                                              onPressed: () {
-                                                                                if (selectedValue == null && selectDineIn == true) {
-                                                                                  setState(() {
-                                                                                    isCompleteOrder = false;
-                                                                                  });
-                                                                                  showToast("Table number is required for DINE-IN orders", context, color: false);
-                                                                                  return;
-                                                                                } else if (((widget.isEditingOrder == null || widget.isEditingOrder == false)) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST"))) {
-                                                                                  setState(() {
-                                                                                    isCompleteOrder = false;
-                                                                                  });
-                                                                                  List<Map<String, dynamic>> payments = [
-                                                                                    {
-                                                                                      "amount": (postAddToBillingModel.total ?? 0).toDouble(),
-                                                                                      "balanceAmount": 0,
-                                                                                      "method": selectedFullPaymentMethod.toUpperCase(),
+                                                                    selectedOrderType == OrderType.line ||
+                                                                            selectedOrderType ==
+                                                                                OrderType.ac
+                                                                        ? Expanded(
+                                                                            child: orderLoad
+                                                                                ? SpinKitCircle(color: appPrimaryColor, size: 30)
+                                                                                : ElevatedButton(
+                                                                                    onPressed: () {
+                                                                                      if ((selectedValue == null && selectedOrderType == OrderType.line) || (selectedValue == null && selectedOrderType == OrderType.ac)) {
+                                                                                        setState(() {
+                                                                                          isCompleteOrder = false;
+                                                                                        });
+                                                                                        showToast("Table number is required for LINE/AC orders", context, color: false);
+                                                                                        return;
+                                                                                      } else if ((selectedValueWaiter == null && selectedOrderType == OrderType.line) || (selectedValueWaiter == null && selectedOrderType == OrderType.ac)) {
+                                                                                        setState(() {
+                                                                                          isCompleteOrder = false;
+                                                                                        });
+                                                                                        showToast("Waiter name is required for LINE/AC orders", context, color: false);
+                                                                                        return;
+                                                                                      } else if (((widget.isEditingOrder == null || widget.isEditingOrder == false)) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST"))) {
+                                                                                        setState(() {
+                                                                                          isCompleteOrder = false;
+                                                                                        });
+                                                                                        List<Map<String, dynamic>> payments = [
+                                                                                          {
+                                                                                            "amount": (postAddToBillingModel.total ?? 0).toDouble(),
+                                                                                            "balanceAmount": 0,
+                                                                                            "method": selectedFullPaymentMethod.toUpperCase(),
+                                                                                          },
+                                                                                        ];
+                                                                                        final orderPayload = buildOrderPayload(
+                                                                                          postAddToBillingModel: postAddToBillingModel,
+                                                                                          tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                          waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
+                                                                                          orderStatus: 'WAITLIST',
+                                                                                          orderType: selectedOrderType == OrderType.line
+                                                                                              ? 'LINE'
+                                                                                              : selectedOrderType == OrderType.parcel
+                                                                                                  ? 'PARCEL'
+                                                                                                  : selectedOrderType == OrderType.parcel
+                                                                                                      ? 'PARCEL'
+                                                                                                      : "AC",
+                                                                                          // : selectedOrderType == OrderType.hd
+                                                                                          // ? "HD"
+                                                                                          //  : "SWIGGY",
+                                                                                          discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
+                                                                                          isDiscountApplied: isDiscountApplied,
+                                                                                          tipAmount: tipController.text,
+                                                                                          payments: widget.isEditingOrder == true ? [] : payments,
+                                                                                        );
+                                                                                        debugPrint("payload:${jsonEncode(orderPayload)}");
+                                                                                        setState(() {
+                                                                                          orderLoad = true;
+                                                                                        });
+                                                                                        if (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
+                                                                                          if (((selectedValue == null || selectedValue == 'N/A') && selectedOrderType == OrderType.line) || (selectedValue == null || selectedValue == 'N/A') && selectedOrderType == OrderType.ac) {
+                                                                                            showToast("Table number is required for LINE/AC orders", context, color: false);
+                                                                                            setState(() {
+                                                                                              orderLoad = false;
+                                                                                            });
+                                                                                          } else if (((selectedValueWaiter == null || selectedValueWaiter == 'N/A') && selectedOrderType == OrderType.line) || (selectedValueWaiter == null || selectedValueWaiter == 'N/A') && selectedOrderType == OrderType.ac) {
+                                                                                            showToast("Waiter name is required for LINE/AC orders", context, color: false);
+                                                                                            setState(() {
+                                                                                              orderLoad = false;
+                                                                                            });
+                                                                                          } else {
+                                                                                            setState(() {
+                                                                                              isCompleteOrder = false;
+                                                                                            });
+                                                                                            debugPrint("editId:${widget.existingOrder!.data!.id}");
+                                                                                            context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder?.data!.id));
+                                                                                          }
+                                                                                        } else {
+                                                                                          setState(() {
+                                                                                            isCompleteOrder = false;
+                                                                                          });
+                                                                                          context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
+                                                                                        }
+                                                                                      }
                                                                                     },
-                                                                                  ];
-                                                                                  final orderPayload = buildOrderPayload(
-                                                                                    postAddToBillingModel: postAddToBillingModel,
-                                                                                    tableId: selectDineIn == true ? tableId : null,
-                                                                                    orderStatus: 'WAITLIST',
-                                                                                    orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
-                                                                                    discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
-                                                                                    isDiscountApplied: isDiscountApplied,
-                                                                                    tipAmount: tipController.text,
-                                                                                    payments: widget.isEditingOrder == true ? [] : payments,
-                                                                                  );
-                                                                                  setState(() {
-                                                                                    orderLoad = true;
-                                                                                  });
-                                                                                  debugPrint("payloadsave:${jsonEncode(orderPayload)}");
-                                                                                  if (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
-                                                                                    if ((selectedValue == null || selectedValue == 'N/A') && selectDineIn == true) {
-                                                                                      showToast("Table number is required for DINE-IN orders", context, color: false);
-                                                                                      setState(() {
-                                                                                        orderLoad = false;
-                                                                                      });
-                                                                                    } else {
-                                                                                      setState(() {
-                                                                                        isCompleteOrder = false;
-                                                                                      });
-                                                                                      debugPrint("editId:${widget.existingOrder!.data!.id}");
-                                                                                      context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder?.data!.id));
-                                                                                    }
-                                                                                  } else {
-                                                                                    setState(() {
-                                                                                      isCompleteOrder = false;
-                                                                                    });
-                                                                                    context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
-                                                                                  }
-                                                                                }
-                                                                              },
-                                                                              style: ElevatedButton.styleFrom(
-                                                                                backgroundColor: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? appPrimaryColor : greyColor,
-                                                                                minimumSize: const Size(0, 50), // Height only
-                                                                                shape: RoundedRectangleBorder(
-                                                                                  borderRadius: BorderRadius.circular(30),
-                                                                                ),
-                                                                              ),
-                                                                              child: Text(
-                                                                                "Save Order",
-                                                                                style: TextStyle(color: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? whiteColor : blackColor),
-                                                                              ),
-                                                                            ),
-                                                                    ),
+                                                                                    style: ElevatedButton.styleFrom(
+                                                                                      backgroundColor: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? appPrimaryColor : greyColor,
+                                                                                      minimumSize: const Size(0, 50), // Height only
+                                                                                      shape: RoundedRectangleBorder(
+                                                                                        borderRadius: BorderRadius.circular(30),
+                                                                                      ),
+                                                                                    ),
+                                                                                    child: Text(
+                                                                                      "Save Order",
+                                                                                      style: TextStyle(color: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? whiteColor : blackColor),
+                                                                                    ),
+                                                                                  ),
+                                                                          )
+                                                                        : Container(),
                                                                     const SizedBox(
                                                                         width:
                                                                             10),
@@ -4134,8 +4599,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           : ElevatedButton(
                                                                               onPressed: () {
                                                                                 /* Full payment */
-                                                                                if (selectedValue == null && selectDineIn == true) {
-                                                                                  showToast("Table number is required for DINE-IN orders", context, color: false);
+                                                                                if ((selectedValue == null && selectedOrderType == OrderType.line) || (selectedValue == null && selectedOrderType == OrderType.ac)) {
+                                                                                  showToast("Table number is required for LINE/AC orders", context, color: false);
+                                                                                } else if ((selectedValueWaiter == null && selectedOrderType == OrderType.line) || (selectedValueWaiter == null && selectedOrderType == OrderType.ac)) {
+                                                                                  showToast("Waiter name is required for LINE/AC orders", context, color: false);
                                                                                 } else {
                                                                                   if ((widget.isEditingOrder == false || widget.isEditingOrder == null) || (widget.isEditingOrder == true && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
                                                                                     setState(() {
@@ -4145,47 +4612,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                       showToast("Select any one of the payment method", context, color: false);
                                                                                       return;
                                                                                     }
-                                                                                    // if (amountController
-                                                                                    //         .text
-                                                                                    //         .isEmpty &&
-                                                                                    //     selectedFullPaymentMethod ==
-                                                                                    //         "Cash") {
-                                                                                    //   showToast(
-                                                                                    //       "Enter the amount",
-                                                                                    //       context,
-                                                                                    //       color:
-                                                                                    //           false);
-                                                                                    //   return;
-                                                                                    // }
                                                                                     if (selectedFullPaymentMethod == "Cash" || selectedFullPaymentMethod == "Card" || selectedFullPaymentMethod == "UPI") {
-                                                                                      // String
-                                                                                      //     amountText =
-                                                                                      //     amountController
-                                                                                      //         .text
-                                                                                      //         .trim();
-                                                                                      // if (selectedFullPaymentMethod ==
-                                                                                      //     "Cash") {
-                                                                                      //   if (amountText.isEmpty ||
-                                                                                      //       double.tryParse(amountText) ==
-                                                                                      //           null) {
-                                                                                      //     showToast(
-                                                                                      //         "Enter a valid amount",
-                                                                                      //         context,
-                                                                                      //         color: false);
-                                                                                      //     return;
-                                                                                      //   }
-                                                                                      //   double
-                                                                                      //       amount =
-                                                                                      //       double.parse(amountText);
-                                                                                      //   if (amount !=
-                                                                                      //       postAddToBillingModel.total) {
-                                                                                      //     showToast(
-                                                                                      //         "Amount not matching",
-                                                                                      //         context,
-                                                                                      //         color: false);
-                                                                                      //     return;
-                                                                                      //   }
-                                                                                      // }
                                                                                       List<Map<String, dynamic>> payments = [];
                                                                                       payments = [
                                                                                         {
@@ -4197,9 +4624,19 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                       final orderPayload = buildOrderPayload(
                                                                                         postAddToBillingModel: postAddToBillingModel,
-                                                                                        tableId: selectDineIn == true ? tableId : null,
+                                                                                        tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                        waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                         orderStatus: 'COMPLETED',
-                                                                                        orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                        orderType: selectedOrderType == OrderType.line
+                                                                                            ? 'LINE'
+                                                                                            : selectedOrderType == OrderType.parcel
+                                                                                                ? 'PARCEL'
+                                                                                                : "AC",
+                                                                                        // : selectedOrderType == OrderType.ac
+                                                                                        //     ? "AC"
+                                                                                        // : selectedOrderType == OrderType.hd
+                                                                                        // ? "HD"
+                                                                                        // : "SWIGGY",
                                                                                         discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                         isDiscountApplied: isDiscountApplied,
                                                                                         tipAmount: tipController.text,
@@ -4224,9 +4661,19 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                       final orderPayload = buildOrderPayload(
                                                                                         postAddToBillingModel: postAddToBillingModel,
-                                                                                        tableId: selectDineIn == true ? tableId : null,
+                                                                                        tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                        waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                         orderStatus: 'COMPLETED',
-                                                                                        orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                        orderType: selectedOrderType == OrderType.line
+                                                                                            ? 'LINE'
+                                                                                            : selectedOrderType == OrderType.parcel
+                                                                                                ? 'PARCEL'
+                                                                                                : "AC",
+                                                                                        // selectedOrderType == OrderType.ac
+                                                                                        //             ? "AC"
+                                                                                        // : selectedOrderType == OrderType.hd
+                                                                                        // ? "HD"
+                                                                                        //   : "SWIGGY",
                                                                                         discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                         isDiscountApplied: isDiscountApplied,
                                                                                         tipAmount: tipController.text,
@@ -4235,7 +4682,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                       setState(() {
                                                                                         completeLoad = true;
                                                                                       });
-                                                                                      debugPrint("editIdCompleted:${widget.existingOrder!.data!.id}");
                                                                                       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder!.data!.id));
                                                                                       balance = 0;
                                                                                     }
@@ -4247,42 +4693,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                         showToast("Select any one of the payment method", context, color: false);
                                                                                         return;
                                                                                       }
-                                                                                      // if (amountController
-                                                                                      //         .text
-                                                                                      //         .isEmpty &&
-                                                                                      //     selectedFullPaymentMethod ==
-                                                                                      //         "Cash") {
-                                                                                      //   showToast(
-                                                                                      //       "Enter the amount",
-                                                                                      //       context,
-                                                                                      //       color:
-                                                                                      //           false);
-                                                                                      //   return;
-                                                                                      // }
                                                                                       if (selectedFullPaymentMethod == "Cash" || selectedFullPaymentMethod == "Card" || selectedFullPaymentMethod == "UPI") {
-                                                                                        // String
-                                                                                        //     amountText =
-                                                                                        //     amountController.text.trim();
-                                                                                        // if (selectedFullPaymentMethod ==
-                                                                                        //     "Cash") {
-                                                                                        //   if (amountText.isEmpty ||
-                                                                                        //       double.tryParse(amountText) == null) {
-                                                                                        //     showToast("Enter a valid amount",
-                                                                                        //         context,
-                                                                                        //         color: false);
-                                                                                        //     return;
-                                                                                        //   }
-                                                                                        //   double
-                                                                                        //       amount =
-                                                                                        //       double.parse(amountText);
-                                                                                        //   if (amount !=
-                                                                                        //       balance) {
-                                                                                        //     showToast("Amount not matching",
-                                                                                        //         context,
-                                                                                        //         color: false);
-                                                                                        //     return;
-                                                                                        //   }
-                                                                                        // }
                                                                                         List<Map<String, dynamic>> payments = [];
                                                                                         payments = [
                                                                                           {
@@ -4294,9 +4705,19 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                         final orderPayload = buildOrderPayload(
                                                                                           postAddToBillingModel: postAddToBillingModel,
-                                                                                          tableId: selectDineIn == true ? tableId : null,
+                                                                                          tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                          waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                           orderStatus: 'COMPLETED',
-                                                                                          orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                          orderType: selectedOrderType == OrderType.line
+                                                                                              ? 'LINE'
+                                                                                              : selectedOrderType == OrderType.parcel
+                                                                                                  ? 'PARCEL'
+                                                                                                  : "AC",
+                                                                                          // selectedOrderType == OrderType.ac
+                                                                                          //             ? "AC"
+                                                                                          // : selectedOrderType == OrderType.hd
+                                                                                          // ? "HD"
+                                                                                          // : "SWIGGY",
                                                                                           discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                           isDiscountApplied: isDiscountApplied,
                                                                                           tipAmount: tipController.text,
@@ -4360,19 +4781,28 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           return;
                                                                         }
 
-                                                                        if (selectedValue ==
-                                                                                null &&
-                                                                            selectDineIn ==
-                                                                                true) {
+                                                                        if ((selectedValue == null && selectedOrderType == OrderType.line) ||
+                                                                            (selectedValue == null &&
+                                                                                selectedOrderType == OrderType.ac)) {
                                                                           showToast(
-                                                                            "Table number is required for DINE-IN orders",
+                                                                            "Table number is required for LINE/AC orders",
                                                                             context,
                                                                             color:
                                                                                 false,
                                                                           );
                                                                           return;
                                                                         }
-
+                                                                        if ((selectedValueWaiter == null && selectedOrderType == OrderType.line) ||
+                                                                            (selectedValueWaiter == null &&
+                                                                                selectedOrderType == OrderType.ac)) {
+                                                                          showToast(
+                                                                            "Waiter name is required for LINE/AC orders",
+                                                                            context,
+                                                                            color:
+                                                                                false,
+                                                                          );
+                                                                          return;
+                                                                        }
                                                                         List<Map<String, dynamic>>
                                                                             payments =
                                                                             [];
@@ -4402,14 +4832,26 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                               buildOrderPayload(
                                                                             postAddToBillingModel:
                                                                                 postAddToBillingModel,
-                                                                            tableId: selectDineIn == true
+                                                                            tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac
                                                                                 ? tableId
+                                                                                : null,
+                                                                            waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac
+                                                                                ? waiterId
                                                                                 : null,
                                                                             orderStatus:
                                                                                 'COMPLETED',
-                                                                            orderType: selectDineIn == true
-                                                                                ? 'DINE-IN'
-                                                                                : 'TAKE-AWAY',
+                                                                            orderType: selectedOrderType == OrderType.line
+                                                                                ? 'LINE'
+                                                                                : selectedOrderType == OrderType.parcel
+                                                                                    ? 'PARCEL'
+                                                                                    : selectedOrderType == OrderType.parcel
+                                                                                        ? 'PARCEL'
+                                                                                        : "AC",
+                                                                            // selectedOrderType == OrderType.ac
+                                                                            //             ? "AC"
+                                                                            // : selectedOrderType == OrderType.hd
+                                                                            // ? "HD"
+                                                                            // : "SWIGGY",
                                                                             discountAmount:
                                                                                 postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                             isDiscountApplied:
@@ -4453,9 +4895,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             final orderPayload =
                                                                                 buildOrderPayload(
                                                                               postAddToBillingModel: postAddToBillingModel,
-                                                                              tableId: selectDineIn == true ? tableId : null,
+                                                                              tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                              waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                               orderStatus: 'COMPLETED',
-                                                                              orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                              orderType: selectedOrderType == OrderType.line
+                                                                                  ? 'LINE'
+                                                                                  : selectedOrderType == OrderType.parcel
+                                                                                      ? 'PARCEL'
+                                                                                      : selectedOrderType == OrderType.parcel
+                                                                                          ? 'PARCEL'
+                                                                                          : "AC",
+                                                                              // selectedOrderType == OrderType.ac
+                                                                              //             ? "AC"
+                                                                              // : selectedOrderType == OrderType.hd
+                                                                              // ? "HD"
+                                                                              // : "SWIGGY",
                                                                               discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                               isDiscountApplied: isDiscountApplied,
                                                                               tipAmount: tipController.text,
@@ -4496,9 +4950,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             final orderPayload =
                                                                                 buildOrderPayload(
                                                                               postAddToBillingModel: postAddToBillingModel,
-                                                                              tableId: selectDineIn == true ? tableId : null,
+                                                                              tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                              waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                               orderStatus: 'COMPLETED',
-                                                                              orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                              orderType: selectedOrderType == OrderType.line
+                                                                                  ? 'LINE'
+                                                                                  : selectedOrderType == OrderType.parcel
+                                                                                      ? 'PARCEL'
+                                                                                      : selectedOrderType == OrderType.parcel
+                                                                                          ? 'PARCEL'
+                                                                                          : "AC",
+                                                                              // selectedOrderType == OrderType.ac
+                                                                              //             ? "AC"
+                                                                              // : selectedOrderType == OrderType.hd
+                                                                              // ? "HD"
+                                                                              //   : "SWIGGY",
                                                                               discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                               isDiscountApplied: isDiscountApplied,
                                                                               tipAmount: tipController.text,
@@ -4556,83 +5022,319 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                     onTap: () {
                                                                       setState(
                                                                           () {
-                                                                        selectDineIn =
-                                                                            true;
+                                                                        selectedOrderType =
+                                                                            OrderType.line;
                                                                         if (widget.isEditingOrder !=
                                                                             true) {
                                                                           selectedValue =
                                                                               null;
+                                                                          selectedValueWaiter =
+                                                                              null;
                                                                           tableId =
+                                                                              null;
+                                                                          waiterId =
                                                                               null;
                                                                         }
                                                                         isSplitPayment =
                                                                             false;
+                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                            List.from(billingItems),
+                                                                            isDiscountApplied,
+                                                                            selectedOrderType));
                                                                       });
                                                                     },
                                                                     child:
                                                                         Container(
-                                                                      padding: EdgeInsets.symmetric(
+                                                                      padding: const EdgeInsets
+                                                                          .symmetric(
                                                                           vertical:
                                                                               8),
-                                                                      decoration: BoxDecoration(
-                                                                          color: selectDineIn == true
-                                                                              ? appPrimaryColor
-                                                                              : whiteColor,
-                                                                          borderRadius:
-                                                                              BorderRadius.circular(30)),
+                                                                      constraints:
+                                                                          const BoxConstraints(
+                                                                              minWidth: 70),
+                                                                      decoration:
+                                                                          BoxDecoration(
+                                                                        color: selectedOrderType ==
+                                                                                OrderType.line
+                                                                            ? appPrimaryColor
+                                                                            : whiteColor,
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(30),
+                                                                      ),
                                                                       child:
                                                                           Center(
-                                                                        child: Text(
-                                                                            "Dine In",
-                                                                            style: MyTextStyle.f14(selectDineIn == true
+                                                                        child:
+                                                                            Text(
+                                                                          "Line",
+                                                                          style:
+                                                                              MyTextStyle.f12(
+                                                                            selectedOrderType == OrderType.line
                                                                                 ? whiteColor
-                                                                                : blackColor)),
+                                                                                : blackColor,
+                                                                          ),
+                                                                        ),
                                                                       ),
                                                                     ),
                                                                   ),
                                                                 ),
+                                                                const SizedBox(
+                                                                    width: 8),
                                                                 Expanded(
                                                                   child:
                                                                       InkWell(
                                                                     onTap: () {
                                                                       setState(
                                                                           () {
-                                                                        selectDineIn =
-                                                                            false;
+                                                                        selectedOrderType =
+                                                                            OrderType.parcel;
                                                                         if (widget.isEditingOrder !=
                                                                             true) {
                                                                           selectedValue =
                                                                               null;
+                                                                          selectedValueWaiter =
+                                                                              null;
                                                                           tableId =
+                                                                              null;
+                                                                          waiterId =
                                                                               null;
                                                                         }
                                                                         isSplitPayment =
                                                                             false;
+                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                            List.from(billingItems),
+                                                                            isDiscountApplied,
+                                                                            selectedOrderType));
                                                                       });
                                                                     },
                                                                     child:
                                                                         Container(
-                                                                      padding: EdgeInsets.symmetric(
-                                                                          vertical:
-                                                                              8),
-                                                                      decoration: BoxDecoration(
-                                                                          color: selectDineIn == false
-                                                                              ? appPrimaryColor
-                                                                              : whiteColor,
-                                                                          borderRadius:
-                                                                              BorderRadius.circular(30)),
-                                                                      child: Center(
-                                                                          child: Text(
-                                                                              "Take Away",
-                                                                              style: MyTextStyle.f14(selectDineIn == false ? whiteColor : blackColor))),
+                                                                      alignment:
+                                                                          Alignment
+                                                                              .center,
+                                                                      padding:
+                                                                          const EdgeInsets
+                                                                              .symmetric(
+                                                                        vertical:
+                                                                            8,
+                                                                      ),
+                                                                      constraints:
+                                                                          const BoxConstraints(
+                                                                              minWidth: 70),
+                                                                      decoration:
+                                                                          BoxDecoration(
+                                                                        color: selectedOrderType ==
+                                                                                OrderType.parcel
+                                                                            ? appPrimaryColor
+                                                                            : whiteColor,
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(30),
+                                                                      ),
+                                                                      child:
+                                                                          Center(
+                                                                        child:
+                                                                            Text(
+                                                                          "Parcel",
+                                                                          style:
+                                                                              MyTextStyle.f12(
+                                                                            selectedOrderType == OrderType.parcel
+                                                                                ? whiteColor
+                                                                                : blackColor,
+                                                                          ),
+                                                                        ),
+                                                                      ),
                                                                     ),
                                                                   ),
                                                                 ),
-                                                                SizedBox(
-                                                                    width: 16),
+                                                                const SizedBox(
+                                                                    width: 2),
+                                                                Expanded(
+                                                                  child:
+                                                                      InkWell(
+                                                                    onTap: () {
+                                                                      setState(
+                                                                          () {
+                                                                        selectedOrderType =
+                                                                            OrderType.ac;
+                                                                        if (widget.isEditingOrder !=
+                                                                            true) {
+                                                                          selectedValue =
+                                                                              null;
+                                                                          selectedValueWaiter =
+                                                                              null;
+                                                                          tableId =
+                                                                              null;
+                                                                          waiterId =
+                                                                              null;
+                                                                        }
+                                                                        isSplitPayment =
+                                                                            false;
+                                                                        context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                            List.from(billingItems),
+                                                                            isDiscountApplied,
+                                                                            selectedOrderType));
+                                                                      });
+                                                                    },
+                                                                    child:
+                                                                        Container(
+                                                                      padding: const EdgeInsets
+                                                                          .symmetric(
+                                                                          vertical:
+                                                                              8),
+                                                                      constraints:
+                                                                          const BoxConstraints(
+                                                                              minWidth: 70),
+                                                                      decoration:
+                                                                          BoxDecoration(
+                                                                        color: selectedOrderType ==
+                                                                                OrderType.ac
+                                                                            ? appPrimaryColor
+                                                                            : whiteColor,
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(30),
+                                                                      ),
+                                                                      child:
+                                                                          Center(
+                                                                        child:
+                                                                            Text(
+                                                                          "AC",
+                                                                          style:
+                                                                              MyTextStyle.f12(
+                                                                            selectedOrderType == OrderType.ac
+                                                                                ? whiteColor
+                                                                                : blackColor,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                // Expanded(
+                                                                //   child:
+                                                                //   InkWell(
+                                                                //     onTap: () {
+                                                                //       setState(
+                                                                //               () {
+                                                                //             selectedOrderType =
+                                                                //                 OrderType.hd;
+                                                                //             if (widget.isEditingOrder !=
+                                                                //                 true) {
+                                                                //               selectedValue =
+                                                                //               null;
+                                                                //               selectedValueWaiter =
+                                                                //               null;
+                                                                //               tableId =
+                                                                //               null;
+                                                                //               waiterId =
+                                                                //               null;
+                                                                //             }
+                                                                //             isSplitPayment =
+                                                                //             false;
+                                                                //             context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                //                 List.from(billingItems),
+                                                                //                 isDiscountApplied,
+                                                                //                 selectedOrderType));
+                                                                //           });
+                                                                //     },
+                                                                //     child:
+                                                                //     Container(
+                                                                //       padding: const EdgeInsets
+                                                                //           .symmetric(
+                                                                //           vertical:
+                                                                //           8),
+                                                                //       constraints:
+                                                                //       const BoxConstraints(
+                                                                //           minWidth: 70),
+                                                                //       decoration:
+                                                                //       BoxDecoration(
+                                                                //         color: selectedOrderType ==
+                                                                //             OrderType.hd
+                                                                //             ? appPrimaryColor
+                                                                //             : whiteColor,
+                                                                //         borderRadius:
+                                                                //         BorderRadius.circular(30),
+                                                                //       ),
+                                                                //       child:
+                                                                //       Center(
+                                                                //         child:
+                                                                //         Text(
+                                                                //           "HD",
+                                                                //           style:
+                                                                //           MyTextStyle.f12(
+                                                                //             selectedOrderType == OrderType.hd
+                                                                //                 ? whiteColor
+                                                                //                 : blackColor,
+                                                                //           ),
+                                                                //         ),
+                                                                //       ),
+                                                                //     ),
+                                                                //   ),
+                                                                // ),
+                                                                // Expanded(
+                                                                //   child:
+                                                                //   InkWell(
+                                                                //     onTap: () {
+                                                                //       setState(
+                                                                //               () {
+                                                                //             selectedOrderType =
+                                                                //                 OrderType.swiggy;
+                                                                //             if (widget.isEditingOrder !=
+                                                                //                 true) {
+                                                                //               selectedValue =
+                                                                //               null;
+                                                                //               selectedValueWaiter =
+                                                                //               null;
+                                                                //               tableId =
+                                                                //               null;
+                                                                //               waiterId =
+                                                                //               null;
+                                                                //             }
+                                                                //             isSplitPayment =
+                                                                //             false;
+                                                                //             context.read<FoodCategoryBloc>().add(AddToBilling(
+                                                                //                 List.from(billingItems),
+                                                                //                 isDiscountApplied,
+                                                                //                 selectedOrderType));
+                                                                //           });
+                                                                //     },
+                                                                //     child:
+                                                                //     Container(
+                                                                //       padding: const EdgeInsets
+                                                                //           .symmetric(
+                                                                //           vertical:
+                                                                //           8),
+                                                                //       constraints:
+                                                                //       const BoxConstraints(
+                                                                //           minWidth: 70),
+                                                                //       decoration:
+                                                                //       BoxDecoration(
+                                                                //         color: selectedOrderType ==
+                                                                //             OrderType.swiggy
+                                                                //             ? appPrimaryColor
+                                                                //             : whiteColor,
+                                                                //         borderRadius:
+                                                                //         BorderRadius.circular(30),
+                                                                //       ),
+                                                                //       child:
+                                                                //       Center(
+                                                                //         child:
+                                                                //         Text(
+                                                                //           "Swiggy",
+                                                                //           style:
+                                                                //           MyTextStyle.f12(
+                                                                //             selectedOrderType == OrderType.swiggy
+                                                                //                 ? whiteColor
+                                                                //                 : blackColor,
+                                                                //           ),
+                                                                //         ),
+                                                                //       ),
+                                                                //     ),
+                                                                //   ),
+                                                                // ),
+                                                                const SizedBox(
+                                                                    width: 8),
                                                                 Text(
                                                                   "Bills",
-                                                                  style: MyTextStyle.f14(
+                                                                  style: MyTextStyle.f13(
                                                                       blackColor,
                                                                       weight: FontWeight
                                                                           .bold),
@@ -4646,10 +5348,16 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           .clear();
                                                                       selectedValue =
                                                                           null;
+                                                                      selectedValueWaiter =
+                                                                          null;
                                                                       tableId =
                                                                           null;
-                                                                      selectDineIn =
-                                                                          true;
+                                                                      waiterId =
+                                                                          null;
+
+                                                                      selectedOrderType =
+                                                                          OrderType
+                                                                              .line;
                                                                       isCompleteOrder =
                                                                           false;
                                                                       isSplitPayment =
@@ -4663,9 +5371,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                       balance =
                                                                           0;
                                                                       if (billingItems
-                                                                              .isEmpty ||
-                                                                          billingItems ==
-                                                                              []) {
+                                                                          .isEmpty) {
                                                                         isDiscountApplied =
                                                                             false;
                                                                       }
@@ -4673,9 +5379,12 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                     context
                                                                         .read<
                                                                             FoodCategoryBloc>()
-                                                                        .add(AddToBilling(
-                                                                            List.from(billingItems),
-                                                                            isDiscountApplied));
+                                                                        .add(
+                                                                          AddToBilling(
+                                                                              List.from(billingItems),
+                                                                              isDiscountApplied,
+                                                                              selectedOrderType),
+                                                                        );
                                                                   },
                                                                   icon: const Icon(
                                                                       Icons
@@ -4685,107 +5394,213 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                             ),
                                                             SizedBox(
                                                                 height: 10),
-                                                            if (selectDineIn ==
-                                                                true)
-                                                              Text(
-                                                                'Choose Table',
-                                                                style:
-                                                                    MyTextStyle
-                                                                        .f14(
-                                                                  blackColor,
-                                                                  weight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            if (selectDineIn ==
-                                                                true)
-                                                              Container(
-                                                                margin:
-                                                                    const EdgeInsets
-                                                                        .all(
-                                                                        10),
-                                                                child:
-                                                                    DropdownButtonFormField<
-                                                                        String>(
-                                                                  value: (getTableModel.data?.any((item) =>
-                                                                              item.name ==
-                                                                              selectedValue) ??
-                                                                          false)
-                                                                      ? selectedValue
-                                                                      : null,
-                                                                  icon:
-                                                                      const Icon(
-                                                                    Icons
-                                                                        .arrow_drop_down,
-                                                                    color:
-                                                                        appPrimaryColor,
-                                                                  ),
-                                                                  isExpanded:
-                                                                      true,
-                                                                  decoration:
-                                                                      InputDecoration(
-                                                                    border:
-                                                                        OutlineInputBorder(
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              8),
-                                                                      borderSide:
-                                                                          const BorderSide(
-                                                                        color:
-                                                                            appPrimaryColor,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                  items: getTableModel
-                                                                      .data
-                                                                      ?.map(
-                                                                          (item) {
-                                                                    return DropdownMenuItem<
-                                                                        String>(
-                                                                      value: item
-                                                                          .name,
+                                                            if (selectedOrderType ==
+                                                                    OrderType
+                                                                        .line ||
+                                                                selectedOrderType ==
+                                                                    OrderType
+                                                                        .ac)
+                                                              Row(
+                                                                children: [
+                                                                  Expanded(
+                                                                    child:
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .all(
+                                                                          10.0),
                                                                       child:
                                                                           Text(
-                                                                        "Table ${item.name}",
+                                                                        'Select Table',
                                                                         style: MyTextStyle
                                                                             .f14(
                                                                           blackColor,
                                                                           weight:
-                                                                              FontWeight.normal,
+                                                                              FontWeight.bold,
                                                                         ),
                                                                       ),
-                                                                    );
-                                                                  }).toList(),
-                                                                  onChanged:
-                                                                      (String?
-                                                                          newValue) {
-                                                                    if (newValue !=
-                                                                        null) {
-                                                                      setState(
-                                                                          () {
-                                                                        selectedValue =
-                                                                            newValue;
-                                                                        final selectedItem = getTableModel.data?.firstWhere((item) =>
-                                                                            item.name ==
-                                                                            newValue);
-                                                                        tableId = selectedItem
-                                                                            ?.id
-                                                                            .toString();
-                                                                      });
-                                                                    }
-                                                                  },
-                                                                  hint: Text(
-                                                                    '-- Select Table --',
-                                                                    style:
-                                                                        MyTextStyle
-                                                                            .f14(
-                                                                      blackColor,
-                                                                      weight: FontWeight
-                                                                          .normal,
                                                                     ),
                                                                   ),
-                                                                ),
+                                                                  Expanded(
+                                                                    child:
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .all(
+                                                                          10.0),
+                                                                      child:
+                                                                          Text(
+                                                                        'Select Table',
+                                                                        style: MyTextStyle
+                                                                            .f14(
+                                                                          blackColor,
+                                                                          weight:
+                                                                              FontWeight.bold,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            if (selectedOrderType ==
+                                                                    OrderType
+                                                                        .line ||
+                                                                selectedOrderType ==
+                                                                    OrderType
+                                                                        .ac)
+                                                              Row(
+                                                                children: [
+                                                                  Expanded(
+                                                                    child:
+                                                                        Container(
+                                                                      margin: const EdgeInsets
+                                                                          .all(
+                                                                          10),
+                                                                      child: DropdownButtonFormField<
+                                                                          String>(
+                                                                        value: (getTableModel.data?.any((item) => item.name == selectedValue) ??
+                                                                                false)
+                                                                            ? selectedValue
+                                                                            : null,
+                                                                        icon:
+                                                                            const Icon(
+                                                                          Icons
+                                                                              .arrow_drop_down,
+                                                                          color:
+                                                                              appPrimaryColor,
+                                                                        ),
+                                                                        isExpanded:
+                                                                            true,
+                                                                        decoration:
+                                                                            InputDecoration(
+                                                                          border:
+                                                                              OutlineInputBorder(
+                                                                            borderRadius:
+                                                                                BorderRadius.circular(8),
+                                                                            borderSide:
+                                                                                const BorderSide(
+                                                                              color: appPrimaryColor,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                        items: getTableModel
+                                                                            .data
+                                                                            ?.map((item) {
+                                                                          return DropdownMenuItem<
+                                                                              String>(
+                                                                            value:
+                                                                                item.name,
+                                                                            child:
+                                                                                Text(
+                                                                              "Table ${item.name}",
+                                                                              style: MyTextStyle.f14(
+                                                                                blackColor,
+                                                                                weight: FontWeight.normal,
+                                                                              ),
+                                                                            ),
+                                                                          );
+                                                                        }).toList(),
+                                                                        onChanged:
+                                                                            (String?
+                                                                                newValue) {
+                                                                          if (newValue !=
+                                                                              null) {
+                                                                            setState(() {
+                                                                              selectedValue = newValue;
+                                                                              final selectedItem = getTableModel.data?.firstWhere((item) => item.name == newValue);
+                                                                              tableId = selectedItem?.id.toString();
+                                                                            });
+                                                                          }
+                                                                        },
+                                                                        hint:
+                                                                            Text(
+                                                                          '-- Select Table --',
+                                                                          style:
+                                                                              MyTextStyle.f14(
+                                                                            blackColor,
+                                                                            weight:
+                                                                                FontWeight.normal,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  Expanded(
+                                                                    child:
+                                                                        Container(
+                                                                      margin: const EdgeInsets
+                                                                          .all(
+                                                                          10),
+                                                                      child: DropdownButtonFormField<
+                                                                          String>(
+                                                                        value: (getWaiterModel.data?.any((item) => item.name == selectedValueWaiter) ??
+                                                                                false)
+                                                                            ? selectedValueWaiter
+                                                                            : null,
+                                                                        icon:
+                                                                            const Icon(
+                                                                          Icons
+                                                                              .arrow_drop_down,
+                                                                          color:
+                                                                              appPrimaryColor,
+                                                                        ),
+                                                                        isExpanded:
+                                                                            true,
+                                                                        decoration:
+                                                                            InputDecoration(
+                                                                          border:
+                                                                              OutlineInputBorder(
+                                                                            borderRadius:
+                                                                                BorderRadius.circular(8),
+                                                                            borderSide:
+                                                                                const BorderSide(
+                                                                              color: appPrimaryColor,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                        items: getWaiterModel
+                                                                            .data
+                                                                            ?.map((item) {
+                                                                          return DropdownMenuItem<
+                                                                              String>(
+                                                                            value:
+                                                                                item.name,
+                                                                            child:
+                                                                                Text(
+                                                                              "${item.name}",
+                                                                              style: MyTextStyle.f14(
+                                                                                blackColor,
+                                                                                weight: FontWeight.normal,
+                                                                              ),
+                                                                            ),
+                                                                          );
+                                                                        }).toList(),
+                                                                        onChanged:
+                                                                            (String?
+                                                                                newValue) {
+                                                                          if (newValue !=
+                                                                              null) {
+                                                                            setState(() {
+                                                                              selectedValueWaiter = newValue;
+                                                                              final selectedItem = getWaiterModel.data?.firstWhere((item) => item.name == newValue);
+                                                                              waiterId = selectedItem?.id.toString();
+                                                                              debugPrint("waitername:$selectedValueWaiter");
+                                                                              debugPrint("waiterId:$waiterId");
+                                                                            });
+                                                                          }
+                                                                        },
+                                                                        hint:
+                                                                            Text(
+                                                                          '-- Select Waiter --',
+                                                                          style:
+                                                                              MyTextStyle.f14(
+                                                                            blackColor,
+                                                                            weight:
+                                                                                FontWeight.normal,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
                                                               ),
                                                             Divider(),
                                                             Column(
@@ -4793,49 +5608,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                   postAddToBillingModel
                                                                       .items!
                                                                       .map((e) {
-                                                                final bool
-                                                                    isPaidItem =
-                                                                    paidItemIds.contains(
-                                                                        e.id ??
-                                                                            '');
-                                                                final paidQty = widget
-                                                                        .existingOrder
-                                                                        ?.data
-                                                                        ?.items
-                                                                        ?.firstWhereOrNull((item) =>
-                                                                            item.product?.id ==
-                                                                            e.id)
-                                                                        ?.quantity ??
-                                                                    0;
-
-                                                                final currentQty =
-                                                                    billingItems
-                                                                            .firstWhere(
-                                                                          (item) =>
-                                                                              item['_id'] ==
-                                                                              e.id,
-                                                                          orElse: () =>
-                                                                              <String, dynamic>{
-                                                                            'qty':
-                                                                                0
-                                                                          },
-                                                                        )['qty'] ??
-                                                                        0;
-
-                                                                final bool disableDecrement = widget
-                                                                            .isEditingOrder ==
-                                                                        true &&
-                                                                    widget
-                                                                            .existingOrder
-                                                                            ?.data
-                                                                            ?.orderStatus ==
-                                                                        "COMPLETED" &&
-                                                                    paidItemIds
-                                                                        .contains(e
-                                                                            .id) &&
-                                                                    currentQty <=
-                                                                        paidQty;
-
                                                                 return Padding(
                                                                   padding: const EdgeInsets
                                                                       .symmetric(
@@ -4902,12 +5674,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                       icon: Icon(Icons.remove_circle_outline, size: 20),
                                                                                       padding: EdgeInsets.all(4),
                                                                                       constraints: BoxConstraints(),
-                                                                                      onPressed
-
-                                                                                          //:
-                                                                                          // disableDecrement
-                                                                                          //     ? null
-                                                                                          : () {
+                                                                                      onPressed: () {
                                                                                         setState(() {
                                                                                           final index = billingItems.indexWhere((item) => item['_id'] == e.id); // Using dot notation
                                                                                           if (index != -1 && billingItems[index]['qty'] > 1) {
@@ -4919,9 +5686,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                             isDiscountApplied = false;
                                                                                             widget.isEditingOrder = false;
                                                                                             tableId = null;
+                                                                                            waiterId = null;
                                                                                             selectedValue = null;
                                                                                           }
-                                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                         });
                                                                                       },
                                                                                     ),
@@ -4961,28 +5729,25 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                   : []
                                                                                             });
                                                                                           }
-                                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                         });
                                                                                       },
                                                                                     ),
-                                                                                    //if (!isPaidItem)
                                                                                     IconButton(
                                                                                       icon: Icon(Icons.delete, color: redColor, size: 20),
                                                                                       padding: EdgeInsets.all(4),
                                                                                       constraints: BoxConstraints(),
-                                                                                      onPressed
-                                                                                          // : disableDecrement
-                                                                                          // ? null
-                                                                                          : () {
+                                                                                      onPressed: () {
                                                                                         setState(() {
                                                                                           billingItems.removeWhere((item) => item['_id'] == e.id);
                                                                                           if (billingItems.isEmpty || billingItems == []) {
                                                                                             isDiscountApplied = false;
                                                                                             widget.isEditingOrder = false;
                                                                                             tableId = null;
+                                                                                            waiterId = null;
                                                                                             selectedValue = null;
                                                                                           }
-                                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                          context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                         });
                                                                                       },
                                                                                     ),
@@ -5023,9 +5788,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                         isDiscountApplied = false;
                                                                                                         widget.isEditingOrder = false;
                                                                                                         tableId = null;
+                                                                                                        waiterId = null;
                                                                                                         selectedValue = null;
                                                                                                       }
-                                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                                     });
                                                                                                   } else {
                                                                                                     setState(() {
@@ -5034,9 +5800,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                                         isDiscountApplied = false;
                                                                                                         widget.isEditingOrder = false;
                                                                                                         tableId = null;
+                                                                                                        waiterId = null;
                                                                                                         selectedValue = null;
                                                                                                       }
-                                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                      context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                                     });
                                                                                                   }
                                                                                                 },
@@ -5051,7 +5818,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                                   setState(() {
                                                                                                     addonsList[addonIndex]['quantity'] = addonsList[addonIndex]['quantity'] + 1;
-                                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
+                                                                                                    context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
                                                                                                   });
                                                                                                 },
                                                                                               ),
@@ -5063,16 +5830,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                   }),
                                                                                 price("Base Price", isBold: true, "₹ ${(e.basePrice! * e.qty!).toStringAsFixed(2)}"),
                                                                                 if (e.addonTotal != 0) price('Addons Total', isBold: true, "₹ ${e.addonTotal!.toStringAsFixed(2)}"),
-
-                                                                                // Taxes
-                                                                                // if ((e.appliedTaxes?.length ?? 0) >
-                                                                                //     0)
-                                                                                //   ...e.appliedTaxes!.map((tax) {
-                                                                                //     return price(
-                                                                                //       "${tax.name} (${tax.percentage ?? 0}%):",
-                                                                                //       "₹ ${tax.amount?.toStringAsFixed(2) ?? '0.00'}",
-                                                                                //     );
-                                                                                //   }),
                                                                                 price("Item Total", "₹ ${(e.basePrice! * e.qty! + (e.addonTotal ?? 0)).toStringAsFixed(2)}", isBold: true),
                                                                               ],
                                                                             )
@@ -5123,95 +5880,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                       "₹ ${postAddToBillingModel.totalTax}"),
                                                                 ]),
                                                             SizedBox(height: 8),
-                                                            // if (double.parse(postAddToBillingModel
-                                                            //         .totalDiscount
-                                                            //         .toString()) >
-                                                            //     0)
-                                                            //   const Divider(thickness: 1),
-                                                            // if (double.parse(postAddToBillingModel
-                                                            //         .totalDiscount
-                                                            //         .toString()) >
-                                                            //     0)
-                                                            //   Row(
-                                                            //       mainAxisAlignment:
-                                                            //           MainAxisAlignment
-                                                            //               .spaceBetween,
-                                                            //       children: [
-                                                            //         Row(
-                                                            //           children: [
-                                                            //             Text(
-                                                            //               "Apply Discount",
-                                                            //               style: MyTextStyle.f14(
-                                                            //                   blackColor),
-                                                            //             ),
-                                                            //             Transform.scale(
-                                                            //               scale: 0.7,
-                                                            //               child: SizedBox(
-                                                            //                 height: 24,
-                                                            //                 child: Switch(
-                                                            //                   value:
-                                                            //                       isDiscountApplied,
-                                                            //                   onChanged: (value) {
-                                                            //                     setState(() {
-                                                            //                       final isEditingCompletedOrder = widget
-                                                            //                                   .existingOrder !=
-                                                            //                               null &&
-                                                            //                           (widget.existingOrder!.data!.orderStatus ==
-                                                            //                                   "COMPLETED" ||
-                                                            //                               widget.existingOrder!.data!.orderStatus ==
-                                                            //                                   "WAITLIST");
-                                                            //
-                                                            //                       final allowToggle = widget
-                                                            //                                   .existingOrder ==
-                                                            //                               null ||
-                                                            //                           !isEditingCompletedOrder ||
-                                                            //                           !isDiscountApplied;
-                                                            //
-                                                            //                       if (allowToggle) {
-                                                            //                         isDiscountApplied =
-                                                            //                             value;
-                                                            //                         debugPrint(
-                                                            //                             "isDiscountApplied:$isDiscountApplied");
-                                                            //
-                                                            //                         context
-                                                            //                             .read<
-                                                            //                                 FoodCategoryBloc>()
-                                                            //                             .add(
-                                                            //                               AddToBilling(
-                                                            //                                   List.from(billingItems),
-                                                            //                                   isDiscountApplied),
-                                                            //                             );
-                                                            //                       } else {
-                                                            //                         debugPrint(
-                                                            //                             "Toggle not allowed: editing completed order with discount already applied.");
-                                                            //                       }
-                                                            //                     });
-                                                            //                   },
-                                                            //                   activeColor:
-                                                            //                       whiteColor,
-                                                            //                   activeTrackColor:
-                                                            //                       appPrimaryColor,
-                                                            //                   inactiveThumbColor:
-                                                            //                       whiteColor,
-                                                            //                   inactiveTrackColor:
-                                                            //                       greyColor,
-                                                            //                   materialTapTargetSize:
-                                                            //                       MaterialTapTargetSize
-                                                            //                           .shrinkWrap,
-                                                            //                 ),
-                                                            //               ),
-                                                            //             ),
-                                                            //           ],
-                                                            //         ),
-                                                            //         Text(
-                                                            //           '-₹ ${postAddToBillingModel.totalDiscount?.toStringAsFixed(2)}',
-                                                            //           style: const TextStyle(
-                                                            //               color: Colors.green,
-                                                            //               fontWeight:
-                                                            //                   FontWeight.bold,
-                                                            //               fontSize: 16),
-                                                            //         ),
-                                                            //       ]),
                                                             const Divider(
                                                                 thickness: 1),
                                                             Row(
@@ -5233,130 +5901,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                 ]),
                                                             const Divider(
                                                                 thickness: 1),
-                                                            // Row(
-                                                            //   mainAxisAlignment:
-                                                            //       MainAxisAlignment
-                                                            //           .spaceBetween,
-                                                            //   children: [
-                                                            //     const Text(
-                                                            //         "Add Tip",
-                                                            //         style: TextStyle(
-                                                            //             fontSize:
-                                                            //                 16)),
-                                                            //     GestureDetector(
-                                                            //       onTap:
-                                                            //           toggleTipField,
-                                                            //       child: Text(
-                                                            //         showTipField
-                                                            //             ? "Hide"
-                                                            //             : "Add",
-                                                            //         style:
-                                                            //             const TextStyle(
-                                                            //           color: Colors
-                                                            //               .blue,
-                                                            //           fontWeight:
-                                                            //               FontWeight
-                                                            //                   .bold,
-                                                            //         ),
-                                                            //       ),
-                                                            //     ),
-                                                            //   ],
-                                                            // ),
-                                                            // if (showTipField) ...[
-                                                            //   const SizedBox(
-                                                            //       height: 8),
-                                                            //   Row(
-                                                            //     children: [
-                                                            //       const Text("₹"),
-                                                            //       const SizedBox(
-                                                            //           width: 4),
-                                                            //       Expanded(
-                                                            //         child:
-                                                            //             TextField(
-                                                            //           controller:
-                                                            //               tipController,
-                                                            //           keyboardType:
-                                                            //               TextInputType
-                                                            //                   .number,
-                                                            //           onChanged:
-                                                            //               updateTip,
-                                                            //           decoration:
-                                                            //               const InputDecoration(
-                                                            //             hintText:
-                                                            //                 "Enter tip amount",
-                                                            //             border:
-                                                            //                 OutlineInputBorder(),
-                                                            //             focusedBorder:
-                                                            //                 OutlineInputBorder(
-                                                            //               borderSide:
-                                                            //                   BorderSide(
-                                                            //                 color:
-                                                            //                     appPrimaryColor, // Your app's primary color
-                                                            //                 width:
-                                                            //                     2.0,
-                                                            //               ),
-                                                            //             ),
-                                                            //             contentPadding:
-                                                            //                 EdgeInsets.symmetric(
-                                                            //                     horizontal:
-                                                            //                         10),
-                                                            //           ),
-                                                            //         ),
-                                                            //       ),
-                                                            //     ],
-                                                            //   ),
-                                                            // ],
-                                                            // const SizedBox(
-                                                            //     height: 12),
-                                                            // if (tipAmount > 0)
-                                                            //   Row(
-                                                            //     mainAxisAlignment:
-                                                            //         MainAxisAlignment
-                                                            //             .spaceBetween,
-                                                            //     children: [
-                                                            //       const Text(
-                                                            //           "Tip Amount",
-                                                            //           style: TextStyle(
-                                                            //               fontSize:
-                                                            //                   16)),
-                                                            //       Text(
-                                                            //         '₹ ${tipAmount.toStringAsFixed(2)}',
-                                                            //         style: const TextStyle(
-                                                            //             fontSize:
-                                                            //                 16,
-                                                            //             color: Colors
-                                                            //                 .green,
-                                                            //             fontWeight:
-                                                            //                 FontWeight
-                                                            //                     .bold),
-                                                            //       ),
-                                                            //     ],
-                                                            //   ),
-                                                            // const Divider(
-                                                            //     thickness: 2),
-                                                            // Row(
-                                                            //   mainAxisAlignment:
-                                                            //       MainAxisAlignment
-                                                            //           .spaceBetween,
-                                                            //   children: [
-                                                            //     const Text(
-                                                            //         "Final Total",
-                                                            //         style: TextStyle(
-                                                            //             fontSize:
-                                                            //                 18,
-                                                            //             fontWeight:
-                                                            //                 FontWeight
-                                                            //                     .bold)),
-                                                            //     Text(
-                                                            //       '₹ ${finalTotal.toStringAsFixed(2)}',
-                                                            //       style: const TextStyle(
-                                                            //           fontSize: 18,
-                                                            //           fontWeight:
-                                                            //               FontWeight
-                                                            //                   .bold),
-                                                            //     ),
-                                                            //   ],
-                                                            // ),
                                                             SizedBox(
                                                                 height: 12),
                                                             Row(
@@ -5658,104 +6202,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           ),
                                                                         ])
                                                                   : Container(),
-                                                            // isCompleteOrder == true &&
-                                                            //         !isSplitPayment &&
-                                                            //         selectedFullPaymentMethod ==
-                                                            //             "Cash"
-                                                            //     ? Column(
-                                                            //         crossAxisAlignment:
-                                                            //             CrossAxisAlignment.start,
-                                                            //         children: [
-                                                            //           const SizedBox(height: 12),
-                                                            //           TextField(
-                                                            //             controller:
-                                                            //                 amountController,
-                                                            //             decoration:
-                                                            //                 InputDecoration(
-                                                            //               hintText:
-                                                            //                   "Enter amount paid (₹)",
-                                                            //               border:
-                                                            //                   OutlineInputBorder(
-                                                            //                 borderRadius:
-                                                            //                     BorderRadius
-                                                            //                         .circular(8),
-                                                            //               ),
-                                                            //               enabledBorder:
-                                                            //                   OutlineInputBorder(
-                                                            //                 borderSide: BorderSide(
-                                                            //                     color:
-                                                            //                         appGreyColor),
-                                                            //                 borderRadius:
-                                                            //                     BorderRadius
-                                                            //                         .circular(8),
-                                                            //               ),
-                                                            //               focusedBorder:
-                                                            //                   OutlineInputBorder(
-                                                            //                 borderSide: BorderSide(
-                                                            //                     color:
-                                                            //                         appPrimaryColor,
-                                                            //                     width: 2),
-                                                            //                 borderRadius:
-                                                            //                     BorderRadius
-                                                            //                         .circular(8),
-                                                            //               ),
-                                                            //             ),
-                                                            //             keyboardType:
-                                                            //                 TextInputType.number,
-                                                            //             inputFormatters: [
-                                                            //               FilteringTextInputFormatter
-                                                            //                   .digitsOnly
-                                                            //             ],
-                                                            //             onChanged: (value) {
-                                                            //               setState(() {
-                                                            //                 totalAmount = double.tryParse(
-                                                            //                         postAddToBillingModel
-                                                            //                             .total
-                                                            //                             .toString()) ??
-                                                            //                     0.0;
-                                                            //                 paidAmount =
-                                                            //                     double.tryParse(
-                                                            //                             value) ??
-                                                            //                         0.0;
-                                                            //                 balanceAmount =
-                                                            //                     paidAmount -
-                                                            //                         totalAmount;
-                                                            //               });
-                                                            //             },
-                                                            //           ),
-                                                            //           const SizedBox(height: 8),
-                                                            //           if (amountController
-                                                            //               .text.isNotEmpty)
-                                                            //             Row(
-                                                            //               mainAxisAlignment:
-                                                            //                   MainAxisAlignment
-                                                            //                       .spaceBetween,
-                                                            //               children: [
-                                                            //                 Text(
-                                                            //                   "Balance",
-                                                            //                   style:
-                                                            //                       MyTextStyle.f14(
-                                                            //                     weight: FontWeight
-                                                            //                         .w400,
-                                                            //                     greyColor,
-                                                            //                   ),
-                                                            //                 ),
-                                                            //                 Text(
-                                                            //                   "₹ ${balanceAmount.toStringAsFixed(2)}",
-                                                            //                   style:
-                                                            //                       MyTextStyle.f14(
-                                                            //                     weight: FontWeight
-                                                            //                         .w400,
-                                                            //                     balanceAmount < 0
-                                                            //                         ? redColor
-                                                            //                         : greenColor,
-                                                            //                   ),
-                                                            //                 ),
-                                                            //               ],
-                                                            //             ),
-                                                            //         ],
-                                                            //       )
-                                                            //     : const SizedBox.shrink(),
                                                             if ((isCompleteOrder == true &&
                                                                     postAddToBillingModel
                                                                             .total !=
@@ -5934,155 +6380,102 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                             !isSplitPayment
                                                                 ? Row(
                                                                     children: [
-                                                                      Expanded(
-                                                                        child: orderLoad
-                                                                            ? SpinKitCircle(color: appPrimaryColor, size: 30)
-                                                                            : ElevatedButton(
-                                                                                onPressed: () {
-                                                                                  if (selectedValue == null && selectDineIn == true) {
-                                                                                    setState(() {
-                                                                                      isCompleteOrder = false;
-                                                                                    });
-                                                                                    showToast("Table number is required for DINE-IN orders", context, color: false);
-                                                                                    return;
-                                                                                  } else if (((widget.isEditingOrder == null || widget.isEditingOrder == false)) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST"))) {
-                                                                                    setState(() {
-                                                                                      isCompleteOrder = false;
-                                                                                    });
-                                                                                    List<Map<String, dynamic>> payments = [
-                                                                                      {
-                                                                                        "amount": (postAddToBillingModel.total ?? 0).toDouble(),
-                                                                                        "balanceAmount": 0,
-                                                                                        "method": selectedFullPaymentMethod.toUpperCase(),
+                                                                      selectedOrderType == OrderType.line ||
+                                                                              selectedOrderType == OrderType.ac
+                                                                          ? Expanded(
+                                                                              child: orderLoad
+                                                                                  ? SpinKitCircle(color: appPrimaryColor, size: 30)
+                                                                                  : ElevatedButton(
+                                                                                      onPressed: () {
+                                                                                        if ((selectedValue == null && selectedOrderType == OrderType.line) || (selectedValue == null && selectedOrderType == OrderType.ac)) {
+                                                                                          setState(() {
+                                                                                            isCompleteOrder = false;
+                                                                                          });
+                                                                                          showToast("Table number is required for LINE/AC orders", context, color: false);
+                                                                                          return;
+                                                                                        } else if ((selectedValueWaiter == null && selectedOrderType == OrderType.line) || (selectedValueWaiter == null && selectedOrderType == OrderType.ac)) {
+                                                                                          setState(() {
+                                                                                            isCompleteOrder = false;
+                                                                                          });
+                                                                                          showToast("Waiter name is required for LINE/AC orders", context, color: false);
+                                                                                          return;
+                                                                                        } else if (((widget.isEditingOrder == null || widget.isEditingOrder == false)) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST"))) {
+                                                                                          setState(() {
+                                                                                            isCompleteOrder = false;
+                                                                                          });
+                                                                                          List<Map<String, dynamic>> payments = [
+                                                                                            {
+                                                                                              "amount": (postAddToBillingModel.total ?? 0).toDouble(),
+                                                                                              "balanceAmount": 0,
+                                                                                              "method": selectedFullPaymentMethod.toUpperCase(),
+                                                                                            },
+                                                                                          ];
+                                                                                          final orderPayload = buildOrderPayload(
+                                                                                            postAddToBillingModel: postAddToBillingModel,
+                                                                                            tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                            waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
+                                                                                            orderStatus: 'WAITLIST',
+                                                                                            orderType: selectedOrderType == OrderType.line
+                                                                                                ? 'LINE'
+                                                                                                : selectedOrderType == OrderType.parcel
+                                                                                                    ? 'PARCEL'
+                                                                                                    : selectedOrderType == OrderType.parcel
+                                                                                                        ? 'PARCEL'
+                                                                                                        : "AC",
+                                                                                            // selectedOrderType == OrderType.ac
+                                                                                            //             ? "AC"
+                                                                                            // : selectedOrderType == OrderType.hd
+                                                                                            // ? "HD"
+                                                                                            //   : "SWIGGY",
+                                                                                            discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
+                                                                                            isDiscountApplied: isDiscountApplied,
+                                                                                            tipAmount: tipController.text,
+                                                                                            payments: widget.isEditingOrder == true ? [] : payments,
+                                                                                          );
+                                                                                          setState(() {
+                                                                                            orderLoad = true;
+                                                                                          });
+                                                                                          debugPrint("payloadsave:${jsonEncode(orderPayload)}");
+                                                                                          if (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
+                                                                                            if (((selectedValue == null || selectedValue == 'N/A') && selectedOrderType == OrderType.line) || ((selectedValue == null || selectedValue == 'N/A') && selectedOrderType == OrderType.ac)) {
+                                                                                              showToast("Table number is required for LINE/AC orders", context, color: false);
+                                                                                              setState(() {
+                                                                                                orderLoad = false;
+                                                                                              });
+                                                                                            } else if (((selectedValueWaiter == null || selectedValueWaiter == 'N/A') && selectedOrderType == OrderType.line) || ((selectedValueWaiter == null || selectedValueWaiter == 'N/A') && selectedOrderType == OrderType.ac)) {
+                                                                                              showToast("Waiter name is required for LINE/AC orders", context, color: false);
+                                                                                              setState(() {
+                                                                                                orderLoad = false;
+                                                                                              });
+                                                                                            } else {
+                                                                                              setState(() {
+                                                                                                isCompleteOrder = false;
+                                                                                              });
+                                                                                              debugPrint("editId:${widget.existingOrder!.data!.id}");
+                                                                                              context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder?.data!.id));
+                                                                                            }
+                                                                                          } else {
+                                                                                            setState(() {
+                                                                                              isCompleteOrder = false;
+                                                                                            });
+                                                                                            context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
+                                                                                          }
+                                                                                        }
                                                                                       },
-                                                                                    ];
-                                                                                    final orderPayload = buildOrderPayload(
-                                                                                      postAddToBillingModel: postAddToBillingModel,
-                                                                                      tableId: selectDineIn == true ? tableId : null,
-                                                                                      orderStatus: 'WAITLIST',
-                                                                                      orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
-                                                                                      discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
-                                                                                      isDiscountApplied: isDiscountApplied,
-                                                                                      tipAmount: tipController.text,
-                                                                                      payments: widget.isEditingOrder == true ? [] : payments,
-                                                                                    );
-                                                                                    setState(() {
-                                                                                      orderLoad = true;
-                                                                                    });
-                                                                                    debugPrint("payloadsave:${jsonEncode(orderPayload)}");
-                                                                                    if (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
-                                                                                      if ((selectedValue == null || selectedValue == 'N/A') && selectDineIn == true) {
-                                                                                        showToast("Table number is required for DINE-IN orders", context, color: false);
-                                                                                        setState(() {
-                                                                                          orderLoad = false;
-                                                                                        });
-                                                                                      } else {
-                                                                                        setState(() {
-                                                                                          isCompleteOrder = false;
-                                                                                        });
-                                                                                        debugPrint("editId:${widget.existingOrder!.data!.id}");
-                                                                                        context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder?.data!.id));
-                                                                                      }
-                                                                                    } else {
-                                                                                      setState(() {
-                                                                                        isCompleteOrder = false;
-                                                                                      });
-                                                                                      context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
-                                                                                    }
-                                                                                  }
-                                                                                },
-                                                                                // onPressed: () async {
-                                                                                //   if (selectedValue == null && selectDineIn == true) {
-                                                                                //     setState(() {
-                                                                                //       isCompleteOrder = false;
-                                                                                //     });
-                                                                                //     showToast("Table number is required for DINE-IN orders", context, color: false);
-                                                                                //     return;
-                                                                                //   }
-                                                                                //
-                                                                                //   setState(() {
-                                                                                //     isCompleteOrder = false;
-                                                                                //     orderLoad = true;
-                                                                                //   });
-                                                                                //
-                                                                                //   List<Map<String, dynamic>> payments = [
-                                                                                //     {
-                                                                                //       "amount": (postAddToBillingModel.total ?? 0).toDouble(),
-                                                                                //       "balanceAmount": 0,
-                                                                                //       "method": selectedFullPaymentMethod.toUpperCase(),
-                                                                                //     },
-                                                                                //   ];
-                                                                                //
-                                                                                //   final orderPayload = buildOrderPayload(
-                                                                                //     postAddToBillingModel: postAddToBillingModel,
-                                                                                //     tableId: selectDineIn == true ? tableId : null,
-                                                                                //     orderStatus: 'WAITLIST',
-                                                                                //     orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
-                                                                                //     discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
-                                                                                //     isDiscountApplied: isDiscountApplied,
-                                                                                //     tipAmount: tipController.text,
-                                                                                //     payments: widget.isEditingOrder == true ? [] : payments,
-                                                                                //   );
-                                                                                //
-                                                                                //   // Check if online or offline
-                                                                                //   if (_networkManager.isOnline) {
-                                                                                //     // Online - use existing API
-                                                                                //     if (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
-                                                                                //       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder?.data!.id));
-                                                                                //     } else {
-                                                                                //       context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
-                                                                                //     }
-                                                                                //   } else {
-                                                                                //     // Offline - save locally
-                                                                                //     try {
-                                                                                //       await _syncService.saveOrderLocally(orderPayload);
-                                                                                //
-                                                                                //       // Clear cart and reset state
-                                                                                //       setState(() {
-                                                                                //         orderLoad = false;
-                                                                                //         billingItems.clear();
-                                                                                //         selectedValue = null;
-                                                                                //         tableId = null;
-                                                                                //         selectDineIn = true;
-                                                                                //         isCompleteOrder = false;
-                                                                                //         isSplitPayment = false;
-                                                                                //         amountController.clear();
-                                                                                //         selectedFullPaymentMethod = "";
-                                                                                //         widget.isEditingOrder = false;
-                                                                                //         balance = 0;
-                                                                                //         if (billingItems.isEmpty) {
-                                                                                //           isDiscountApplied = false;
-                                                                                //         }
-                                                                                //       });
-                                                                                //
-                                                                                //       await _syncService.clearLocalBillingItems();
-                                                                                //       await _updatePendingOrdersCount();
-                                                                                //
-                                                                                //       showToast("Order saved offline. Will sync when online.", context, color: true);
-                                                                                //
-                                                                                //       // Update billing state
-                                                                                //       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
-                                                                                //     } catch (e) {
-                                                                                //       setState(() {
-                                                                                //         orderLoad = false;
-                                                                                //       });
-                                                                                //       showToast("Error saving order: $e", context, color: false);
-                                                                                //     }
-                                                                                //   }
-                                                                                // },
-                                                                                style: ElevatedButton.styleFrom(
-                                                                                  backgroundColor: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? appPrimaryColor : greyColor,
-                                                                                  minimumSize: const Size(0, 50), // Height only
-                                                                                  shape: RoundedRectangleBorder(
-                                                                                    borderRadius: BorderRadius.circular(30),
-                                                                                  ),
-                                                                                ),
-                                                                                child: Text(
-                                                                                  "Save Order",
-                                                                                  style: TextStyle(color: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? whiteColor : blackColor),
-                                                                                ),
-                                                                              ),
-                                                                      ),
+                                                                                      style: ElevatedButton.styleFrom(
+                                                                                        backgroundColor: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? appPrimaryColor : greyColor,
+                                                                                        minimumSize: const Size(0, 50), // Height only
+                                                                                        shape: RoundedRectangleBorder(
+                                                                                          borderRadius: BorderRadius.circular(30),
+                                                                                        ),
+                                                                                      ),
+                                                                                      child: Text(
+                                                                                        "Save Order",
+                                                                                        style: TextStyle(color: (widget.isEditingOrder == null || widget.isEditingOrder == false) || (widget.isEditingOrder == true && (postAddToBillingModel.total != widget.existingOrder?.data!.total && widget.existingOrder?.data!.orderStatus == "WAITLIST")) ? whiteColor : blackColor),
+                                                                                      ),
+                                                                                    ),
+                                                                            )
+                                                                          : Container(),
                                                                       const SizedBox(
                                                                           width:
                                                                               10),
@@ -6092,8 +6485,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             : ElevatedButton(
                                                                                 onPressed: () {
                                                                                   /* Full payment */
-                                                                                  if (selectedValue == null && selectDineIn == true) {
-                                                                                    showToast("Table number is required for DINE-IN orders", context, color: false);
+                                                                                  if ((selectedValue == null && selectedOrderType == OrderType.line) || (selectedValue == null && selectedOrderType == OrderType.ac)) {
+                                                                                    showToast("Table number is required for LINE/AC orders", context, color: false);
+                                                                                  } else if ((selectedValueWaiter == null && selectedOrderType == OrderType.line) || (selectedValueWaiter == null && selectedOrderType == OrderType.ac)) {
+                                                                                    showToast("Waiter name is required for LINE/AC orders", context, color: false);
                                                                                   } else {
                                                                                     if ((widget.isEditingOrder == false || widget.isEditingOrder == null) || (widget.isEditingOrder == true && widget.existingOrder?.data!.orderStatus == "WAITLIST")) {
                                                                                       setState(() {
@@ -6103,47 +6498,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                         showToast("Select any one of the payment method", context, color: false);
                                                                                         return;
                                                                                       }
-                                                                                      // if (amountController
-                                                                                      //         .text
-                                                                                      //         .isEmpty &&
-                                                                                      //     selectedFullPaymentMethod ==
-                                                                                      //         "Cash") {
-                                                                                      //   showToast(
-                                                                                      //       "Enter the amount",
-                                                                                      //       context,
-                                                                                      //       color:
-                                                                                      //           false);
-                                                                                      //   return;
-                                                                                      // }
+
                                                                                       if (selectedFullPaymentMethod == "Cash" || selectedFullPaymentMethod == "Card" || selectedFullPaymentMethod == "UPI") {
-                                                                                        // String
-                                                                                        //     amountText =
-                                                                                        //     amountController
-                                                                                        //         .text
-                                                                                        //         .trim();
-                                                                                        // if (selectedFullPaymentMethod ==
-                                                                                        //     "Cash") {
-                                                                                        //   if (amountText.isEmpty ||
-                                                                                        //       double.tryParse(amountText) ==
-                                                                                        //           null) {
-                                                                                        //     showToast(
-                                                                                        //         "Enter a valid amount",
-                                                                                        //         context,
-                                                                                        //         color: false);
-                                                                                        //     return;
-                                                                                        //   }
-                                                                                        //   double
-                                                                                        //       amount =
-                                                                                        //       double.parse(amountText);
-                                                                                        //   if (amount !=
-                                                                                        //       postAddToBillingModel.total) {
-                                                                                        //     showToast(
-                                                                                        //         "Amount not matching",
-                                                                                        //         context,
-                                                                                        //         color: false);
-                                                                                        //     return;
-                                                                                        //   }
-                                                                                        // }
                                                                                         List<Map<String, dynamic>> payments = [];
                                                                                         payments = [
                                                                                           {
@@ -6155,9 +6511,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                         final orderPayload = buildOrderPayload(
                                                                                           postAddToBillingModel: postAddToBillingModel,
-                                                                                          tableId: selectDineIn == true ? tableId : null,
+                                                                                          tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                          waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                           orderStatus: 'COMPLETED',
-                                                                                          orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                          orderType: selectedOrderType == OrderType.line
+                                                                                              ? 'LINE'
+                                                                                              : selectedOrderType == OrderType.parcel
+                                                                                                  ? 'PARCEL'
+                                                                                                  : selectedOrderType == OrderType.parcel
+                                                                                                      ? 'PARCEL'
+                                                                                                      : "AC",
+                                                                                          // selectedOrderType == OrderType.ac
+                                                                                          //             ? "AC"
+                                                                                          // : selectedOrderType == OrderType.hd
+                                                                                          // ? "HD"
+                                                                                          //   : "SWIGGY",
                                                                                           discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                           isDiscountApplied: isDiscountApplied,
                                                                                           tipAmount: tipController.text,
@@ -6182,9 +6550,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                         final orderPayload = buildOrderPayload(
                                                                                           postAddToBillingModel: postAddToBillingModel,
-                                                                                          tableId: selectDineIn == true ? tableId : null,
+                                                                                          tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                          waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                           orderStatus: 'COMPLETED',
-                                                                                          orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                          orderType: selectedOrderType == OrderType.line
+                                                                                              ? 'LINE'
+                                                                                              : selectedOrderType == OrderType.parcel
+                                                                                                  ? 'PARCEL'
+                                                                                                  : selectedOrderType == OrderType.parcel
+                                                                                                      ? 'PARCEL'
+                                                                                                      : "AC",
+                                                                                          // selectedOrderType == OrderType.ac
+                                                                                          //             ? "AC"
+                                                                                          // : selectedOrderType == OrderType.hd
+                                                                                          // ? "HD"
+                                                                                          // : "SWIGGY",
                                                                                           discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                           isDiscountApplied: isDiscountApplied,
                                                                                           tipAmount: tipController.text,
@@ -6205,42 +6585,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                           showToast("Select any one of the payment method", context, color: false);
                                                                                           return;
                                                                                         }
-                                                                                        // if (amountController
-                                                                                        //         .text
-                                                                                        //         .isEmpty &&
-                                                                                        //     selectedFullPaymentMethod ==
-                                                                                        //         "Cash") {
-                                                                                        //   showToast(
-                                                                                        //       "Enter the amount",
-                                                                                        //       context,
-                                                                                        //       color:
-                                                                                        //           false);
-                                                                                        //   return;
-                                                                                        // }
                                                                                         if (selectedFullPaymentMethod == "Cash" || selectedFullPaymentMethod == "Card" || selectedFullPaymentMethod == "UPI") {
-                                                                                          // String
-                                                                                          //     amountText =
-                                                                                          //     amountController.text.trim();
-                                                                                          // if (selectedFullPaymentMethod ==
-                                                                                          //     "Cash") {
-                                                                                          //   if (amountText.isEmpty ||
-                                                                                          //       double.tryParse(amountText) == null) {
-                                                                                          //     showToast("Enter a valid amount",
-                                                                                          //         context,
-                                                                                          //         color: false);
-                                                                                          //     return;
-                                                                                          //   }
-                                                                                          //   double
-                                                                                          //       amount =
-                                                                                          //       double.parse(amountText);
-                                                                                          //   if (amount !=
-                                                                                          //       balance) {
-                                                                                          //     showToast("Amount not matching",
-                                                                                          //         context,
-                                                                                          //         color: false);
-                                                                                          //     return;
-                                                                                          //   }
-                                                                                          // }
                                                                                           List<Map<String, dynamic>> payments = [];
                                                                                           payments = [
                                                                                             {
@@ -6252,9 +6597,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                                           final orderPayload = buildOrderPayload(
                                                                                             postAddToBillingModel: postAddToBillingModel,
-                                                                                            tableId: selectDineIn == true ? tableId : null,
+                                                                                            tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                            waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                             orderStatus: 'COMPLETED',
-                                                                                            orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                            orderType: selectedOrderType == OrderType.line
+                                                                                                ? 'LINE'
+                                                                                                : selectedOrderType == OrderType.parcel
+                                                                                                    ? 'PARCEL'
+                                                                                                    : selectedOrderType == OrderType.parcel
+                                                                                                        ? 'PARCEL'
+                                                                                                        : "AC",
+                                                                                            // selectedOrderType == OrderType.ac
+                                                                                            //             ? "AC"
+                                                                                            // : selectedOrderType == OrderType.hd
+                                                                                            // ? "HD"
+                                                                                            //   : "SWIGGY",
                                                                                             discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                             isDiscountApplied: isDiscountApplied,
                                                                                             tipAmount: tipController.text,
@@ -6271,91 +6628,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                                     }
                                                                                   }
                                                                                 },
-                                                                                // onPressed: () async {
-                                                                                //   if (selectedValue == null && selectDineIn == true) {
-                                                                                //     showToast("Table number is required for DINE-IN orders", context, color: false);
-                                                                                //     return;
-                                                                                //   }
-                                                                                //
-                                                                                //   setState(() {
-                                                                                //     isCompleteOrder = true;
-                                                                                //     completeLoad = true;
-                                                                                //   });
-                                                                                //
-                                                                                //   if (selectedFullPaymentMethod.isEmpty || (selectedFullPaymentMethod != "Cash" && selectedFullPaymentMethod != "Card" && selectedFullPaymentMethod != "UPI")) {
-                                                                                //     setState(() {
-                                                                                //       completeLoad = false;
-                                                                                //     });
-                                                                                //     showToast("Select any one of the payment method", context, color: false);
-                                                                                //     return;
-                                                                                //   }
-                                                                                //
-                                                                                //   List<Map<String, dynamic>> payments = [
-                                                                                //     {
-                                                                                //       "amount": (postAddToBillingModel.total ?? 0).toDouble(),
-                                                                                //       "balanceAmount": 0,
-                                                                                //       "method": selectedFullPaymentMethod.toUpperCase(),
-                                                                                //     }
-                                                                                //   ];
-                                                                                //
-                                                                                //   final orderPayload = buildOrderPayload(
-                                                                                //     postAddToBillingModel: postAddToBillingModel,
-                                                                                //     tableId: selectDineIn == true ? tableId : null,
-                                                                                //     orderStatus: 'COMPLETED',
-                                                                                //     orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
-                                                                                //     discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
-                                                                                //     isDiscountApplied: isDiscountApplied,
-                                                                                //     tipAmount: tipController.text,
-                                                                                //     payments: payments,
-                                                                                //   );
-                                                                                //
-                                                                                //   // Check if online or offline
-                                                                                //   if (_networkManager.isOnline) {
-                                                                                //     // Online - use existing API
-                                                                                //     if (widget.isEditingOrder == true && widget.existingOrder?.data!.orderStatus == "WAITLIST") {
-                                                                                //       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder!.data!.id));
-                                                                                //     } else {
-                                                                                //       context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
-                                                                                //     }
-                                                                                //   } else {
-                                                                                //     // Offline - save locally
-                                                                                //     try {
-                                                                                //       await _syncService.saveOrderLocally(orderPayload);
-                                                                                //
-                                                                                //       // Clear cart and reset state
-                                                                                //       setState(() {
-                                                                                //         completeLoad = false;
-                                                                                //         billingItems.clear();
-                                                                                //         selectedValue = null;
-                                                                                //         tableId = null;
-                                                                                //         selectDineIn = true;
-                                                                                //         isCompleteOrder = false;
-                                                                                //         isSplitPayment = false;
-                                                                                //         amountController.clear();
-                                                                                //         selectedFullPaymentMethod = "";
-                                                                                //         widget.isEditingOrder = false;
-                                                                                //         balance = 0;
-                                                                                //         if (billingItems.isEmpty) {
-                                                                                //           isDiscountApplied = false;
-                                                                                //         }
-                                                                                //       });
-                                                                                //
-                                                                                //       await _syncService.clearLocalBillingItems();
-                                                                                //       await _updatePendingOrdersCount();
-                                                                                //
-                                                                                //       showToast("Order completed offline. Will sync when online.", context, color: true);
-                                                                                //
-                                                                                //       // Update billing state
-                                                                                //       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
-                                                                                //     } catch (e) {
-                                                                                //       setState(() {
-                                                                                //         completeLoad = false;
-                                                                                //       });
-                                                                                //       showToast("Error completing order: $e", context, color: false);
-                                                                                //     }
-                                                                                //   }
-                                                                                // },
-
                                                                                 style: ElevatedButton.styleFrom(
                                                                                   backgroundColor: appPrimaryColor,
                                                                                   minimumSize: const Size(0, 50),
@@ -6400,10 +6672,19 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             return;
                                                                           }
 
-                                                                          if (selectedValue == null &&
-                                                                              selectDineIn == true) {
+                                                                          if ((selectedValue == null && selectedOrderType == OrderType.line) ||
+                                                                              (selectedValue == null && selectedOrderType == OrderType.ac)) {
                                                                             showToast(
-                                                                              "Table number is required for DINE-IN orders",
+                                                                              "Table number is required for LINE/AC orders",
+                                                                              context,
+                                                                              color: false,
+                                                                            );
+                                                                            return;
+                                                                          }
+                                                                          if ((selectedValueWaiter == null && selectedOrderType == OrderType.line) ||
+                                                                              (selectedValueWaiter == null && selectedOrderType == OrderType.ac)) {
+                                                                            showToast(
+                                                                              "Waiter name is required for LINE/AC orders",
                                                                               context,
                                                                               color: false,
                                                                             );
@@ -6435,9 +6716,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             final orderPayload =
                                                                                 buildOrderPayload(
                                                                               postAddToBillingModel: postAddToBillingModel,
-                                                                              tableId: selectDineIn == true ? tableId : null,
+                                                                              tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                              waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                               orderStatus: 'COMPLETED',
-                                                                              orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                              orderType: selectedOrderType == OrderType.line
+                                                                                  ? 'LINE'
+                                                                                  : selectedOrderType == OrderType.parcel
+                                                                                      ? 'PARCEL'
+                                                                                      : selectedOrderType == OrderType.parcel
+                                                                                          ? 'PARCEL'
+                                                                                          : "AC",
+                                                                              // selectedOrderType == OrderType.ac
+                                                                              //             ? "AC"
+                                                                              // : selectedOrderType == OrderType.hd
+                                                                              // ? "HD"
+                                                                              //: "SWIGGY",
                                                                               discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                               isDiscountApplied: isDiscountApplied,
                                                                               tipAmount: tipController.text,
@@ -6471,9 +6764,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                               final orderPayload = buildOrderPayload(
                                                                                 postAddToBillingModel: postAddToBillingModel,
-                                                                                tableId: selectDineIn == true ? tableId : null,
+                                                                                tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                 orderStatus: 'COMPLETED',
-                                                                                orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                orderType: selectedOrderType == OrderType.line
+                                                                                    ? 'LINE'
+                                                                                    : selectedOrderType == OrderType.parcel
+                                                                                        ? 'PARCEL'
+                                                                                        : selectedOrderType == OrderType.parcel
+                                                                                            ? 'PARCEL'
+                                                                                            : "AC",
+                                                                                // selectedOrderType == OrderType.ac
+                                                                                //             ? "AC"
+                                                                                // : selectedOrderType == OrderType.hd
+                                                                                // ? "HD"
+                                                                                //   : "SWIGGY",
                                                                                 discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                 isDiscountApplied: isDiscountApplied,
                                                                                 tipAmount: tipController.text,
@@ -6511,9 +6816,21 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
                                                                               final orderPayload = buildOrderPayload(
                                                                                 postAddToBillingModel: postAddToBillingModel,
-                                                                                tableId: selectDineIn == true ? tableId : null,
+                                                                                tableId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? tableId : null,
+                                                                                waiterId: selectedOrderType == OrderType.line || selectedOrderType == OrderType.ac ? waiterId : null,
                                                                                 orderStatus: 'COMPLETED',
-                                                                                orderType: selectDineIn == true ? 'DINE-IN' : 'TAKE-AWAY',
+                                                                                orderType: selectedOrderType == OrderType.line
+                                                                                    ? 'LINE'
+                                                                                    : selectedOrderType == OrderType.parcel
+                                                                                        ? 'PARCEL'
+                                                                                        : selectedOrderType == OrderType.parcel
+                                                                                            ? 'PARCEL'
+                                                                                            : "AC",
+                                                                                // selectedOrderType == OrderType.ac
+                                                                                //             ? "AC"
+                                                                                // : selectedOrderType == OrderType.hd
+                                                                                // ? "HD"
+                                                                                //  : "SWIGGY",
                                                                                 discountAmount: postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
                                                                                 isDiscountApplied: isDiscountApplied,
                                                                                 tipAmount: tipController.text,
@@ -6527,136 +6844,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             }
                                                                           }
                                                                         },
-                                                                        // onPressed:
-                                                                        //     () async {
-                                                                        //   if (!allSplitAmountsFilled() ||
-                                                                        //       !allPaymentMethodsSelected()) {
-                                                                        //     showToast("Please complete payment method and amount fields",
-                                                                        //         context,
-                                                                        //         color: false);
-                                                                        //     return;
-                                                                        //   }
-                                                                        //
-                                                                        //   if (totalSplit !=
-                                                                        //       postAddToBillingModel.total) {
-                                                                        //     showToast("Split payments must sum to total amount",
-                                                                        //         context,
-                                                                        //         color: false);
-                                                                        //     return;
-                                                                        //   }
-                                                                        //
-                                                                        //   if (selectedValue == null &&
-                                                                        //       selectDineIn == true) {
-                                                                        //     showToast("Table number is required for DINE-IN orders",
-                                                                        //         context,
-                                                                        //         color: false);
-                                                                        //     return;
-                                                                        //   }
-                                                                        //
-                                                                        //   setState(
-                                                                        //       () {
-                                                                        //     completeLoad =
-                                                                        //         true;
-                                                                        //   });
-                                                                        //
-                                                                        //   List<Map<String, dynamic>>
-                                                                        //       payments =
-                                                                        //       [];
-                                                                        //   for (int i = 0;
-                                                                        //       i < _paymentFieldCount;
-                                                                        //       i++) {
-                                                                        //     final method =
-                                                                        //         selectedPaymentMethods[i];
-                                                                        //     final amountText =
-                                                                        //         splitAmountControllers[i].text;
-                                                                        //     final amount =
-                                                                        //         double.tryParse(amountText) ?? 0;
-                                                                        //
-                                                                        //     if (method == null ||
-                                                                        //         method.isEmpty) {
-                                                                        //       setState(() {
-                                                                        //         completeLoad = false;
-                                                                        //       });
-                                                                        //       showToast("Please select a payment method for split #${i + 1}", context, color: false);
-                                                                        //       return;
-                                                                        //     }
-                                                                        //
-                                                                        //     payments.add({
-                                                                        //       "amount": amount,
-                                                                        //       "balanceAmount": 0,
-                                                                        //       "method": method.toUpperCase(),
-                                                                        //     });
-                                                                        //   }
-                                                                        //
-                                                                        //   final orderPayload =
-                                                                        //       buildOrderPayload(
-                                                                        //     postAddToBillingModel:
-                                                                        //         postAddToBillingModel,
-                                                                        //     tableId: selectDineIn == true
-                                                                        //         ? tableId
-                                                                        //         : null,
-                                                                        //     orderStatus:
-                                                                        //         'COMPLETED',
-                                                                        //     orderType: selectDineIn == true
-                                                                        //         ? 'DINE-IN'
-                                                                        //         : 'TAKE-AWAY',
-                                                                        //     discountAmount:
-                                                                        //         postAddToBillingModel.totalDiscount!.toStringAsFixed(2),
-                                                                        //     isDiscountApplied:
-                                                                        //         isDiscountApplied,
-                                                                        //     tipAmount:
-                                                                        //         tipController.text,
-                                                                        //     payments:
-                                                                        //         payments,
-                                                                        //   );
-                                                                        //
-                                                                        //   // Check if online or offline
-                                                                        //   if (_networkManager
-                                                                        //       .isOnline) {
-                                                                        //     // Online - use existing API
-                                                                        //     if (widget.isEditingOrder == true &&
-                                                                        //         widget.existingOrder?.data!.orderStatus == "WAITLIST") {
-                                                                        //       context.read<FoodCategoryBloc>().add(UpdateOrder(jsonEncode(orderPayload), widget.existingOrder!.data!.id));
-                                                                        //     } else {
-                                                                        //       context.read<FoodCategoryBloc>().add(GenerateOrder(jsonEncode(orderPayload)));
-                                                                        //     }
-                                                                        //   } else {
-                                                                        //     // Offline - save locally
-                                                                        //     try {
-                                                                        //       await _syncService.saveOrderLocally(orderPayload);
-                                                                        //
-                                                                        //       // Clear cart and reset state
-                                                                        //       setState(() {
-                                                                        //         completeLoad = false;
-                                                                        //         billingItems.clear();
-                                                                        //         selectedValue = null;
-                                                                        //         tableId = null;
-                                                                        //         selectDineIn = true;
-                                                                        //         isCompleteOrder = false;
-                                                                        //         isSplitPayment = false;
-                                                                        //         selectedFullPaymentMethod = "";
-                                                                        //         widget.isEditingOrder = false;
-                                                                        //         balance = 0;
-                                                                        //         if (billingItems.isEmpty) {
-                                                                        //           isDiscountApplied = false;
-                                                                        //         }
-                                                                        //       });
-                                                                        //
-                                                                        //       await _syncService.clearLocalBillingItems();
-                                                                        //       await _updatePendingOrdersCount();
-                                                                        //
-                                                                        //       showToast("Split payment order completed offline. Will sync when online.", context, color: true);
-                                                                        //
-                                                                        //       // Update billing state
-                                                                        //       context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied));
-                                                                        //     } catch (e) {
-                                                                        //       setState(() {
-                                                                        //         completeLoad = false;
-                                                                        //       });
-                                                                        //       showToast("Error completing split payment order: $e", context, color: false);
-                                                                        //     }
-                                                                        //   }
-                                                                        // },
                                                                         style: ElevatedButton
                                                                             .styleFrom(
                                                                           backgroundColor: (allSplitAmountsFilled() && allPaymentMethodsSelected() && totalSplit == postAddToBillingModel.total) || (widget.isEditingOrder == true && widget.existingOrder?.data!.orderStatus == "COMPLETED")
