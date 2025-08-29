@@ -26,6 +26,7 @@ import 'package:simple/ModelClass/Order/Post_generate_order_model.dart'
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart'
     as update;
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
+import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 import 'package:simple/Reusable/color.dart';
@@ -131,6 +132,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   generate.PostGenerateOrderModel postGenerateOrderModel =
       generate.PostGenerateOrderModel();
   GetTableModel getTableModel = GetTableModel();
+  GetWaiterModel getWaiterModel = GetWaiterModel();
   update.UpdateGenerateOrderModel updateGenerateOrderModel =
       update.UpdateGenerateOrderModel();
 
@@ -256,10 +258,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
               })
           .toList();
 
-      String businessName =
-          postGenerateOrderModel.invoice!.businessName ?? 'Business Name';
-      String address =
-          postGenerateOrderModel.invoice!.address ?? 'Business Address';
+      String businessName = postGenerateOrderModel.invoice!.businessName ?? '';
+      String address = postGenerateOrderModel.invoice!.address ?? '';
+      String gst = postGenerateOrderModel.invoice!.gstNumber ?? '';
       double taxPercent = (postGenerateOrderModel.order!.tax ?? 0.0).toDouble();
       String orderNumber = postGenerateOrderModel.order!.orderNumber ?? 'N/A';
       String paymentMethod = postGenerateOrderModel.invoice!.paidBy ?? '';
@@ -269,8 +270,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       double total = (postGenerateOrderModel.invoice!.total ?? 0.0).toDouble();
       String orderType = postGenerateOrderModel.order!.orderType ?? '';
       String orderStatus = postGenerateOrderModel.invoice!.orderStatus ?? '';
-      String tableName = orderType == 'DINE-IN'
+      String tableName = orderType == 'LINE' || orderType == 'AC'
           ? postGenerateOrderModel.invoice!.tableName.toString()
+          : 'N/A';
+      String waiterName = orderType == 'LINE' || orderType == 'AC'
+          ? postGenerateOrderModel.invoice!.waiterName.toString()
           : 'N/A';
       String date = formatInvoiceDate(postGenerateOrderModel.invoice?.date);
       Navigator.of(context).pop();
@@ -294,15 +298,17 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                     child: getThermalReceiptWidget(
                       businessName: businessName,
                       address: address,
+                      gst: gst,
                       items: items,
                       tax: taxPercent,
                       paidBy: paymentMethod,
-                      tamilTagline: 'ஒரே ஒரு முறை சுவைத்து பாருங்கள்',
+                      tamilTagline: '',
                       phone: phone,
                       subtotal: subTotal,
                       total: total,
                       orderNumber: orderNumber,
                       tableName: tableName,
+                      waiterName: waiterName,
                       orderType: orderType,
                       date: date,
                       status: orderStatus,
@@ -398,9 +404,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
           .toList();
 
       String businessName =
-          updateGenerateOrderModel.invoice!.businessName ?? 'Business Name';
-      String address =
-          updateGenerateOrderModel.invoice!.address ?? 'Business Address';
+          updateGenerateOrderModel.invoice!.businessName ?? '';
+      String address = updateGenerateOrderModel.invoice!.address ?? '';
+      String gst = updateGenerateOrderModel.invoice!.gstNumber ?? '';
       double taxPercent =
           (updateGenerateOrderModel.order!.tax ?? 0.0).toDouble();
       String orderNumber = updateGenerateOrderModel.order!.orderNumber ?? 'N/A';
@@ -412,8 +418,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
           (updateGenerateOrderModel.invoice!.total ?? 0.0).toDouble();
       String orderType = updateGenerateOrderModel.order!.orderType ?? '';
       String orderStatus = updateGenerateOrderModel.invoice!.orderStatus ?? '';
-      String tableName = orderType == 'DINE-IN'
+      String tableName = orderType == 'LINE' || orderType == 'AC'
           ? updateGenerateOrderModel.invoice!.tableName.toString()
+          : 'N/A';
+      String waiterName = orderType == 'LINE' || orderType == 'AC'
+          ? updateGenerateOrderModel.invoice!.waiterName.toString()
           : 'N/A';
       String date = formatInvoiceDate(updateGenerateOrderModel.invoice?.date);
       Navigator.of(context).pop();
@@ -437,15 +446,17 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                     child: getThermalReceiptWidget(
                         businessName: businessName,
                         address: address,
+                        gst: gst,
                         items: items,
                         tax: taxPercent,
                         paidBy: paymentMethod,
-                        tamilTagline: 'ஒரே ஒரு முறை சுவைத்து பாருங்கள்',
+                        tamilTagline: '',
                         phone: phone,
                         subtotal: subTotal,
                         total: total,
                         orderNumber: orderNumber,
                         tableName: tableName,
+                        waiterName: waiterName,
                         orderType: orderType,
                         date: date,
                         status: orderStatus),
@@ -596,6 +607,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       }
       tableId = data.tableNo;
       selectedValue = data.tableName;
+      waiterId = data.waiter;
+      selectedValueWaiter = data.waiterName;
       isCartLoaded = true;
       isDiscountApplied =
           widget.existingOrder?.data!.isDiscountApplied ?? false;
@@ -632,7 +645,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     setState(() {
       billingItems.clear();
       tableId = null;
+      waiterId = null;
       selectedValue = null;
+      selectedValueWaiter = null;
       selectedOrderType = OrderType.line;
       isSplitPayment = false;
       amountController.clear();
@@ -1025,6 +1040,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       loadDataBasedOnConnectivity();
     }
     context.read<FoodCategoryBloc>().add(TableDine());
+    context.read<FoodCategoryBloc>().add(WaiterDine());
     setState(() {
       categoryLoad = true;
     });
@@ -1062,18 +1078,10 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
         product.Category(name: 'All', image: Images.all, id: ""),
         ...sortedCategories,
       ];
-      final List<String> paidItemIds = widget.isEditingOrder == true &&
-              widget.existingOrder?.data?.orderStatus == "COMPLETED"
-          ? widget.existingOrder!.data!.items!
-              .map((i) => i.product?.id)
-              .whereType<String>()
-              .toList()
-          : [];
 
       double total = (postAddToBillingModel.total ?? 0).toDouble();
       double paidAmount = (widget.existingOrder?.data?.total ?? 0).toDouble();
       balance = total - paidAmount;
-      double finalTotal = total + tipAmount;
       @override
       Widget price(String label, String value, {bool isBold = false}) {
         return SizedBox(
@@ -6980,7 +6988,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
             billingItems.clear();
             selectedValue = null;
             tableId = null;
-            selectDineIn = true;
+            waiterId = null;
+            selectedValueWaiter = null;
+            selectedOrderType = OrderType.line;
             isCompleteOrder = false;
             isSplitPayment = false;
             amountController.clear();
@@ -6992,9 +7002,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
             }
           });
 
-          context
-              .read<FoodCategoryBloc>()
-              .add(AddToBilling(List.from(billingItems), isDiscountApplied));
+          context.read<FoodCategoryBloc>().add(AddToBilling(
+              List.from(billingItems), isDiscountApplied, selectedOrderType));
           context.read<FoodCategoryBloc>().add(
               FoodProductItem(selectedCatId.toString(), searchController.text));
           if (shouldPrintReceipt == true &&
@@ -7019,7 +7028,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
             billingItems.clear();
             selectedValue = null;
             tableId = null;
-            selectDineIn = true;
+            waiterId = null;
+            selectedValueWaiter = null;
+            selectedOrderType = OrderType.line;
             isCompleteOrder = false;
             isSplitPayment = false;
             amountController.clear();
@@ -7030,9 +7041,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
               isDiscountApplied = false;
             }
           });
-          context
-              .read<FoodCategoryBloc>()
-              .add(AddToBilling(List.from(billingItems), isDiscountApplied));
+          context.read<FoodCategoryBloc>().add(AddToBilling(
+              List.from(billingItems), isDiscountApplied, selectedOrderType));
           context.read<FoodCategoryBloc>().add(
               FoodProductItem(selectedCatId.toString(), searchController.text));
           if (shouldPrintReceipt == true &&
@@ -7058,6 +7068,24 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
               categoryLoad = false;
             });
             showToast("No Tables found", context, color: false);
+          }
+          return true;
+        }
+        if (current is GetWaiterModel) {
+          getWaiterModel = current;
+          if (getWaiterModel.errorResponse?.isUnauthorized == true) {
+            _handle401Error();
+            return true;
+          }
+          if (getWaiterModel.success == true) {
+            setState(() {
+              categoryLoad = false;
+            });
+          } else {
+            setState(() {
+              categoryLoad = false;
+            });
+            showToast("No Waiter found", context, color: false);
           }
           return true;
         }

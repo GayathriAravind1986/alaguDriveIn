@@ -8,6 +8,7 @@ Widget getThermalReceiptWidget({
   required String businessName,
   required String tamilTagline,
   required String address,
+  required String gst,
   required String phone,
   required List<Map<String, dynamic>> items,
   required double subtotal,
@@ -15,6 +16,7 @@ Widget getThermalReceiptWidget({
   required double total,
   required String orderNumber,
   required String tableName,
+  required String waiterName,
   required String orderType,
   required String paidBy,
   required String date,
@@ -33,16 +35,6 @@ Widget getThermalReceiptWidget({
             child: Column(
               children: [
                 Text(
-                  tamilTagline,
-                  style: const TextStyle(
-                    fontSize: 20, // Increased from 14
-                    fontWeight: FontWeight.w600,
-                    color: blackColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
                   businessName,
                   style: const TextStyle(
                     fontSize: 24, // Increased from 18
@@ -60,6 +52,14 @@ Widget getThermalReceiptWidget({
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (gst != "N/A")
+                  Text(
+                    "GST: $gst",
+                    style: const TextStyle(
+                      fontSize: 18, // Increased from 12
+                      color: blackColor,
+                    ),
+                  ),
                 Text(
                   "Phone: $phone",
                   style: const TextStyle(
@@ -74,7 +74,7 @@ Widget getThermalReceiptWidget({
 
           // Separator line
           Container(
-            height: 1,
+            height: 4,
             color: blackColor,
             margin: const EdgeInsets.symmetric(vertical: 4),
           ),
@@ -84,11 +84,14 @@ Widget getThermalReceiptWidget({
           _buildThermalLabelRow("Date: ", date),
           _buildThermalLabelRow("Type: ", orderType),
           _buildThermalLabelRow("Status: ", status),
-          if (orderType == 'DINE-IN')
-            _buildThermalLabelRow(
-                "Table: ", orderType == 'DINE-IN' ? tableName : "N/A"),
+          if (orderType == 'LINE' || orderType == 'AC')
+            _buildThermalLabelRow("Table: ",
+                orderType == 'LINE' || orderType == 'AC' ? tableName : "N/A"),
+          if (orderType == 'LINE' || orderType == 'AC')
+            _buildThermalLabelRow("Waiter: ",
+                orderType == 'LINE' || orderType == 'AC' ? waiterName : "N/A"),
           Container(
-            height: 1,
+            height: 4,
             color: blackColor,
             margin: const EdgeInsets.symmetric(vertical: 4),
           ),
@@ -98,12 +101,13 @@ Widget getThermalReceiptWidget({
 
           // Separator line
           Container(
-            height: 1,
+            height: 4,
             color: blackColor,
             margin: const EdgeInsets.symmetric(vertical: 2),
           ),
 
           // Items
+
           ...items.map((item) => Column(
                 children: [
                   _buildThermalItemRow(
@@ -118,7 +122,7 @@ Widget getThermalReceiptWidget({
 
           // Separator line
           Container(
-            height: 1,
+            height: 4,
             color: blackColor,
             margin: const EdgeInsets.symmetric(vertical: 4),
           ),
@@ -130,7 +134,7 @@ Widget getThermalReceiptWidget({
 
           // Separator line
           Container(
-            height: 1,
+            height: 4,
             color: blackColor,
             margin: const EdgeInsets.symmetric(vertical: 4),
           ),
@@ -398,7 +402,7 @@ Future<Uint8List?> captureMonochromeReceipt(GlobalKey key) async {
 
     return finalByteData?.buffer.asUint8List();
   } catch (e) {
-    print("Error creating monochrome image: $e");
+    debugPrint("Error creating monochrome image: $e");
     return null;
   }
 }

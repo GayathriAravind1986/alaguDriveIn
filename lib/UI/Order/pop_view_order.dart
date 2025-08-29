@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
 import 'package:simple/Reusable/color.dart';
@@ -41,17 +40,19 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
     final order = widget.getViewOrderModel.data!;
     final invoice = order.invoice!;
     var size = MediaQuery.of(context).size;
-    List<Map<String, dynamic>> items = order.items!
+    List<Map<String, dynamic>> items = invoice.invoiceItems!
         .map((e) => {
-              'name': e.name,
-              'qty': e.quantity,
-              'price': (e.unitPrice ?? 0).toDouble(),
-              'total': ((e.quantity ?? 0) * (e.unitPrice ?? 0)).toDouble(),
+              'name': e.tamilname,
+              'qty': e.qty,
+              'price': (e.basePrice ?? 0).toDouble(),
+              'total': ((e.qty ?? 0) * (e.basePrice ?? 0)).toDouble(),
             })
         .toList();
 
-    String businessName = invoice.businessName ?? 'Business Name';
-    String address = invoice.address ?? 'Business Address';
+    String businessName = invoice.businessName ?? '';
+    String address = invoice.address ?? '';
+    String gst = invoice.gstNumber ?? '';
+    debugPrint("gst:$gst");
     double taxAmount = (order.tax ?? 0.0).toDouble();
     String orderNumber = order.orderNumber ?? 'N/A';
     String paymentMethod = invoice.paidBy ?? '';
@@ -60,8 +61,12 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
     double total = (invoice.total ?? 0.0).toDouble();
     String orderType = order.orderType ?? '';
     String orderStatus = order.orderStatus ?? '';
-    String tableName =
-        orderType == 'DINE-IN' ? (invoice.tableNum ?? 'N/A') : 'N/A';
+    String tableName = orderType == 'LINE' || orderType == 'AC'
+        ? (invoice.tableNum ?? 'N/A')
+        : 'N/A';
+    String waiterName = orderType == 'LINE' || orderType == 'AC'
+        ? (invoice.waiterNum ?? 'N/A')
+        : 'N/A';
     String date = DateFormat('dd/MM/yyyy hh:mm a').format(
         DateFormat('M/d/yyyy, h:mm:ss a').parse(invoice.date.toString()));
 
@@ -115,15 +120,17 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
                       child: getThermalReceiptWidget(
                         businessName: businessName,
                         address: address,
+                        gst: gst,
                         items: items,
                         tax: taxAmount,
                         paidBy: paymentMethod,
-                        tamilTagline: 'ஒரே ஒரு முறை சுவைத்து பாருங்கள்',
+                        tamilTagline: '',
                         phone: phone,
                         subtotal: subTotal,
                         total: total,
                         orderNumber: orderNumber,
                         tableName: tableName,
+                        waiterName: waiterName,
                         orderType: orderType,
                         date: date,
                         status: orderStatus,
@@ -147,8 +154,8 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
                               if (imageBytes != null) {
                                 await printerService.init();
                                 await printerService.printBitmap(imageBytes);
-                                await Future.delayed(
-                                    const Duration(seconds: 3));
+                                // await Future.delayed(
+                                //     const Duration(seconds: 2));
                                 await printerService.fullCut();
                                 Navigator.pop(context);
                               }

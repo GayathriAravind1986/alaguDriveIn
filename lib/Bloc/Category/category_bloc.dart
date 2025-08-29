@@ -64,6 +64,8 @@ class UpdateOrder extends FoodCategoryEvent {
 
 class TableDine extends FoodCategoryEvent {}
 
+class WaiterDine extends FoodCategoryEvent {}
+
 class StockDetails extends FoodCategoryEvent {}
 
 class SyncPendingOrders extends FoodCategoryEvent {}
@@ -442,6 +444,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           ));
         }
       }
+    });
+    on<WaiterDine>((event, emit) async {
+      await ApiProvider().getWaiterAPI().then((value) {
+        emit(value);
+      }).catchError((error) {
+        emit(error);
+      });
     });
     on<StockDetails>((event, emit) async {
       try {

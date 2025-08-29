@@ -197,11 +197,13 @@ class Invoice {
     num? total,
     String? orderNumber,
     String? orderStatus,
+    List<Kot>? kot,
     String? date,
     String? paidBy,
     String? transactionId,
     String? tableNum,
     String? tableName,
+    String? waiterName,
     String? orderType,
     num? tipAmount,
   }) {
@@ -217,11 +219,13 @@ class Invoice {
     _total = total;
     _orderNumber = orderNumber;
     _orderStatus = orderStatus;
+    _kot = kot;
     _date = date;
     _paidBy = paidBy;
     _transactionId = transactionId;
     _tableNum = tableNum;
     _tableName = tableName;
+    _waiterName = waiterName;
     _orderType = orderType;
     _tipAmount = tipAmount;
   }
@@ -244,11 +248,18 @@ class Invoice {
     _total = json['total'];
     _orderNumber = json['orderNumber'];
     _orderStatus = json['orderStatus'];
+    if (json['kot'] != null) {
+      _kot = [];
+      json['kot'].forEach((v) {
+        _kot?.add(Kot.fromJson(v));
+      });
+    }
     _date = json['date'];
     _paidBy = json['paidBy'];
     _transactionId = json['transactionId'];
     _tableNum = json['tableNum'];
     _tableName = json['tableName'];
+    _waiterName = json['waiterName'];
     _orderType = json['orderType'];
     _tipAmount = json['tipAmount'];
   }
@@ -264,11 +275,13 @@ class Invoice {
   num? _total;
   String? _orderNumber;
   String? _orderStatus;
+  List<Kot>? _kot;
   String? _date;
   String? _paidBy;
   String? _transactionId;
   String? _tableNum;
   String? _tableName;
+  String? _waiterName;
   String? _orderType;
   num? _tipAmount;
   Invoice copyWith({
@@ -284,11 +297,13 @@ class Invoice {
     num? total,
     String? orderNumber,
     String? orderStatus,
+    List<Kot>? kot,
     String? date,
     String? paidBy,
     String? transactionId,
     String? tableNum,
     String? tableName,
+    String? waiterName,
     String? orderType,
     num? tipAmount,
   }) =>
@@ -305,11 +320,13 @@ class Invoice {
         total: total ?? _total,
         orderNumber: orderNumber ?? _orderNumber,
         orderStatus: orderStatus ?? _orderStatus,
+        kot: kot ?? _kot,
         date: date ?? _date,
         paidBy: paidBy ?? _paidBy,
         transactionId: transactionId ?? _transactionId,
         tableNum: tableNum ?? _tableNum,
         tableName: tableName ?? _tableName,
+        waiterName: waiterName ?? _waiterName,
         orderType: orderType ?? _orderType,
         tipAmount: tipAmount ?? _tipAmount,
       );
@@ -325,11 +342,13 @@ class Invoice {
   num? get total => _total;
   String? get orderNumber => _orderNumber;
   String? get orderStatus => _orderStatus;
+  List<Kot>? get kot => _kot;
   String? get date => _date;
   String? get paidBy => _paidBy;
   String? get transactionId => _transactionId;
   String? get tableNum => _tableNum;
   String? get tableName => _tableName;
+  String? get waiterName => _waiterName;
   String? get orderType => _orderType;
   num? get tipAmount => _tipAmount;
 
@@ -349,13 +368,54 @@ class Invoice {
     map['total'] = _total;
     map['orderNumber'] = _orderNumber;
     map['orderStatus'] = _orderStatus;
+    if (_kot != null) {
+      map['kot'] = _kot?.map((v) => v.toJson()).toList();
+    }
     map['date'] = _date;
     map['paidBy'] = _paidBy;
     map['transactionId'] = _transactionId;
     map['tableNum'] = _tableNum;
     map['tableName'] = _tableName;
+    map['waiterName'] = _waiterName;
     map['orderType'] = _orderType;
     map['tipAmount'] = _tipAmount;
+    return map;
+  }
+}
+
+/// name : "PANNER SCHZWAN FRIED RICE"
+/// quantity : 2
+
+class Kot {
+  Kot({
+    String? name,
+    num? quantity,
+  }) {
+    _name = name;
+    _quantity = quantity;
+  }
+
+  Kot.fromJson(dynamic json) {
+    _name = json['name'];
+    _quantity = json['quantity'];
+  }
+  String? _name;
+  num? _quantity;
+  Kot copyWith({
+    String? name,
+    num? quantity,
+  }) =>
+      Kot(
+        name: name ?? _name,
+        quantity: quantity ?? _quantity,
+      );
+  String? get name => _name;
+  num? get quantity => _quantity;
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{};
+    map['name'] = _name;
+    map['quantity'] = _quantity;
     return map;
   }
 }
@@ -369,6 +429,7 @@ class Invoice {
 class InvoiceItems {
   InvoiceItems({
     String? name,
+    String? tamilname,
     num? basePrice,
     num? qty,
     num? taxPrice,
@@ -376,6 +437,7 @@ class InvoiceItems {
     bool? isAddon,
   }) {
     _name = name;
+    _tamilname = tamilname;
     _basePrice = basePrice;
     _qty = qty;
     _taxPrice = taxPrice;
@@ -385,6 +447,7 @@ class InvoiceItems {
 
   InvoiceItems.fromJson(dynamic json) {
     _name = json['name'];
+    _tamilname = json['tamilname'];
     _basePrice = json['basePrice'];
     _qty = json['qty'];
     _taxPrice = json['taxPrice'];
@@ -392,6 +455,7 @@ class InvoiceItems {
     _isAddon = json['isAddon'];
   }
   String? _name;
+  String? _tamilname;
   num? _basePrice;
   num? _qty;
   num? _taxPrice;
@@ -399,6 +463,7 @@ class InvoiceItems {
   bool? _isAddon;
   InvoiceItems copyWith({
     String? name,
+    String? tamilname,
     num? basePrice,
     num? qty,
     num? taxPrice,
@@ -407,6 +472,7 @@ class InvoiceItems {
   }) =>
       InvoiceItems(
         name: name ?? _name,
+        tamilname: tamilname ?? _tamilname,
         basePrice: basePrice ?? _basePrice,
         qty: qty ?? _qty,
         taxPrice: taxPrice ?? _taxPrice,
@@ -414,6 +480,7 @@ class InvoiceItems {
         isAddon: isAddon ?? _isAddon,
       );
   String? get name => _name;
+  String? get tamilname => _tamilname;
   num? get basePrice => _basePrice;
   num? get qty => _qty;
   num? get taxPrice => _taxPrice;
@@ -423,6 +490,7 @@ class InvoiceItems {
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
     map['name'] = _name;
+    map['tamilname'] = _tamilname;
     map['basePrice'] = _basePrice;
     map['qty'] = _qty;
     map['taxPrice'] = _taxPrice;
@@ -537,11 +605,45 @@ class Order {
 /// tax : 0
 /// subtotal : 189.49
 /// _id : "687641b8ff518ce12520c9b4"
+class Kotitems {
+  Kotitems({
+    String? name,
+    num? quantity,
+  }) {
+    _name = name;
+    _quantity = quantity;
+  }
+
+  Kotitems.fromJson(dynamic json) {
+    _name = json['name'];
+    _quantity = json['quantity'];
+  }
+  String? _name;
+  num? _quantity;
+  Kotitems copyWith({
+    String? name,
+    num? quantity,
+  }) =>
+      Kotitems(
+        name: name ?? _name,
+        quantity: quantity ?? _quantity,
+      );
+  String? get name => _name;
+  num? get quantity => _quantity;
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{};
+    map['name'] = _name;
+    map['quantity'] = _quantity;
+    return map;
+  }
+}
 
 class Items {
   Items({
     String? product,
     String? name,
+    String? tamilname,
     num? quantity,
     num? unitPrice,
     List<Addons>? addons,
@@ -551,6 +653,7 @@ class Items {
   }) {
     _product = product;
     _name = name;
+    _tamilname = tamilname;
     _quantity = quantity;
     _unitPrice = unitPrice;
     _addons = addons;
@@ -562,6 +665,7 @@ class Items {
   Items.fromJson(dynamic json) {
     _product = json['product'];
     _name = json['name'];
+    _tamilname = json['tamilname'];
     _quantity = json['quantity'];
     _unitPrice = json['unitPrice'];
     if (json['addons'] != null) {
@@ -576,6 +680,7 @@ class Items {
   }
   String? _product;
   String? _name;
+  String? _tamilname;
   num? _quantity;
   num? _unitPrice;
   List<Addons>? _addons;
@@ -585,6 +690,7 @@ class Items {
   Items copyWith({
     String? product,
     String? name,
+    String? tamilname,
     num? quantity,
     num? unitPrice,
     List<Addons>? addons,
@@ -595,6 +701,7 @@ class Items {
       Items(
         product: product ?? _product,
         name: name ?? _name,
+        tamilname: tamilname ?? _tamilname,
         quantity: quantity ?? _quantity,
         unitPrice: unitPrice ?? _unitPrice,
         addons: addons ?? _addons,
@@ -604,6 +711,7 @@ class Items {
       );
   String? get product => _product;
   String? get name => _name;
+  String? get tamilname => _tamilname;
   num? get quantity => _quantity;
   num? get unitPrice => _unitPrice;
   List<Addons>? get addons => _addons;
@@ -615,6 +723,7 @@ class Items {
     final map = <String, dynamic>{};
     map['product'] = _product;
     map['name'] = _name;
+    map['tamilname'] = _tamilname;
     map['quantity'] = _quantity;
     map['unitPrice'] = _unitPrice;
     if (_addons != null) {

@@ -6,6 +6,7 @@ import 'package:simple/Bloc/Report/report_bloc.dart';
 import 'package:simple/Bloc/StockIn/stock_in_bloc.dart';
 import 'package:simple/Bloc/demo/demo_bloc.dart';
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
+import 'package:simple/Reusable/color.dart';
 import 'package:simple/UI/CustomAppBar/custom_appbar.dart';
 import 'package:simple/UI/Home_screen/home_screen.dart';
 import 'package:simple/UI/Order/order_list.dart';
@@ -58,7 +59,8 @@ class _DashBoardState extends State<DashBoard> {
       GlobalKey<ReportViewViewState>();
   final GlobalKey<StockViewViewState> stockKey =
       GlobalKey<StockViewViewState>();
-
+  final GlobalKey<OrderTabViewViewState> orderTabKey =
+      GlobalKey<OrderTabViewViewState>();
   int selectedIndex = 0;
   bool orderLoad = false;
 
@@ -75,6 +77,15 @@ class _DashBoardState extends State<DashBoard> {
     super.initState();
     if (widget.selectTab != null) {
       selectedIndex = widget.selectTab!;
+    }
+  }
+
+  void _resetOrderTab() {
+    final orderTabState = orderTabKey.currentState;
+    if (orderTabState != null) {
+      orderTabState.resetSelections();
+    } else {
+      debugPrint("orderTabState is NULL — check if key is assigned properly");
     }
   }
 
@@ -115,7 +126,7 @@ class _DashBoardState extends State<DashBoard> {
   Widget mainContainer() {
     return SafeArea(
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: whiteColor,
         appBar: CustomAppBar(
           selectedIndex: selectedIndex,
           onTabSelected: (index) {
@@ -135,8 +146,10 @@ class _DashBoardState extends State<DashBoard> {
                 break;
               case 1: // Orders tab
                 _resetOtherTabStates(1);
-                WidgetsBinding.instance
-                    .addPostFrameCallback((_) => _refreshOrders());
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _refreshOrders();
+                  _resetOrderTab();
+                });
                 break;
               case 2: // Reports tab
                 if (!tabRefreshStates[2]!) {
@@ -183,6 +196,7 @@ class _DashBoardState extends State<DashBoard> {
             OrdersTabbedScreen(
               key: PageStorageKey('OrdersTabbedScreen'),
               orderAllKey: orderAllTabKey,
+              orderResetKey: orderTabKey,
             ),
             BlocProvider(
               create: (_) => ReportTodayBloc(),

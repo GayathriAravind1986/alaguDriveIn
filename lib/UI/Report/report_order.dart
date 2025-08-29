@@ -8,6 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Report/report_bloc.dart';
 import 'package:simple/ModelClass/Report/Get_report_model.dart';
+import 'package:simple/ModelClass/Table/Get_table_model.dart';
+import 'package:simple/ModelClass/User/getUserModel.dart';
+import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/space.dart';
 import 'package:simple/Reusable/text_styles.dart';
@@ -45,7 +48,16 @@ class ReportViewView extends StatefulWidget {
 
 class ReportViewViewState extends State<ReportViewView> {
   GetReportModel getReportModel = GetReportModel();
-
+  GetTableModel getTableModel = GetTableModel();
+  GetWaiterModel getWaiterModel = GetWaiterModel();
+  GetUserModel getUserModel = GetUserModel();
+  dynamic selectedValue;
+  dynamic selectedValueWaiter;
+  dynamic selectedValueUser;
+  dynamic tableId;
+  dynamic waiterId;
+  dynamic userId;
+  bool tableLoad = false;
   String? errorMessage;
   bool reportLoad = false;
   final String todayDisplayDate =
@@ -107,7 +119,8 @@ class ReportViewViewState extends State<ReportViewView> {
           String formattedToDate = DateFormat('yyyy-MM-dd').format(_toDate!);
 
           context.read<ReportTodayBloc>().add(
-                ReportTodayList(formattedFromDate, formattedToDate),
+                ReportTodayList(formattedFromDate, formattedToDate,
+                    tableId ?? "", waiterId ?? "", userId ?? ""),
               );
         } else if (_fromDate != null && _toDate == null) {
           String formattedFromDate =
@@ -115,7 +128,8 @@ class ReportViewViewState extends State<ReportViewView> {
           String formattedToDate = DateFormat('yyyy-MM-dd').format(now);
 
           context.read<ReportTodayBloc>().add(
-                ReportTodayList(formattedFromDate, formattedToDate),
+                ReportTodayList(formattedFromDate, formattedToDate,
+                    tableId ?? "", waiterId ?? "", userId ?? ""),
               );
         }
       });
@@ -125,7 +139,8 @@ class ReportViewViewState extends State<ReportViewView> {
   void refreshReport() {
     if (!mounted || !context.mounted) return;
     context.read<ReportTodayBloc>().add(
-          ReportTodayList(todayApiDate, todayApiDate),
+          ReportTodayList(todayApiDate, todayApiDate, tableId ?? "",
+              waiterId ?? "", userId ?? ""),
         );
     setState(() {
       reportLoad = true;
@@ -135,7 +150,9 @@ class ReportViewViewState extends State<ReportViewView> {
   @override
   void initState() {
     super.initState();
-
+    context.read<ReportTodayBloc>().add(TableDine());
+    context.read<ReportTodayBloc>().add(WaiterDine());
+    context.read<ReportTodayBloc>().add(UserDetails());
     if (widget.hasRefreshedReport == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         setState(() {
@@ -152,9 +169,29 @@ class ReportViewViewState extends State<ReportViewView> {
         toDateController.text = todayDisplayDate;
       });
       context.read<ReportTodayBloc>().add(
-            ReportTodayList(todayApiDate, todayApiDate),
+            ReportTodayList(todayApiDate, todayApiDate, tableId ?? "",
+                waiterId ?? "", userId ?? ""),
           );
     }
+  }
+
+  void _refreshData() {
+    setState(() {
+      selectedValue = null;
+      selectedValueWaiter = null;
+      selectedValueUser = null;
+      tableId = null;
+      waiterId = null;
+      userId = null;
+    });
+    context.read<ReportTodayBloc>().add(
+          ReportTodayList(todayApiDate, todayApiDate, tableId ?? "",
+              waiterId ?? "", userId ?? ""),
+        );
+    context.read<ReportTodayBloc>().add(TableDine());
+    context.read<ReportTodayBloc>().add(WaiterDine());
+    context.read<ReportTodayBloc>().add(UserDetails());
+    widget.reportKey?.currentState?.refreshReport();
   }
 
   @override
@@ -174,9 +211,25 @@ class ReportViewViewState extends State<ReportViewView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
-                child: Text("Report",
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Report",
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      onPressed: () {
+                        _refreshData();
+                      },
+                      icon: const Icon(
+                        Icons.refresh,
+                        color: appPrimaryColor,
+                        size: 28,
+                      ),
+                      tooltip: 'Refresh Orders',
+                    ),
+                  ],
+                ),
               ),
               verticalSpace(height: 10),
               Row(
@@ -212,7 +265,11 @@ class ReportViewViewState extends State<ReportViewView> {
                                           toDateController.text.isEmpty) {
                                         context.read<ReportTodayBloc>().add(
                                               ReportTodayList(
-                                                  todayApiDate, todayApiDate),
+                                                  todayApiDate,
+                                                  todayApiDate,
+                                                  tableId ?? "",
+                                                  waiterId ?? "",
+                                                  userId ?? ""),
                                             );
                                       }
                                     });
@@ -255,7 +312,11 @@ class ReportViewViewState extends State<ReportViewView> {
                                           toDateController.text.isEmpty) {
                                         context.read<ReportTodayBloc>().add(
                                               ReportTodayList(
-                                                  todayApiDate, todayApiDate),
+                                                  todayApiDate,
+                                                  todayApiDate,
+                                                  tableId ?? "",
+                                                  waiterId ?? "",
+                                                  userId ?? ""),
                                             );
                                       }
                                     });
@@ -264,6 +325,199 @@ class ReportViewViewState extends State<ReportViewView> {
                               : null,
                         ),
                         onTap: () => _selectDate(context, false),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      child: DropdownButtonFormField<String>(
+                        value: (getTableModel.data?.any(
+                                    (item) => item.name == selectedValue) ??
+                                false)
+                            ? selectedValue
+                            : null,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: appPrimaryColor,
+                        ),
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: appPrimaryColor,
+                            ),
+                          ),
+                        ),
+                        items: getTableModel.data?.map((item) {
+                          return DropdownMenuItem<String>(
+                            value: item.name,
+                            child: Text(
+                              "Table ${item.name}",
+                              style: MyTextStyle.f14(
+                                blackColor,
+                                weight: FontWeight.normal,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedValue = newValue;
+                              final selectedItem = getTableModel.data
+                                  ?.firstWhere((item) => item.name == newValue);
+                              tableId = selectedItem?.id.toString();
+                              context.read<ReportTodayBloc>().add(
+                                    ReportTodayList(
+                                        todayApiDate,
+                                        todayApiDate,
+                                        tableId ?? "",
+                                        waiterId ?? "",
+                                        userId ?? ""),
+                                  );
+                            });
+                          }
+                        },
+                        hint: Text(
+                          '-- Select Table --',
+                          style: MyTextStyle.f14(
+                            blackColor,
+                            weight: FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.only(left: 8),
+                      child: DropdownButtonFormField<String>(
+                        value: (getWaiterModel.data?.any((item) =>
+                                    item.name == selectedValueWaiter) ??
+                                false)
+                            ? selectedValueWaiter
+                            : null,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: appPrimaryColor,
+                        ),
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: appPrimaryColor,
+                            ),
+                          ),
+                        ),
+                        items: getWaiterModel.data?.map((item) {
+                          return DropdownMenuItem<String>(
+                            value: item.name,
+                            child: Text(
+                              "${item.name}",
+                              style: MyTextStyle.f14(
+                                blackColor,
+                                weight: FontWeight.normal,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedValueWaiter = newValue;
+                              final selectedItem = getWaiterModel.data
+                                  ?.firstWhere((item) => item.name == newValue);
+                              waiterId = selectedItem?.id.toString();
+                              context.read<ReportTodayBloc>().add(
+                                    ReportTodayList(
+                                        todayApiDate,
+                                        todayApiDate,
+                                        tableId ?? "",
+                                        waiterId ?? "",
+                                        userId ?? ""),
+                                  );
+                            });
+                          }
+                        },
+                        hint: Text(
+                          '-- Select Waiter --',
+                          style: MyTextStyle.f14(
+                            blackColor,
+                            weight: FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.all(10),
+                      child: DropdownButtonFormField<String>(
+                        value: (getUserModel.data?.any(
+                                    (item) => item.name == selectedValueUser) ??
+                                false)
+                            ? selectedValueUser
+                            : null,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: appPrimaryColor,
+                        ),
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: appPrimaryColor,
+                            ),
+                          ),
+                        ),
+                        items: getUserModel.data?.map((item) {
+                          return DropdownMenuItem<String>(
+                            value: item.name,
+                            child: Text(
+                              "${item.name}",
+                              style: MyTextStyle.f14(
+                                blackColor,
+                                weight: FontWeight.normal,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedValueUser = newValue;
+                              final selectedItem = getUserModel.data
+                                  ?.firstWhere((item) => item.name == newValue);
+                              userId = selectedItem?.id.toString();
+                            });
+                            debugPrint("operatorSelectr:$userId");
+                            debugPrint("operatorSelectr:$selectedValueUser");
+                            context.read<ReportTodayBloc>().add(
+                                  ReportTodayList(
+                                      todayApiDate,
+                                      todayApiDate,
+                                      tableId ?? "",
+                                      waiterId ?? "",
+                                      userId ?? ""),
+                                );
+                          }
+                        },
+                        hint: Text(
+                          '-- Select Operator --',
+                          style: MyTextStyle.f14(
+                            blackColor,
+                            weight: FontWeight.normal,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -456,7 +710,6 @@ class ReportViewViewState extends State<ReportViewView> {
             }
           } catch (e, stackTrace) {
             debugPrint("Error in processing report order: $e");
-            print(stackTrace);
             if (e is DioException) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -470,6 +723,60 @@ class ReportViewViewState extends State<ReportViewView> {
                 ),
               );
             }
+          }
+          return true;
+        }
+        if (current is GetTableModel) {
+          getTableModel = current;
+          if (getTableModel.errorResponse?.isUnauthorized == true) {
+            _handle401Error();
+            return true;
+          }
+          if (getTableModel.success == true) {
+            setState(() {
+              tableLoad = false;
+            });
+          } else {
+            setState(() {
+              tableLoad = false;
+            });
+            showToast("No Tables found", context, color: false);
+          }
+          return true;
+        }
+        if (current is GetWaiterModel) {
+          getWaiterModel = current;
+          if (getWaiterModel.errorResponse?.isUnauthorized == true) {
+            _handle401Error();
+            return true;
+          }
+          if (getWaiterModel.success == true) {
+            setState(() {
+              tableLoad = false;
+            });
+          } else {
+            setState(() {
+              tableLoad = false;
+            });
+            showToast("No Waiter found", context, color: false);
+          }
+          return true;
+        }
+        if (current is GetUserModel) {
+          getUserModel = current;
+          if (getUserModel.errorResponse?.isUnauthorized == true) {
+            _handle401Error();
+            return true;
+          }
+          if (getUserModel.success == true) {
+            setState(() {
+              tableLoad = false;
+            });
+          } else {
+            setState(() {
+              tableLoad = false;
+            });
+            showToast("No Operator found", context, color: false);
           }
           return true;
         }
