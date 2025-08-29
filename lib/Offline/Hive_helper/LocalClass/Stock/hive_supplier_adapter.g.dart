@@ -1,10 +1,9 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
+import 'package:hive/hive.dart';
+import 'hive_product_stock.dart';
 
-part of 'hive_product_stock.dart';
+// part of 'hive_product_stock.dart';
 
-// **************************************************************************
-// TypeAdapterGenerator
-// **************************************************************************
 
 class HiveProductStockAdapter extends TypeAdapter<HiveProductStock> {
   @override
@@ -38,7 +37,7 @@ class HiveProductStockAdapter extends TypeAdapter<HiveProductStock> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is HiveProductStockAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
+          other is HiveProductStockAdapter &&
+              runtimeType == other.runtimeType &&
+              typeId == other.typeId;
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,9 +11,9 @@ import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/StockIn/stock_in_bloc.dart';
 import 'package:simple/ModelClass/StockIn/getLocationModel.dart' as location;
 import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart'
-    as supplier;
+as supplier;
 import 'package:simple/ModelClass/StockIn/get_add_product_model.dart'
-    as productModel;
+as productModel;
 import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_stock_service.dart';
@@ -23,6 +22,33 @@ import 'package:simple/Reusable/space.dart';
 import 'package:simple/UI/Authentication/login_screen.dart';
 import 'package:simple/UI/StockIn/Helper/stockIn_helper.dart';
 import 'package:simple/UI/StockIn/widget/productModel.dart';
+
+// ------------------- Hive Models (Inline for self-contained code) -------------------
+// IMPORTANT: In a real project, you would put these in separate files and
+// run `flutter packages pub run build_runner build` to generate the adapters.
+// We are including them here for a complete, runnable example within this single file.
+
+@HiveType(typeId: 2)
+class HiveSupplier {
+  @HiveField(0)
+  final String id;
+  @HiveField(1)
+  final String name;
+
+  HiveSupplier({required this.id, required this.name});
+}
+
+@HiveType(typeId: 3)
+class HiveProduct {
+  @HiveField(0)
+  final String id;
+  @HiveField(1)
+  final String name;
+
+  HiveProduct({required this.id, required this.name});
+}
+
+// ------------------- End of Hive Models -------------------
 
 class StockView extends StatelessWidget {
   final GlobalKey<StockViewViewState>? stockKey;
@@ -56,9 +82,9 @@ class StockViewView extends StatefulWidget {
 class StockViewViewState extends State<StockViewView> {
   location.GetLocationModel getLocationModel = location.GetLocationModel();
   supplier.GetSupplierLocationModel getSupplierLocationModel =
-      supplier.GetSupplierLocationModel();
+  supplier.GetSupplierLocationModel();
   productModel.GetAddProductModel getAddProductModel =
-      productModel.GetAddProductModel();
+  productModel.GetAddProductModel();
   SaveStockInModel saveStockInModel = SaveStockInModel();
 
   Key productDropdownKey = UniqueKey();
@@ -74,15 +100,20 @@ class StockViewViewState extends State<StockViewView> {
   String? locationId;
 
   final TextEditingController subtotalController =
-      TextEditingController(text: '0.00');
+  TextEditingController(text: '0.00');
   final TextEditingController taxController =
-      TextEditingController(text: '0.00');
+  TextEditingController(text: '0.00');
   final TextEditingController totalController =
-      TextEditingController(text: '0.00');
+  TextEditingController(text: '0.00');
   final TextEditingController finalController =
-      TextEditingController(text: '0.00');
+  TextEditingController(text: '0.00');
   productModel.Data? selectedProductObj;
   List<ProductRowModel> selectedProducts = [];
+
+  // Add these flags to track offline data loading
+  bool _suppliersLoadedFromHive = false;
+  bool _productsLoadedFromHive = false;
+
   bool _isProductAlreadyAdded(String productId) {
     return selectedProducts.any((product) => product.id == productId);
   }
@@ -256,21 +287,21 @@ class StockViewViewState extends State<StockViewView> {
   void _setupConnectivityListener() {
     _connectivitySubscription =
         Connectivity().onConnectivityChanged.listen((dynamic result) {
-      final wasConnected = hasConnection;
-      hasConnection = result != ConnectivityResult.none;
+          final wasConnected = hasConnection;
+          hasConnection = result != ConnectivityResult.none;
 
-      debugPrint("🔄 Connectivity changed: $wasConnected → $hasConnection");
+          debugPrint("🔄 Connectivity changed: $wasConnected → $hasConnection");
 
-      if (!wasConnected && hasConnection) {
-        // Just came online - sync with server
-        debugPrint("🔄 Coming online - syncing data");
-        syncStockWhenOnline();
-      } else if (wasConnected && !hasConnection) {
-        // Just went offline - load offline data
-        debugPrint("🔄 Going offline - loading offline data");
-        loadOfflineData();
-      }
-    });
+          if (!wasConnected && hasConnection) {
+            // Just came online - sync with server
+            debugPrint("🔄 Coming online - syncing data");
+            syncStockWhenOnline();
+          } else if (wasConnected && !hasConnection) {
+            // Just went offline - load offline data
+            debugPrint("🔄 Going offline - loading offline data");
+            loadOfflineData();
+          }
+        });
   }
 
   Future<void> loadOfflineData() async {
@@ -292,26 +323,132 @@ class StockViewViewState extends State<StockViewView> {
 
     // Always trigger the location event - the bloc will handle online/offline
     context.read<StockInBloc>().add(StockInLocation());
-
-    // Don't trigger other events here - let the BlocBuilder handle the sequence
   }
 
-  // Future<void> saveLocationToHiveUI(location.Data? apiData) async {
-  //   if (apiData == null) return;
-  //
-  //   try {
-  //     final box = await Hive.openBox<HiveLocation>('location');
-  //     final hiveLocation = HiveLocation(
-  //       id: apiData.id,
-  //       locationName: apiData.locationName,
-  //       locationId: apiData.locationId,
-  //     );
-  //     await box.put('current_location', hiveLocation);
-  //     debugPrint("✅ Saved to Hive: ${hiveLocation.locationName}");
-  //   } catch (e) {
-  //     debugPrint("❌ Error saving to Hive: $e");
-  //   }
-  // }
+  // A new function to load location from Hive
+  Future<location.GetLocationModel?> loadLocationsFromHive() async {
+    try {
+      // Corrected: Use Hive.box() instead of Hive.openBox()
+      final box = Hive.box<HiveLocation>('location');
+      final hiveLocation = box.get('current_location');
+      if (hiveLocation != null) {
+        debugPrint("✅ Loaded from Hive: ${hiveLocation.locationName}");
+        // Convert Hive object back to the model used by your UI
+        final data = location.Data(
+          id: hiveLocation.id,
+          locationName: hiveLocation.locationName,
+          locationId: hiveLocation.locationId,
+        );
+        return location.GetLocationModel(data: data, success: true);
+      } else {
+        debugPrint("⚠️ No location data found in Hive.");
+        return null;
+      }
+    } catch (e) {
+      debugPrint("❌ Error loading from Hive: $e");
+      return null;
+    }
+  }
+
+  Future<void> saveLocationToHive(location.Data apiData) async {
+    if (apiData == null) return;
+
+    try {
+      // Corrected: Use Hive.box() instead of Hive.openBox()
+      final box = Hive.box<HiveLocation>('location');
+      final hiveLocation = HiveLocation(
+        id: apiData.id!,
+        locationName: apiData.locationName!,
+        locationId: apiData.locationId!,
+      );
+      await box.put('current_location', hiveLocation);
+      debugPrint("✅ Saved to Hive: ${hiveLocation.locationName}");
+    } catch (e) {
+      debugPrint("❌ Error saving to Hive: $e");
+    }
+  }
+
+  // New function to load suppliers from Hive
+  Future<supplier.GetSupplierLocationModel?> loadSuppliersFromHive() async {
+    try {
+      // Corrected: Use Hive.box() instead of Hive.openBox()
+      final box = Hive.box<HiveSupplier>('suppliers_box');
+      final supplierList = box.values.toList();
+      if (supplierList.isNotEmpty) {
+        final apiSuppliers = supplierList
+            .map((hiveSup) => supplier.Data(
+          id: hiveSup.id,
+          name: hiveSup.name,
+        ))
+            .toList();
+        debugPrint("✅ Loaded suppliers from Hive: ${supplierList.length} items");
+        return supplier.GetSupplierLocationModel(
+            data: apiSuppliers, success: true);
+      } else {
+        debugPrint("⚠️ No supplier data found in Hive.");
+        return null;
+      }
+    } catch (e) {
+      debugPrint("❌ Error loading suppliers from Hive: $e");
+      return null;
+    }
+  }
+
+  // New function to save suppliers to Hive
+  Future<void> saveSuppliersToHive(List<supplier.Data> apiData) async {
+    try {
+      // Corrected: Use Hive.box() instead of Hive.openBox()
+      final box = Hive.box<HiveSupplier>('suppliers_box');
+      await box.clear(); // Clear old data first
+      final hiveList =
+      apiData.map((e) => HiveSupplier(id: e.id!, name: e.name!)).toList();
+      await box.addAll(hiveList);
+      debugPrint("✅ Saved ${apiData.length} suppliers to Hive.");
+    } catch (e) {
+      debugPrint("❌ Error saving suppliers to Hive: $e");
+    }
+  }
+
+  // New function to load products from Hive
+  Future<productModel.GetAddProductModel?> loadProductsFromHive() async {
+    try {
+      // Corrected: Use Hive.box() instead of Hive.openBox()
+      final box = Hive.box<HiveProduct>('products_box');
+      final productList = box.values.toList();
+      if (productList.isNotEmpty) {
+        final apiProducts = productList
+            .map((hiveProd) => productModel.Data(
+          id: hiveProd.id,
+          name: hiveProd.name,
+        ))
+            .toList();
+        debugPrint("✅ Loaded products from Hive: ${productList.length} items");
+        return productModel.GetAddProductModel(
+            data: apiProducts, success: true);
+      } else {
+        debugPrint("⚠️ No product data found in Hive.");
+        return null;
+      }
+    } catch (e) {
+      debugPrint("❌ Error loading products from Hive: $e");
+      return null;
+    }
+  }
+
+  // New function to save products to Hive
+  Future<void> saveProductsToHive(List<productModel.Data> apiData) async {
+    try {
+      // Corrected: Use Hive.box() instead of Hive.openBox()
+      final box = Hive.box<HiveProduct>('products_box');
+      await box.clear(); // Clear old data first
+      final hiveList =
+      apiData.map((e) => HiveProduct(id: e.id!, name: e.name!)).toList();
+      await box.addAll(hiveList);
+      debugPrint("✅ Saved ${apiData.length} products to Hive.");
+    } catch (e) {
+      debugPrint("❌ Error saving products to Hive: $e");
+    }
+  }
 
   Future<void> syncStockWhenOnline() async {
     try {
@@ -377,7 +514,7 @@ class StockViewViewState extends State<StockViewView> {
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 foregroundColor:
-                    appPrimaryColor, // OK & Cancel button text color
+                appPrimaryColor, // OK & Cancel button text color
               ),
             ),
           ),
@@ -401,6 +538,174 @@ class StockViewViewState extends State<StockViewView> {
   void dispose() {
     _connectivitySubscription?.cancel();
     super.dispose();
+  }
+
+  // New method to build supplier dropdown with offline support
+  Widget _buildSupplierDropdown() {
+    final hasData = (getSupplierLocationModel.data ?? []).isNotEmpty;
+    final isLoading = stockLoad && !_suppliersLoadedFromHive && !hasData;
+
+    return isLoading
+        ? _buildLoadingDropdown('Loading suppliers...')
+        : DropdownButtonFormField<String>(
+      decoration: InputDecoration(
+        labelText: 'Supplier *',
+        labelStyle: TextStyle(
+            color: showSupplierError
+                ? redColor
+                : (selectedSupplier != null
+                ? appPrimaryColor
+                : greyColor)),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(
+              color: showSupplierError ? redColor : greyColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(
+              color: showSupplierError
+                  ? redColor
+                  : appPrimaryColor,
+              width: 2),
+        ),
+        errorText:
+        showSupplierError ? supplierErrorText : null,
+      ),
+      value: selectedSupplier,
+      items: (getSupplierLocationModel.data ?? [])
+          .map<DropdownMenuItem<String>>(
+              (sup) => DropdownMenuItem<String>(
+            value: sup.id,
+            child: Text(sup.name ?? 'No Name'),
+          ))
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedSupplier = value;
+          showSupplierError = false;
+          supplierErrorText = null;
+        });
+      },
+    );
+  }
+
+  // New method to build product dropdown with offline support
+  Widget _buildProductDropdown() {
+    final hasData = (getAddProductModel.data ?? []).isNotEmpty;
+    final isLoading = stockLoad && !_productsLoadedFromHive && !hasData;
+
+    return isLoading
+        ? _buildLoadingDropdown('Loading products...')
+        : Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<String>(
+          key: productDropdownKey,
+          decoration: InputDecoration(
+            hint: const Text("Add Product *"),
+            labelText: 'Add Product *',
+            labelStyle: TextStyle(
+              color: showProductError
+                  ? redColor
+                  : (selectedProduct != null
+                  ? appPrimaryColor
+                  : greyColor),
+            ),
+            border: OutlineInputBorder(
+              borderSide: BorderSide(
+                  color: showProductError ? redColor : greyColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(
+                  color:
+                  showProductError ? redColor : appPrimaryColor,
+                  width: 2),
+            ),
+          ),
+          value: selectedProduct,
+          items: (getAddProductModel.data ?? [])
+              .map<DropdownMenuItem<String>>(
+                (pro) => DropdownMenuItem<String>(
+              value: pro.id,
+              child: Text(pro.name ?? 'No Name'),
+            ),
+          )
+              .toList(),
+          onChanged: (value) {
+            setState(() {
+              try {
+                selectedProductObj = getAddProductModel.data
+                    ?.firstWhere((product) => product.id == value);
+              } on StateError {
+                selectedProduct = null;
+                selectedProductObj = null;
+                productDropdownKey = UniqueKey();
+              }
+              final dropdownItems = (getAddProductModel.data ?? [])
+                  .where((pro) => !selectedProducts
+                  .any((selected) => selected.id == pro.id))
+                  .toList();
+
+              if (selectedProduct != null &&
+                  dropdownItems
+                      .every((item) => item.id != selectedProduct)) {
+                selectedProduct = null;
+                selectedProductObj = null;
+                productDropdownKey = UniqueKey();
+              }
+              if (value != null &&
+                  selectedProductObj != null &&
+                  !_isProductAlreadyAdded(value)) {
+                selectedProducts.add(ProductRowModel(
+                  id: selectedProductObj?.id ?? '',
+                  name: selectedProductObj?.name ?? 'No Name',
+                ));
+                selectedProduct = null;
+                selectedProductObj = null;
+                productDropdownKey = UniqueKey();
+                showProductError = false;
+                productErrorText = null;
+              } else {
+                selectedProduct = value;
+              }
+              calculateTotals();
+            });
+          },
+        ),
+        if (showProductError && productErrorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+            child: Text(
+              productErrorText!,
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Helper method to show loading state for dropdowns
+  Widget _buildLoadingDropdown(String hint) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: hint,
+        labelStyle: TextStyle(color: greyColor),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: greyColor),
+        ),
+        suffixIcon: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      enabled: false,
+    );
   }
 
   @override
@@ -629,7 +934,7 @@ class StockViewViewState extends State<StockViewView> {
                 Center(
                   child: Text("Stock In",
                       style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 ),
                 verticalSpace(height: 10),
                 Row(
@@ -654,7 +959,7 @@ class StockViewViewState extends State<StockViewView> {
                             ),
                             controller: TextEditingController(
                               text:
-                                  DateFormat('dd/MM/yyyy').format(selectedDate),
+                              DateFormat('dd/MM/yyyy').format(selectedDate),
                             ),
                           ),
                         ),
@@ -663,69 +968,31 @@ class StockViewViewState extends State<StockViewView> {
                     SizedBox(width: 16),
                     getLocationModel.data?.locationName != null
                         ? Expanded(
-                            child: TextFormField(
-                              enabled: false,
-                              initialValue:
-                                  getLocationModel.data!.locationName!,
-                              decoration: InputDecoration(
-                                labelText: 'Location',
-                                labelStyle: TextStyle(color: appPrimaryColor),
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide(color: greyColor),
-                                ),
-                                disabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(color: greyColor),
-                                ),
-                              ),
-                            ),
-                          )
+                      child: TextFormField(
+                        enabled: false,
+                        initialValue:
+                        getLocationModel.data!.locationName!,
+                        decoration: InputDecoration(
+                          labelText: 'Location',
+                          labelStyle: TextStyle(color: appPrimaryColor),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: greyColor),
+                          ),
+                          disabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: greyColor),
+                          ),
+                        ),
+                      ),
+                    )
                         : SizedBox.shrink(), // or show a loading indicator
                   ],
                 ),
                 verticalSpace(height: 10),
                 Row(
                   children: [
+                    // Supplier Dropdown - Updated to handle offline data
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: 'Supplier *',
-                          labelStyle: TextStyle(
-                              color: showSupplierError
-                                  ? redColor
-                                  : (selectedSupplier != null
-                                      ? appPrimaryColor
-                                      : greyColor)),
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide(
-                                color:
-                                    showSupplierError ? redColor : greyColor),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                                color: showSupplierError
-                                    ? redColor
-                                    : appPrimaryColor,
-                                width: 2),
-                          ),
-                          errorText:
-                              showSupplierError ? supplierErrorText : null,
-                        ),
-                        value: selectedSupplier,
-                        items: (getSupplierLocationModel.data ?? [])
-                            .map<DropdownMenuItem<String>>(
-                                (sup) => DropdownMenuItem<String>(
-                                      value: sup.id,
-                                      child: Text(sup.name ?? 'No Name'),
-                                    ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedSupplier = value;
-                            showSupplierError = false;
-                            supplierErrorText = null;
-                          });
-                        },
-                      ),
+                      child: _buildSupplierDropdown(),
                     ),
                     SizedBox(width: 16),
                     Expanded(
@@ -736,8 +1003,8 @@ class StockViewViewState extends State<StockViewView> {
                               color: showTaxTypeError
                                   ? redColor
                                   : (selectedTax != null
-                                      ? appPrimaryColor
-                                      : greyColor)),
+                                  ? appPrimaryColor
+                                  : greyColor)),
                           border: OutlineInputBorder(
                             borderSide: BorderSide(
                                 color: showTaxTypeError ? redColor : greyColor),
@@ -754,9 +1021,9 @@ class StockViewViewState extends State<StockViewView> {
                         value: selectedTax,
                         items: taxType
                             .map((tax) => DropdownMenuItem(
-                                  value: tax,
-                                  child: Text(tax),
-                                ))
+                          value: tax,
+                          child: Text(tax),
+                        ))
                             .toList(),
                         onChanged: (value) {
                           setState(() {
@@ -771,89 +1038,10 @@ class StockViewViewState extends State<StockViewView> {
                   ],
                 ),
                 verticalSpace(height: 10),
-                DropdownButtonFormField<String>(
-                    key: productDropdownKey,
-                    decoration: InputDecoration(
-                      hint: const Text("Add Product *"),
-                      labelText: 'Add Product *',
-                      labelStyle: TextStyle(
-                        color: showProductError
-                            ? redColor
-                            : (selectedProduct != null
-                                ? appPrimaryColor
-                                : greyColor),
-                      ),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                            color: showProductError ? redColor : greyColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                            color:
-                                showProductError ? redColor : appPrimaryColor,
-                            width: 2),
-                      ),
-                    ),
-                    value: selectedProduct,
-                    items: (getAddProductModel.data ?? [])
-                        .map<DropdownMenuItem<String>>(
-                          (pro) => DropdownMenuItem<String>(
-                            value: pro.id,
-                            child: Text(pro.name ?? 'No Name'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        try {
-                          selectedProductObj = getAddProductModel.data
-                              ?.firstWhere((product) => product.id == value);
-                        } on StateError {
-                          selectedProduct = null;
-                          selectedProductObj = null;
-                          productDropdownKey = UniqueKey();
-                        }
-                        final dropdownItems = (getAddProductModel.data ?? [])
-                            .where((pro) => !selectedProducts
-                                .any((selected) => selected.id == pro.id))
-                            .toList();
 
-                        if (selectedProduct != null &&
-                            dropdownItems
-                                .every((item) => item.id != selectedProduct)) {
-                          selectedProduct = null;
-                          selectedProductObj = null;
-                          productDropdownKey = UniqueKey();
-                        }
-                        if (value != null &&
-                            selectedProductObj != null &&
-                            !_isProductAlreadyAdded(value)) {
-                          selectedProducts.add(ProductRowModel(
-                            id: selectedProductObj?.id ?? '',
-                            name: selectedProductObj?.name ?? 'No Name',
-                          ));
-                          selectedProduct = null;
-                          selectedProductObj = null;
-                          productDropdownKey = UniqueKey();
-                          showProductError = false;
-                          productErrorText = null;
-                        } else {
-                          selectedProduct = value;
-                        }
-                        calculateTotals();
-                      });
-                    }),
-                if (showProductError && productErrorText != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0, left: 12.0),
-                    child: Text(
-                      productErrorText!,
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
+                // Product Dropdown - Updated to handle offline data
+                _buildProductDropdown(),
+
                 SizedBox(height: 16),
                 if (selectedProducts.isNotEmpty)
                   Column(
@@ -878,11 +1066,11 @@ class StockViewViewState extends State<StockViewView> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide:
-                                BorderSide(color: appPrimaryColor, width: 2),
+                            BorderSide(color: appPrimaryColor, width: 2),
                           ),
                         ),
                         keyboardType:
-                            TextInputType.numberWithOptions(decimal: true),
+                        TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                     SizedBox(width: 12),
@@ -898,11 +1086,11 @@ class StockViewViewState extends State<StockViewView> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide:
-                                BorderSide(color: appPrimaryColor, width: 2),
+                            BorderSide(color: appPrimaryColor, width: 2),
                           ),
                         ),
                         keyboardType:
-                            TextInputType.numberWithOptions(decimal: true),
+                        TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                     SizedBox(width: 12),
@@ -918,11 +1106,11 @@ class StockViewViewState extends State<StockViewView> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide:
-                                BorderSide(color: appPrimaryColor, width: 2),
+                            BorderSide(color: appPrimaryColor, width: 2),
                           ),
                         ),
                         keyboardType:
-                            TextInputType.numberWithOptions(decimal: true),
+                        TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                     SizedBox(width: 12),
@@ -938,11 +1126,11 @@ class StockViewViewState extends State<StockViewView> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide:
-                                BorderSide(color: appPrimaryColor, width: 2),
+                            BorderSide(color: appPrimaryColor, width: 2),
                           ),
                         ),
                         keyboardType:
-                            TextInputType.numberWithOptions(decimal: true),
+                        TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                   ],
@@ -951,63 +1139,63 @@ class StockViewViewState extends State<StockViewView> {
                 saveLoad
                     ? SpinKitCircle(color: appPrimaryColor, size: 30)
                     : Center(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            if (!validateForm()) {
-                              return; // Stop if validation fails
-                            }
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (!validateForm()) {
+                        return; // Stop if validation fails
+                      }
 
-                            debugPrint("Validation passed, saving...");
-                            setState(() {
-                              saveLoad = true;
-                            });
+                      debugPrint("Validation passed, saving...");
+                      setState(() {
+                        saveLoad = true;
+                      });
 
-                            try {
-                              final payload = buildStockInPayload(
-                                date: selectedDate,
-                                supplierId: selectedSupplier ?? '',
-                                taxType: selectedTax ?? '',
-                                locationId: getLocationModel.data?.id ?? '',
-                                products: selectedProducts,
-                                finalAmount:
-                                    double.tryParse(finalController.text) ??
-                                        0.0,
-                                subtotal:
-                                    double.tryParse(subtotalController.text) ??
-                                        0.0,
-                                taxAmount:
-                                    double.tryParse(taxController.text) ?? 0.0,
-                                totalAmount:
-                                    double.tryParse(totalController.text) ??
-                                        0.0,
-                              );
+                      try {
+                        final payload = buildStockInPayload(
+                          date: selectedDate,
+                          supplierId: selectedSupplier ?? '',
+                          taxType: selectedTax ?? '',
+                          locationId: getLocationModel.data?.id ?? '',
+                          products: selectedProducts,
+                          finalAmount:
+                          double.tryParse(finalController.text) ??
+                              0.0,
+                          subtotal:
+                          double.tryParse(subtotalController.text) ??
+                              0.0,
+                          taxAmount:
+                          double.tryParse(taxController.text) ?? 0.0,
+                          totalAmount:
+                          double.tryParse(totalController.text) ??
+                              0.0,
+                        );
 
-                              debugPrint(
-                                  "📦 Sending StockIn payload: ${jsonEncode(payload)}");
-                              context
-                                  .read<StockInBloc>()
-                                  .add(SaveStockIn(jsonEncode(payload)));
-                            } catch (e) {
-                              setState(() {
-                                saveLoad = false;
-                              });
-                              showValidationSnackBar(
-                                  'An error occurred while saving: $e');
-                            }
-                          },
-                          label: const Text("Save"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: greenColor,
-                            foregroundColor: whiteColor,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 40, vertical: 20),
-                            minimumSize: Size(size.width * 0.25, 50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
+                        debugPrint(
+                            "📦 Sending StockIn payload: ${jsonEncode(payload)}");
+                        context
+                            .read<StockInBloc>()
+                            .add(SaveStockIn(jsonEncode(payload)));
+                      } catch (e) {
+                        setState(() {
+                          saveLoad = false;
+                        });
+                        showValidationSnackBar(
+                            'An error occurred while saving: $e');
+                      }
+                    },
+                    label: const Text("Save"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: greenColor,
+                      foregroundColor: whiteColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 20),
+                      minimumSize: Size(size.width * 0.25, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1025,75 +1213,98 @@ class StockViewViewState extends State<StockViewView> {
             return true;
           }
 
-          if (getLocationModel.success == true &&
+          if (hasConnection &&
+              getLocationModel.success == true &&
               getLocationModel.data != null) {
+            // Online: save data to Hive and trigger next API calls
             locationId =
                 getLocationModel.data?.locationId ?? getLocationModel.data?.id;
             debugPrint("locationId: $locationId");
 
-            // Save to Hive only when online
-            if (hasConnection) {
-              saveLocationToHive(getLocationModel.data!);
-            }
+            saveLocationToHive(getLocationModel.data!);
 
-            // Load suppliers and products with slight delay
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (mounted) {
-                context
-                    .read<StockInBloc>()
-                    .add(StockInSupplier(locationId.toString()));
-                context
-                    .read<StockInBloc>()
-                    .add(StockInAddProduct(locationId.toString()));
+            // Trigger supplier and product loading
+            context
+                .read<StockInBloc>()
+                .add(StockInSupplier(locationId.toString()));
+            context
+                .read<StockInBloc>()
+                .add(StockInAddProduct(locationId.toString()));
+
+            setState(() {
+              stockLoad = false;
+              _suppliersLoadedFromHive = false;
+              _productsLoadedFromHive = false;
+            });
+          } else {
+            // Offline or API failed: load everything from Hive
+            debugPrint("⚠️ No location found online, trying Hive...");
+            loadLocationsFromHive().then((hiveLocation) {
+              if (hiveLocation != null) {
+                setState(() {
+                  getLocationModel = hiveLocation;
+                });
+
+                // Load suppliers and products from Hive
+                loadSuppliersFromHive().then((hiveSuppliers) {
+                  if (hiveSuppliers != null) {
+                    setState(() {
+                      getSupplierLocationModel = hiveSuppliers;
+                      _suppliersLoadedFromHive = true;
+                    });
+                  }
+                });
+
+                loadProductsFromHive().then((hiveProducts) {
+                  if (hiveProducts != null) {
+                    setState(() {
+                      getAddProductModel = hiveProducts;
+                      _productsLoadedFromHive = true;
+                    });
+                  }
+                });
+
+                setState(() => stockLoad = false);
+                showToast("Loaded offline data", context, color: true);
+              } else {
+                setState(() => stockLoad = false);
+                showToast("No Location found online or offline.", context,
+                    color: false);
               }
             });
-
-            setState(() => stockLoad = false);
-
-            // Show appropriate message
-            if (!hasConnection) {
-              showToast("Loaded offline data", context, color: true);
-            }
-          } else {
-            debugPrint("⚠️ No location found (online or offline)");
-            setState(() => stockLoad = false);
-
-            if (!hasConnection) {
-              showToast("No offline data available. Connect to internet first.",
-                  context,
-                  color: false);
-            } else {
-              showToast("No Location found", context, color: false);
-            }
           }
           return true;
         }
 
-        // Handle Supplier Response
+        // Handle Supplier Response - Update to save to Hive when online
         if (current is supplier.GetSupplierLocationModel) {
           getSupplierLocationModel = current;
 
-          if (getSupplierLocationModel.success == true &&
-              getSupplierLocationModel.data != null) {
-            // Save to Hive only when online
-            if (hasConnection && getSupplierLocationModel.data!.isNotEmpty) {
-              saveSuppliersToHive(getSupplierLocationModel.data!);
-            }
+          // Save suppliers to Hive when online
+          if (hasConnection && current.success == true) {
+            saveSuppliersToHive(current.data ?? []);
           }
+
+          setState(() {
+            stockLoad = false;
+            _suppliersLoadedFromHive = !hasConnection;
+          });
           return true;
         }
 
-        // Handle Product Response
+        // Handle Product Response - Update to save to Hive when online
         if (current is productModel.GetAddProductModel) {
           getAddProductModel = current;
 
-          if (getAddProductModel.success == true &&
-              getAddProductModel.data != null) {
-            // Save to Hive only when online
-            if (hasConnection && getAddProductModel.data!.isNotEmpty) {
-              saveProductsToHive(getAddProductModel.data!);
-            }
+          // Save products to Hive when online
+          if (hasConnection && current.success == true) {
+            saveProductsToHive(current.data ?? []);
           }
+
+          setState(() {
+            stockLoad = false;
+            _productsLoadedFromHive = !hasConnection;
+          });
           return true;
         }
 
@@ -1120,7 +1331,6 @@ class StockViewViewState extends State<StockViewView> {
           return true;
         }
 
-        // FIXED: Handle generic responses (for offline mode)
         if (current is Map && current['message'] != null) {
           setState(() {
             saveLoad = false;
@@ -1143,10 +1353,9 @@ class StockViewViewState extends State<StockViewView> {
     await sharedPreferences.remove("token");
     await sharedPreferences.clear();
     showToast("Session expired. Please login again.", context, color: false);
-
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen()),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 }
