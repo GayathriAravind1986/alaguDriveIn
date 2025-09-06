@@ -17,8 +17,10 @@ import 'package:simple/ModelClass/Order/Update_generate_order_model.dart'
     as update;
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
+import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_table_stock.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_waiter_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 import 'package:simple/UI/Home_screen/home_screen.dart';
@@ -446,11 +448,107 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       }
     });
     on<WaiterDine>((event, emit) async {
-      await ApiProvider().getWaiterAPI().then((value) {
-        emit(value);
-      }).catchError((error) {
-        emit(error);
-      });
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+        bool hasConnection = connectivityResult != ConnectivityResult.none;
+
+        debugPrint('🌐 Connectivity: $hasConnection');
+
+        if (hasConnection) {
+          // Online: Try API first
+          try {
+            debugPrint('📡 Fetching waiters from API...');
+            final value = await ApiProvider().getWaiterAPI();
+            debugPrint('✅ API response - success: ${value.success}, data count: ${value.data?.length ?? 0}');
+
+            if (value.success == true && value.data != null) {
+              debugPrint('💾 Saving ${value.data!.length} waiters to Hive...');
+              await HiveWaiterService.saveWaiters(value.data!);
+              debugPrint('✅ Waiters saved to Hive successfully');
+            }
+
+            emit(value);
+          } catch (error) {
+            debugPrint('❌ API failed: $error');
+            // API failed, load from Hive
+            final offlineWaiters = await HiveWaiterService.getWaitersAsApiFormat();
+            debugPrint('📂 Offline waiters found: ${offlineWaiters.length}');
+
+            if (offlineWaiters.isNotEmpty) {
+              debugPrint('🔄 Loading from offline storage');
+              final offlineResponse = GetWaiterModel(
+                success: true,
+                data: offlineWaiters,
+                totalCount: offlineWaiters.length,
+                errorResponse: null, // ← ADD THIS to match table pattern
+              );
+              emit(offlineResponse);
+            } else {
+              debugPrint('❌ No offline data available');
+              emit(GetWaiterModel(
+                success: false,
+                data: [], // ← Make sure this is empty array, not null
+                totalCount: 0,
+                errorResponse: ErrorResponse( // ← ADD errorResponse like table
+                  message: error.toString(),
+                  statusCode: 500,
+                ),
+              ));
+            }
+          }
+        } else {
+          // Offline: Load from Hive directly
+          debugPrint('📶 Offline mode - loading from Hive');
+          final offlineWaiters = await HiveWaiterService.getWaitersAsApiFormat();
+          debugPrint('📂 Offline waiters found: ${offlineWaiters.length}');
+
+          if (offlineWaiters.isNotEmpty) {
+            debugPrint('✅ Loading ${offlineWaiters.length} waiters from offline storage');
+            final offlineResponse = GetWaiterModel(
+              success: true,
+              data: offlineWaiters,
+              totalCount: offlineWaiters.length,
+              errorResponse: null, // ← ADD THIS
+            );
+            emit(offlineResponse);
+          } else {
+            debugPrint('❌ No offline waiter data available');
+            emit(GetWaiterModel(
+              success: false,
+              data: [], // ← Empty array, not null
+              totalCount: 0,
+              errorResponse: ErrorResponse( // ← ADD errorResponse like table
+                message: 'No offline waiter data available',
+                statusCode: 503,
+              ),
+            ));
+          }
+        }
+      } catch (e) {
+        debugPrint('💥 Error in WaiterDine event: $e');
+        final offlineWaiters = await HiveWaiterService.getWaitersAsApiFormat();
+        debugPrint('📂 Fallback offline waiters: ${offlineWaiters.length}');
+
+        if (offlineWaiters.isNotEmpty) {
+          final offlineResponse = GetWaiterModel(
+            success: true,
+            data: offlineWaiters,
+            totalCount: offlineWaiters.length,
+            errorResponse: null, // ← ADD THIS
+          );
+          emit(offlineResponse);
+        } else {
+          emit(GetWaiterModel(
+            success: false,
+            data: [], // ← Empty array, not null
+            totalCount: 0,
+            errorResponse: ErrorResponse( // ← ADD errorResponse like table
+              message: e.toString(),
+              statusCode: 500,
+            ),
+          ));
+        }
+      }
     });
     on<StockDetails>((event, emit) async {
       try {

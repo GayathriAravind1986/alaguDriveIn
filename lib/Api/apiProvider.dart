@@ -20,6 +20,7 @@ import 'package:simple/ModelClass/StockIn/get_add_product_model.dart';
 import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
 import 'package:simple/ModelClass/User/getUserModel.dart';
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_waiter_service.dart';
 import 'package:simple/Reusable/constant.dart';
 
 import '../ModelClass/Table/Get_table_model.dart';
@@ -215,7 +216,9 @@ class ApiProvider {
   Future<GetWaiterModel> getWaiterAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
+
     try {
+      debugPrint("Attempting to fetch waiters from network...");
       var dio = Dio();
       var response = await dio.request(
         '${Constants.baseUrl}api/waiter',
@@ -226,28 +229,43 @@ class ApiProvider {
           },
         ),
       );
-      if (response.statusCode == 200 && response.data != null) {
-        if (response.data['success'] == true) {
-          GetWaiterModel getWaiterResponse =
-              GetWaiterModel.fromJson(response.data);
-          return getWaiterResponse;
+
+      if (response.statusCode == 200 && response.data != null && response.data['success'] == true) {
+        debugPrint("API call successful! Saving data to Hive.");
+        GetWaiterModel getWaiterResponse = GetWaiterModel.fromJson(response.data);
+        if (getWaiterResponse.data != null) {
+          // Save the new data to Hive on successful network response
+          await HiveWaiterService.saveWaiters(getWaiterResponse.data!);
         }
+        return getWaiterResponse;
       } else {
+        // If the API returns a non-200 but not a network error, return the error
         return GetWaiterModel()
           ..errorResponse = ErrorResponse(
             message: "Error: ${response.data['message'] ?? 'Unknown error'}",
             statusCode: response.statusCode,
           );
       }
-      return GetWaiterModel()
-        ..errorResponse = ErrorResponse(
-          message: "Unexpected error occurred.",
-          statusCode: 500,
-        );
     } on DioException catch (dioError) {
+      debugPrint("DioException occurred! Attempting to load waiters from Hive as a fallback.");
+      final offlineData = await HiveWaiterService.getWaitersAsApiFormat();
+      if (offlineData.isNotEmpty) {
+        debugPrint("Successfully loaded ${offlineData.length} waiters from Hive.");
+        return GetWaiterModel(data: offlineData, totalCount: offlineData.length);
+      }
+
+      debugPrint("No offline data found. Returning network error.");
       final errorResponse = handleError(dioError);
       return GetWaiterModel()..errorResponse = errorResponse;
+
     } catch (error) {
+      debugPrint("An unexpected error occurred. Attempting to load waiters from Hive.");
+      final offlineData = await HiveWaiterService.getWaitersAsApiFormat();
+      if (offlineData.isNotEmpty) {
+        debugPrint("Successfully loaded ${offlineData.length} waiters from Hive.");
+        return GetWaiterModel(data: offlineData, totalCount: offlineData.length);
+      }
+      debugPrint("No offline data found. Returning generic error.");
       return GetWaiterModel()..errorResponse = handleError(error);
     }
   }
