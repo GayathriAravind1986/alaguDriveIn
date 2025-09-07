@@ -11,9 +11,9 @@ import 'package:simple/UI/Home_screen/Widget/another_imin_printer/mock_imin_prin
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/real_device_printer.dart';
 import 'package:simple/UI/IminHelper/printer_helper.dart';
 
-class ThermalReceiptDialog extends StatefulWidget {
+class ThermalReceiptDialog extends StatefulWidget
+{
   final GetViewOrderModel getViewOrderModel;
-
   const ThermalReceiptDialog(this.getViewOrderModel, {super.key});
 
   @override

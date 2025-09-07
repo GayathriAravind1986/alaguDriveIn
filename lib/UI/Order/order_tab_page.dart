@@ -26,7 +26,6 @@ class OrdersTabbedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Move BlocProvider to the top level to share state across all tabs
     return BlocProvider(
       create: (_) => OrderTodayBloc(),
       child: OrderTabViewView(
@@ -50,6 +49,8 @@ class OrderTabViewView extends StatefulWidget {
 class OrderTabViewViewState extends State<OrderTabViewView>
     with SingleTickerProviderStateMixin {
   bool hasRefreshedOrder = false;
+  bool isUserOfflineMode = false; // Add user offline mode flag
+  bool isWaiterOfflineMode = false; // Add waiter offline mode flag
   late TabController _tabController;
   GetTableModel getTableModel = GetTableModel();
   GetWaiterModel getWaiterModel = GetWaiterModel();
@@ -64,12 +65,13 @@ class OrderTabViewViewState extends State<OrderTabViewView>
   dynamic operatorId;
   bool tableLoad = false;
   bool isLoadingOrders = false;
+  bool isOfflineMode = false; // Add offline mode flag
   final todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   String? fromDate;
 
   final List<GlobalKey<OrderViewViewState>> _tabKeys = List.generate(
     6,
-    (index) => GlobalKey<OrderViewViewState>(),
+        (index) => GlobalKey<OrderViewViewState>(),
   );
 
   Future<void> getOperatorId() async {
@@ -113,10 +115,13 @@ class OrderTabViewViewState extends State<OrderTabViewView>
       userId = null;
       hasRefreshedOrder = false;
       isLoadingOrders = true;
+      isOfflineMode = false;
+      isWaiterOfflineMode = false;
+      isUserOfflineMode = false;
     });
     context.read<OrderTodayBloc>().add(
-          OrderTodayList(todayDate, todayDate, "", "", ""),
-        );
+      OrderTodayList(todayDate, todayDate, "", "", ""),
+    );
   }
 
   void _loadInitialData() {
@@ -132,10 +137,15 @@ class OrderTabViewViewState extends State<OrderTabViewView>
       userId = null;
       hasRefreshedOrder = false;
       isLoadingOrders = true;
+      isOfflineMode = false;
+      isWaiterOfflineMode = false;
+      isUserOfflineMode = false;
     });
+
+    debugPrint("Loading initial data...");
     context.read<OrderTodayBloc>().add(
-          OrderTodayList(todayDate, todayDate, "", "", ""),
-        );
+      OrderTodayList(todayDate, todayDate, "", "", ""),
+    );
     context.read<OrderTodayBloc>().add(TableDine());
     context.read<OrderTodayBloc>().add(WaiterDine());
     context.read<OrderTodayBloc>().add(UserDetails());
@@ -149,14 +159,14 @@ class OrderTabViewViewState extends State<OrderTabViewView>
     });
     debugPrint("refreshTab");
     context.read<OrderTodayBloc>().add(
-          OrderTodayList(
-            todayDate,
-            todayDate,
-            tableId ?? "",
-            waiterId ?? "",
-            userId ?? "",
-          ),
-        );
+      OrderTodayList(
+        todayDate,
+        todayDate,
+        tableId ?? "",
+        waiterId ?? "",
+        userId ?? "",
+      ),
+    );
   }
 
   void _refreshData() {
@@ -168,21 +178,24 @@ class OrderTabViewViewState extends State<OrderTabViewView>
       waiterId = null;
       userId = null;
       hasRefreshedOrder = false;
-      isLoadingOrders = true; // Set loading state
+      isLoadingOrders = true;
+      isOfflineMode = false;
+      isWaiterOfflineMode = false;
+      isUserOfflineMode = false;
     });
     _tabController.animateTo(0);
     context.read<OrderTodayBloc>().add(TableDine());
     context.read<OrderTodayBloc>().add(WaiterDine());
     context.read<OrderTodayBloc>().add(UserDetails());
     context.read<OrderTodayBloc>().add(
-          OrderTodayList(
-            todayDate,
-            todayDate,
-            tableId ?? "",
-            waiterId ?? "",
-            userId ?? "",
-          ),
-        );
+      OrderTodayList(
+        todayDate,
+        todayDate,
+        tableId ?? "",
+        waiterId ?? "",
+        userId ?? "",
+      ),
+    );
   }
 
   void _onFilterChanged() {
@@ -216,16 +229,29 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                       color: appPrimaryColor,
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {
-                      _refreshData();
-                    },
-                    icon: const Icon(
-                      Icons.refresh,
-                      color: appPrimaryColor,
-                      size: 28,
-                    ),
-                    tooltip: 'Refresh Orders',
+                  Row(
+                    children: [
+                      if (isOfflineMode || isWaiterOfflineMode || isUserOfflineMode)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Icon(
+                            Icons.wifi_off,
+                            color: Colors.orange,
+                            size: 20,
+                          ),
+                        ),
+                      IconButton(
+                        onPressed: () {
+                          _refreshData();
+                        },
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: appPrimaryColor,
+                          size: 28,
+                        ),
+                        tooltip: 'Refresh Orders',
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -251,7 +277,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                       'Select Waiter',
                       style: MyTextStyle.f14(
                         blackColor,
-                        weight: FontWeight.bold,
+                        weight: FontWeight.normal,
                       ),
                     ),
                   ),
@@ -263,7 +289,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                       'Select Operator',
                       style: MyTextStyle.f14(
                         blackColor,
-                        weight: FontWeight.bold,
+                        weight: FontWeight.normal,
                       ),
                     ),
                   ),
@@ -276,10 +302,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                   child: Container(
                     margin: const EdgeInsets.all(10),
                     child: DropdownButtonFormField<String>(
-                      value: (getTableModel.data?.any(
-                                (item) => item.name == selectedValue,
-                              ) ??
-                              false)
+                      value: (getTableModel.data?.any((item) => item.name == selectedValue) ?? false)
                           ? selectedValue
                           : null,
                       icon: const Icon(
@@ -292,6 +315,9 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: appPrimaryColor),
                         ),
+                        suffixIcon: isOfflineMode
+                            ? Icon(Icons.wifi_off, color: Colors.orange, size: 20)
+                            : null,
                       ),
                       items: getTableModel.data?.map((item) {
                         return DropdownMenuItem<String>(
@@ -309,9 +335,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                         if (newValue != null) {
                           setState(() {
                             selectedValue = newValue;
-                            final selectedItem = getTableModel.data?.firstWhere(
-                              (item) => item.name == newValue,
-                            );
+                            final selectedItem = getTableModel.data?.firstWhere((item) => item.name == newValue);
                             tableId = selectedItem?.id.toString();
                           });
                           _onFilterChanged();
@@ -331,10 +355,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                   child: Container(
                     margin: const EdgeInsets.all(10),
                     child: DropdownButtonFormField<String>(
-                      value: (getWaiterModel.data?.any(
-                                (item) => item.name == selectedValueWaiter,
-                              ) ??
-                              false)
+                      value: (getWaiterModel.data?.any((item) => item.name == selectedValueWaiter) ?? false)
                           ? selectedValueWaiter
                           : null,
                       icon: const Icon(
@@ -347,6 +368,9 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: appPrimaryColor),
                         ),
+                        suffixIcon: isWaiterOfflineMode
+                            ? Icon(Icons.wifi_off, color: Colors.orange, size: 20)
+                            : null,
                       ),
                       items: getWaiterModel.data?.map((item) {
                         return DropdownMenuItem<String>(
@@ -364,8 +388,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                         if (newValue != null) {
                           setState(() {
                             selectedValueWaiter = newValue;
-                            final selectedItem = getWaiterModel.data
-                                ?.firstWhere((item) => item.name == newValue);
+                            final selectedItem = getWaiterModel.data?.firstWhere((item) => item.name == newValue);
                             waiterId = selectedItem?.id.toString();
                           });
                           _onFilterChanged();
@@ -385,10 +408,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                   child: Container(
                     margin: const EdgeInsets.all(10),
                     child: DropdownButtonFormField<String>(
-                      value: (getUserModel.data?.any(
-                                (item) => item.name == selectedValueUser,
-                              ) ??
-                              false)
+                      value: (getUserModel.data?.any((item) => item.name == selectedValueUser) ?? false)
                           ? selectedValueUser
                           : null,
                       icon: const Icon(
@@ -401,6 +421,9 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: appPrimaryColor),
                         ),
+                        suffixIcon: isUserOfflineMode
+                            ? Icon(Icons.wifi_off, color: Colors.orange, size: 20)
+                            : null,
                       ),
                       items: getUserModel.data?.map((item) {
                         return DropdownMenuItem<String>(
@@ -418,9 +441,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                         if (newValue != null) {
                           setState(() {
                             selectedValueUser = newValue;
-                            final selectedItem = getUserModel.data?.firstWhere(
-                              (item) => item.name == newValue,
-                            );
+                            final selectedItem = getUserModel.data?.firstWhere((item) => item.name == newValue);
                             userId = selectedItem?.id.toString();
                           });
                           debugPrint("operatorSelectr:$userId");
@@ -449,8 +470,8 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                 Tab(text: "Line"),
                 Tab(text: "Parcel"),
                 Tab(text: "AC"),
-                Tab(text: "HD"),
-                Tab(text: "SWIGGY"),
+                // Tab(text: "HD"),
+                // Tab(text: "SWIGGY"),
               ],
             ),
             Expanded(
@@ -497,26 +518,26 @@ class OrderTabViewViewState extends State<OrderTabViewView>
                     sharedOrderData: getOrderListTodayModel,
                     isLoading: isLoadingOrders,
                   ),
-                  OrderViewView(
-                    key: _tabKeys[4],
-                    type: 'HD',
-                    selectedTableName: tableId,
-                    selectedWaiterName: waiterId,
-                    selectOperator: userId,
-                    operatorShared: operatorId,
-                    sharedOrderData: getOrderListTodayModel,
-                    isLoading: isLoadingOrders,
-                  ),
-                  OrderViewView(
-                    key: _tabKeys[5],
-                    type: 'SWIGGY',
-                    selectedTableName: tableId,
-                    selectedWaiterName: waiterId,
-                    selectOperator: userId,
-                    operatorShared: operatorId,
-                    sharedOrderData: getOrderListTodayModel,
-                    isLoading: isLoadingOrders,
-                  ),
+                  // OrderViewView(
+                  //   key: _tabKeys[4],
+                  //   type: 'HD',
+                  //   selectedTableName: tableId,
+                  //   selectedWaiterName: waiterId,
+                  //   selectOperator: userId,
+                  //   operatorShared: operatorId,
+                  //   sharedOrderData: getOrderListTodayModel,
+                  //   isLoading: isLoadingOrders,
+                  // ),
+                  // OrderViewView(
+                  //   key: _tabKeys[5],
+                  //   type: 'SWIGGY',
+                  //   selectedTableName: tableId,
+                  //   selectedWaiterName: waiterId,
+                  //   selectOperator: userId,
+                  //   operatorShared: operatorId,
+                  //   sharedOrderData: getOrderListTodayModel,
+                  //   isLoading: isLoadingOrders,
+                  // ),
                 ],
               ),
             ),
@@ -548,10 +569,17 @@ class OrderTabViewViewState extends State<OrderTabViewView>
           if (getTableModel.success == true) {
             setState(() {
               tableLoad = false;
+              // Check if this is offline data (no error response but data exists)
+              isOfflineMode = getTableModel.errorResponse == null &&
+                  getTableModel.data != null &&
+                  getTableModel.data!.isNotEmpty;
             });
+            debugPrint('Tables loaded: ${getTableModel.data?.length}');
+            debugPrint('Offline mode: $isOfflineMode');
           } else {
             setState(() {
               tableLoad = false;
+              isOfflineMode = false;
             });
             showToast("No Tables found", context, color: false);
           }
@@ -566,10 +594,17 @@ class OrderTabViewViewState extends State<OrderTabViewView>
           if (getWaiterModel.success == true) {
             setState(() {
               tableLoad = false;
+              // Add offline detection for waiters
+              isWaiterOfflineMode = getWaiterModel.errorResponse == null &&
+                  getWaiterModel.data != null &&
+                  getWaiterModel.data!.isNotEmpty;
             });
+            debugPrint('Waiters loaded: ${getWaiterModel.data?.length}');
+            debugPrint('Waiter offline mode: $isWaiterOfflineMode');
           } else {
             setState(() {
               tableLoad = false;
+              isWaiterOfflineMode = false;
             });
             showToast("No Waiter found", context, color: false);
           }
@@ -584,10 +619,17 @@ class OrderTabViewViewState extends State<OrderTabViewView>
           if (getUserModel.success == true) {
             setState(() {
               tableLoad = false;
+              // Add offline detection for users
+              isUserOfflineMode = getUserModel.errorResponse == null &&
+                  getUserModel.data != null &&
+                  getUserModel.data!.isNotEmpty;
             });
+            debugPrint('Users loaded: ${getUserModel.data?.length}');
+            debugPrint('User offline mode: $isUserOfflineMode');
           } else {
             setState(() {
               tableLoad = false;
+              isUserOfflineMode = false;
             });
             showToast("No Operator found", context, color: false);
           }
@@ -609,7 +651,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen()),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 }

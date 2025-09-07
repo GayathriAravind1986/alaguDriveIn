@@ -20,6 +20,7 @@ import 'package:simple/ModelClass/StockIn/get_add_product_model.dart';
 import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
 import 'package:simple/ModelClass/User/getUserModel.dart';
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_user_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_waiter_service.dart';
 import 'package:simple/Reusable/constant.dart';
 
@@ -274,9 +275,11 @@ class ApiProvider {
   Future<GetUserModel> getUserDetailsAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
+
     try {
-      var dio = Dio();
-      var response = await dio.request(
+      debugPrint("Attempting to fetch users from network...");
+      final dio = Dio();
+      final response = await dio.request(
         '${Constants.baseUrl}auth/users',
         options: Options(
           method: 'GET',
@@ -285,31 +288,75 @@ class ApiProvider {
           },
         ),
       );
-      if (response.statusCode == 200 && response.data != null) {
-        if (response.data['success'] == true) {
+
+      // Check for a successful status code first
+      if (response.statusCode == 200) {
+        if (response.data != null && response.data['success'] == true) {
+          debugPrint("API call successful! Saving data to Hive.");
           GetUserModel getUserResponse = GetUserModel.fromJson(response.data);
+          if (getUserResponse.data != null) {
+            // Save the new data to Hive on successful network response
+            await HiveUserService.saveUsers(getUserResponse.data!);
+          }
           return getUserResponse;
+        } else {
+          // Handle cases where the status code is 200 but the API returns success: false
+          debugPrint("API returned success: false");
+          // Try to load from Hive as fallback
+          final offlineData = await HiveUserService.getUsersAsApiFormat();
+          if (offlineData.isNotEmpty) {
+            debugPrint("Using offline data as fallback");
+            return GetUserModel(data: offlineData, totalCount: offlineData.length);
+          }
+
+          return GetUserModel()
+            ..errorResponse = ErrorResponse(
+              message: response.data['message'] ?? 'API response indicates failure.',
+              statusCode: 200,
+            );
         }
       } else {
+        // Handle non-200 status codes
+        debugPrint("API returned status: ${response.statusCode}");
+        // Try to load from Hive as fallback
+        final offlineData = await HiveUserService.getUsersAsApiFormat();
+        if (offlineData.isNotEmpty) {
+          debugPrint("Using offline data as fallback for status code ${response.statusCode}");
+          return GetUserModel(data: offlineData, totalCount: offlineData.length);
+        }
+
         return GetUserModel()
           ..errorResponse = ErrorResponse(
-            message: "Error: ${response.data['message'] ?? 'Unknown error'}",
+            message: response.statusMessage ?? "Request failed with status code ${response.statusCode}",
             statusCode: response.statusCode,
           );
       }
-      return GetUserModel()
-        ..errorResponse = ErrorResponse(
-          message: "Unexpected error occurred.",
-          statusCode: 500,
-        );
     } on DioException catch (dioError) {
+      debugPrint("DioException occurred! Attempting to load users from Hive as a fallback.");
+      final offlineData = await HiveUserService.getUsersAsApiFormat();
+      if (offlineData.isNotEmpty) {
+        debugPrint("Successfully loaded ${offlineData.length} users from Hive.");
+        return GetUserModel(data: offlineData, totalCount: offlineData.length);
+      }
+
+      debugPrint("No offline data found. Returning network error.");
       final errorResponse = handleError(dioError);
       return GetUserModel()..errorResponse = errorResponse;
+
     } catch (error) {
-      return GetUserModel()..errorResponse = handleError(error);
+      debugPrint("An unexpected error occurred. Attempting to load users from Hive.");
+      final offlineData = await HiveUserService.getUsersAsApiFormat();
+      if (offlineData.isNotEmpty) {
+        debugPrint("Successfully loaded ${offlineData.length} users from Hive.");
+        return GetUserModel(data: offlineData, totalCount: offlineData.length);
+      }
+      debugPrint("No offline data found. Returning generic error.");
+      return GetUserModel()..errorResponse = ErrorResponse(
+        message: error.toString(),
+        statusCode: 500,
+      );
     }
   }
-
   /// Stock Details - Fetch API Integration
   Future<GetStockMaintanencesModel> getStockDetailsAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();

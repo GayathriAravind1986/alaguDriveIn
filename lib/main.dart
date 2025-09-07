@@ -12,6 +12,7 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_order_model.dart
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_selected_addons_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_stock_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_table_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_user_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_waiter_model.dart';
 // NOTE: Removed 'hide HiveProduct' to ensure consistent typing
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart' hide HiveProduct;
@@ -48,6 +49,8 @@ Future<void> main() async {
     Hive.registerAdapter(HiveLocationAdapter());
     Hive.registerAdapter(HiveSupplierAdapter());
     Hive.registerAdapter(HiveWaiterAdapter());
+    // Add this to your Hive initialization
+    Hive.registerAdapter(HiveUserAdapter());
     // Note: If you have a separate adapter for HiveProductStock, you would register it here.
     // Hive.registerAdapter(HiveProductStockAdapter());
 
@@ -68,6 +71,7 @@ Future<void> main() async {
     await Hive.openBox<HiveProduct>('products_box');
     await Hive.openBox('app_state');
     await Hive.openBox<HiveWaiter>('waiters_box');
+    await Hive.openBox<HiveUser>('users_box');
 
   } catch (e) {
     debugPrint("Hive openBox error: $e");
