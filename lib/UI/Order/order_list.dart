@@ -109,7 +109,8 @@ class OrderViewViewState extends State<OrderViewView> {
   void didUpdateWidget(OrderViewView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.sharedOrderData != null) {
-      setState(() {
+      setState(()
+      {
         getOrderListTodayModel = widget.sharedOrderData!;
       });
     }

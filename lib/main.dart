@@ -1,10 +1,13 @@
 import 'dart:io' show Platform;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/observer/observer.dart';
 import 'package:simple/Bloc/theme_cubit.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/category_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_billing_session_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_cart_model.dart';
@@ -16,6 +19,7 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_user_model.dart'
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_waiter_model.dart';
 // NOTE: Removed 'hide HiveProduct' to ensure consistent typing
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart' hide HiveProduct;
+// import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_stock.dart';
 // NOTE: Removed 'hide HiveSupplier' to ensure consistent typing
@@ -24,16 +28,22 @@ import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:simple/UI/SplashScreen/splash_screen.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart';
 
 // Import the adapter files
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
 
+import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
+  // Initialize your ApiProvider
+  final apiProvider = ApiProvider();
+  // Start listening to connectivity changes
+  initConnectivityListener(apiProvider);
 
   try {
     // Register all adapters before opening any boxes.
@@ -51,6 +61,7 @@ Future<void> main() async {
     Hive.registerAdapter(HiveWaiterAdapter());
     // Add this to your Hive initialization
     Hive.registerAdapter(HiveUserAdapter());
+    Hive.registerAdapter(HiveReportModelAdapter());
     // Note: If you have a separate adapter for HiveProductStock, you would register it here.
     // Hive.registerAdapter(HiveProductStockAdapter());
 
@@ -84,10 +95,13 @@ Future<void> main() async {
   Bloc.observer = AppBlocObserver();
   await NetworkManager().initialize();
   runApp(const App());
+
 }
+
 
 class App extends StatelessWidget {
   const App({super.key});
+
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +129,7 @@ class _MyAppState extends State<MyApp> {
   void dispose() {
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {

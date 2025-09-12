@@ -5,26 +5,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Authentication/Post_login_model.dart';
 import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart';
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart';
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart' hide Data;
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart';
 import 'package:simple/ModelClass/Order/Delete_order_model.dart';
-import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
+import 'package:simple/ModelClass/Order/Get_view_order_model.dart' hide Data;
 import 'package:simple/ModelClass/Order/Post_generate_order_model.dart';
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
-import 'package:simple/ModelClass/Order/get_order_list_today_model.dart';
+import 'package:simple/ModelClass/Order/get_order_list_today_model.dart' hide Data;
 import 'package:simple/ModelClass/Report/Get_report_model.dart';
-import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
-import 'package:simple/ModelClass/StockIn/getLocationModel.dart';
-import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart';
-import 'package:simple/ModelClass/StockIn/get_add_product_model.dart';
-import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
-import 'package:simple/ModelClass/User/getUserModel.dart';
-import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
+import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart' hide Data;
+import 'package:simple/ModelClass/StockIn/getLocationModel.dart' hide Data;
+import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart' hide Data;
+import 'package:simple/ModelClass/StockIn/get_add_product_model.dart' hide Data;
+import 'package:simple/ModelClass/StockIn/saveStockInModel.dart' hide Data;
+import 'package:simple/ModelClass/User/getUserModel.dart' hide Data;
+import 'package:simple/ModelClass/Waiter/getWaiterModel.dart' hide Data;
+import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_report_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_user_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_waiter_service.dart';
 import 'package:simple/Reusable/constant.dart';
 
-import '../ModelClass/Table/Get_table_model.dart';
+import '../ModelClass/Table/Get_table_model.dart' hide Data;
 
 /// All API Integration in ApiProvider
 class ApiProvider {
@@ -357,6 +359,7 @@ class ApiProvider {
       );
     }
   }
+
   /// Stock Details - Fetch API Integration
   Future<GetStockMaintanencesModel> getStockDetailsAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
@@ -499,12 +502,18 @@ class ApiProvider {
   }
 
   /// ReportToday - Fetch API Integration
-  Future<GetReportModel> getReportTodayAPI(String? fromDate, String? toDate,
-      String? tableId, String? waiterId, String? operatorId) async {
+  Future<GetReportModel> getReportTodayAPI(
+      String? fromDate,
+      String? toDate,
+      String? tableId,
+      String? waiterId,
+      String? operatorId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
+
     debugPrint(
         "baseUrlReport:'${Constants.baseUrl}api/generate-order/sales-report?from_date=$fromDate&to_date=$toDate&limit=200&tableNo=$tableId&waiter=$waiterId&operator=$operatorId");
+
     try {
       var dio = Dio();
       var response = await dio.request(
@@ -516,10 +525,29 @@ class ApiProvider {
           },
         ),
       );
+
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['success'] == true) {
+          // ✅ API success → parse normally
           GetReportModel getReportListTodayResponse =
-              GetReportModel.fromJson(response.data);
+          GetReportModel.fromJson(response.data);
+
+          // ✅ Convert API reports to Hive models
+          final List<HiveReportModel> hiveReports =
+          (response.data['data'] as List).map((json) => HiveReportModel(
+            productName: json['productName'] ?? json['name'] ?? '',
+            quantity: json['totalQty'] ?? json['quantity'] ?? 0,
+            amount: (json['totalAmount'] ?? json['subtotal'] ?? 0).toDouble(),
+            date: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+            tableNo: json['tableNo']?.toString() ?? '',
+            waiterId: json['waiter']?.toString() ?? '',
+          )).toList();
+
+
+
+          // ✅ Save to Hive for offline use
+          await HiveReportService.saveReports(hiveReports);
+
           return getReportListTodayResponse;
         }
       } else {
@@ -529,18 +557,74 @@ class ApiProvider {
             statusCode: response.statusCode,
           );
       }
+
       return GetReportModel()
         ..errorResponse = ErrorResponse(
           message: "Unexpected error occurred.",
           statusCode: 500,
         );
     } on DioException catch (dioError) {
+      // ✅ API failed → fallback to Hive
+      final offlineReports = await HiveReportService.getReports();
+
+      if (offlineReports.isNotEmpty) {
+        return GetReportModel(
+          success: true,
+          data: offlineReports
+              .map((e) => Data(
+            productId: null,
+            productName: e.productName ?? "Unknown",
+            unitPrice: (e.quantity ?? 0) > 0
+                ? (e.amount ?? 0) / (e.quantity ?? 1)
+                : 0,
+            totalQty: e.quantity ?? 0,
+            totalTax: 0,
+            totalAmount: e.amount ?? 0,
+          ))
+              .toList(),
+          totalRecords: offlineReports.length,
+          finalAmount: offlineReports.fold<num>(
+              0, (sum, r) => sum + (r.amount ?? 0)),
+          finalQty: offlineReports.fold<num>(
+              0, (sum, r) => sum + (r.quantity ?? 0)),
+        );
+      }
+
+      // If no offline data, return error
       final errorResponse = handleError(dioError);
       return GetReportModel()..errorResponse = errorResponse;
     } catch (error) {
+      // Last safety fallback: Hive
+      final offlineReports = await HiveReportService.getReports();
+
+      if (offlineReports.isNotEmpty) {
+        return GetReportModel(
+          success: true,
+          data: offlineReports
+              .map((e) => Data(
+            productId: null,
+            productName: e.productName ?? "Unknown",
+            unitPrice: (e.quantity ?? 0) > 0
+                ? (e.amount ?? 0) / (e.quantity ?? 1)
+                : 0,
+            totalQty: e.quantity ?? 0,
+            totalTax: 0,
+            totalAmount: e.amount ?? 0,
+          ))
+              .toList(),
+          totalRecords: offlineReports.length,
+          finalAmount: offlineReports.fold<num>(
+              0, (sum, r) => sum + (r.amount ?? 0)),
+          finalQty: offlineReports.fold<num>(
+              0, (sum, r) => sum + (r.quantity ?? 0)),
+        );
+      }
+
       return GetReportModel()..errorResponse = handleError(error);
     }
   }
+
+
 
   /// Generate Order - Post API Integration
   Future<PostGenerateOrderModel> postGenerateOrderAPI(
@@ -566,7 +650,7 @@ class ApiProvider {
       if (response.statusCode == 201 && response.data != null) {
         try {
           PostGenerateOrderModel postGenerateOrderResponse =
-              PostGenerateOrderModel.fromJson(response.data);
+          PostGenerateOrderModel.fromJson(response.data);
           return postGenerateOrderResponse;
         } catch (e) {
           return PostGenerateOrderModel()
@@ -588,6 +672,12 @@ class ApiProvider {
       return PostGenerateOrderModel()..errorResponse = handleError(error);
     }
   }
+
+
+
+
+
+
 
   /// Delete Order - Fetch API Integration
   Future<DeleteOrderModel> deleteOrderAPI(String? orderId) async {

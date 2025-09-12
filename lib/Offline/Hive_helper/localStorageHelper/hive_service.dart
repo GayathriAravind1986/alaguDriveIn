@@ -110,9 +110,39 @@ class HiveService {
     String syncAction = 'CREATE',
     String? existingOrderId,
   }) async {
+    // Make sure adapters are registered before using Hive
+    if (!Hive.isAdapterRegistered(HiveOrderAdapter().typeId)) {
+      Hive.registerAdapter(HiveOrderAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveCartItemAdapter().typeId)) {
+      Hive.registerAdapter(HiveCartItemAdapter());
+    }
+
+    // Open the Hive box
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
+    print("Orders saved in Hive before: ${ordersBox.values.length}");
+
+    // Generate unique ID
     final orderId = const Uuid().v4();
 
+    // Debug logs for input
+    print("Saving Offline Order...");
+    print("OrderId: $orderId");
+    print("OrderPayloadJson type: ${orderPayloadJson.runtimeType}");
+    print("OrderPayloadJson: $orderPayloadJson");
+    print("Items raw: $items");
+
+    // Convert items to HiveCartItem
+    final hiveItems = items.map((item) {
+      try {
+        return HiveCartItem.fromMap(item);
+      } catch (e) {
+        print("❌ Error converting item to HiveCartItem: $item");
+        rethrow;
+      }
+    }).toList();
+
+    // Create HiveOrder object
     final order = HiveOrder(
       id: orderId,
       orderPayloadJson: orderPayloadJson,
@@ -122,28 +152,27 @@ class HiveService {
       total: total,
       createdAt: DateTime.now(),
       isSynced: false,
-      items: items.map((item) => HiveCartItem.fromMap(item)).toList(),
+      items: hiveItems,
       syncAction: syncAction,
       existingOrderId: existingOrderId,
     );
 
+    // Save to Hive
     await ordersBox.put(orderId, order);
+
+    // Confirm save
+    final saved = ordersBox.get(orderId);
+    print("Orders saved in Hive after: ${ordersBox.values.length}");
+    print("✅ Order saved: $saved");
+
     return orderId;
   }
 
   static Future<List<HiveOrder>> getPendingSyncOrders() async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    return ordersBox.values.where((order) => !order.isSynced!).toList();
+    return ordersBox.values.where((order) => order.isSynced == false).toList();
   }
 
-  static Future<void> markOrderAsSynced(String orderId) async {
-    final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    final order = ordersBox.get(orderId);
-    if (order != null) {
-      order.isSynced = true;
-      await order.save();
-    }
-  }
 
   static Future<void> deleteOrder(String orderId) async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
@@ -155,27 +184,64 @@ class HiveService {
     return ordersBox.values.toList();
   }
 
-  // Sync Management
-  static Future<void> syncPendingOrders(ApiProvider apiProvider) async {
+   // Sync Management
+   static Future<void> syncPendingOrders(ApiProvider apiProvider) async {
     final pendingOrders = await getPendingSyncOrders();
-
+    print("Pending orders to sync: ${pendingOrders.length}");
     for (var order in pendingOrders) {
       try {
-        if (order.syncAction == 'CREATE') {
-          await apiProvider.postGenerateOrderAPI(order.orderPayloadJson!);
-        } else if (order.syncAction == 'UPDATE') {
-          await apiProvider.updateGenerateOrderAPI(
-              order.orderPayloadJson!, order.existingOrderId);
-        }
+        print("📤 Sending order payload: ${order.orderPayloadJson}");
+        final response = await apiProvider.postGenerateOrderAPI(order.orderPayloadJson!);
+        print("📥 Server response: ${response.toJson()}");
+        print("📤 Sending order payload: ${order.orderPayloadJson}");
+        print("📥 Raw API response: ${response.toJson()}");
+        print("✅ CREATE response from server:");
+        print("CREATE response: $response");
 
-        // Mark as synced if successful
-        await markOrderAsSynced(order.id!);
+        if (response.order != null) {
+          await markOrderAsSynced(order.id!);
+          print("✅ Order synced with server ID: ${response.order}");
+        } else {
+          print("❌ Server did not return an orderId, not marking as synced");
+        }
       } catch (e) {
-        print('Failed to sync order ${order.id}: $e');
-        // Keep order in pending state for retry
+        print("❌ Sync failed: $e");
       }
+
+      // try {
+      //   print("Syncing order ${order.id} (${order.syncAction})...");
+      //
+      //   if (order.syncAction == 'CREATE') {
+      //     final response = await apiProvider.postGenerateOrderAPI(order.orderPayloadJson!);
+      //     print("📤 Sending order payload: ${order.orderPayloadJson}");
+      //     print("📥 Raw API response: ${response.toJson()}");
+      //     print("✅ CREATE response from server:");
+      //     print("CREATE response: $response");
+      //   } else if (order.syncAction == 'UPDATE') {
+      //     final response = await apiProvider.updateGenerateOrderAPI(
+      //       order.orderPayloadJson!, order.existingOrderId,
+      //     );
+      //     print("UPDATE response: $response");
+      //   }
+      //   await markOrderAsSynced(order.id!);
+      //   print("Order ${order.id} marked as synced ✅");
+      // } catch (e) {
+      //   print('❌ Failed to sync order ${order.id}: $e');
+      // }
     }
   }
+
+  static Future<void> markOrderAsSynced(String orderId) async {
+    final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
+    print("Unsynced orders left: ${ordersBox.values.where((o) => o.isSynced == false).length}");
+    final order = ordersBox.get(orderId);
+    if (order != null) {
+      order.isSynced = true;
+      await ordersBox.put(orderId, order);
+      print("✅ Order $orderId marked as synced in Hive");
+    }
+  }
+
 
   // Check if device is offline based on last successful API call
   static Future<void> saveLastOnlineTimestamp() async {

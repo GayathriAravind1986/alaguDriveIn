@@ -368,6 +368,7 @@ class AppliedTaxes {
   }
 }
 
+
 /// _id : "68763b27ff518ce12520c915"
 /// name : "Extra creams"
 /// price : 30
