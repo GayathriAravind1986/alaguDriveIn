@@ -3,8 +3,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
+import 'package:simple/ModelClass/Order/get_order_list_today_model.dart';
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/ModelClass/User/getUserModel.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Order/hive_ordertoday_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_orderstoday.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_table_stock.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_user_service.dart';
 
@@ -39,14 +42,96 @@ class UserDetails extends OrderTodayEvent {}
 class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
   OrderTodayBloc() : super(dynamic) {
     on<OrderTodayList>((event, emit) async {
-      await ApiProvider()
-          .getOrderTodayAPI(event.fromDate, event.toDate, event.tableId,
-              event.waiterId, event.userId)
-          .then((value) {
-        emit(value);
-      }).catchError((error) {
-        emit(error);
-      });
+      final hiveService = HiveOrderTodayService();
+
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+
+        ConnectivityResult result;
+        if (connectivityResult is List) {
+          // Web: handle edge case
+          if (connectivityResult.isNotEmpty && connectivityResult.first is ConnectivityResult) {
+            result = connectivityResult.first as ConnectivityResult;
+          } else {
+            result = ConnectivityResult.none;
+          }
+        } else if (connectivityResult is ConnectivityResult) {
+          // Mobile / Desktop
+          result = connectivityResult as ConnectivityResult;
+        } else {
+          // Unknown / unexpected type
+          result = ConnectivityResult.none;
+        }
+
+        final hasConnection = result != ConnectivityResult.none;
+
+
+        if (hasConnection) {
+          // ✅ Online mode
+          try {
+            final value = await ApiProvider().getOrderTodayAPI(
+              event.fromDate,
+              event.toDate,
+              event.tableId,
+              event.waiterId,
+              event.userId,
+            );
+
+            if (value.success == true && value.data != null) {
+              // Save to Hive
+              await hiveService.saveOrders(value);
+            }
+
+            emit(value);
+          } catch (error) {
+            debugPrint("❌ API failed, fallback to Hive: $error");
+            final cached = await hiveService.getOrders();
+            if (cached != null) {
+              emit(cached);
+            } else {
+              emit(GetOrderListTodayModel(
+                success: false,
+                data: [],
+                errorResponse: ErrorResponse(
+                  message: error.toString(),
+                  statusCode: 500,
+                ),
+              ));
+            }
+          }
+        } else {
+          // 📴 Offline mode
+          final cached = await hiveService.getOrders();
+          if (cached != null) {
+            debugPrint('📴 Loaded ${cached.data?.length ?? 0} offline orders');
+            emit(cached);
+          } else {
+            emit(GetOrderListTodayModel(
+              success: false,
+              data: [],
+              errorResponse: ErrorResponse(
+                message: 'No offline order data available',
+                statusCode: 503,
+              ),
+            ));
+          }
+        }
+      } catch (e) {
+        debugPrint('❌ Bloc Error: $e');
+        final cached = await hiveService.getOrders();
+        if (cached != null) {
+          emit(cached);
+        } else {
+          emit(GetOrderListTodayModel(
+            success: false,
+            data: [],
+            errorResponse: ErrorResponse(
+              message: e.toString(),
+              statusCode: 500,
+            ),
+          ));
+        }
+      }
     });
     on<DeleteOrder>((event, emit) async {
       await ApiProvider().deleteOrderAPI(event.orderId).then((value) {

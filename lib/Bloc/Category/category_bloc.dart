@@ -356,6 +356,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         emit(SyncCompleteState(success: false, error: e.toString()));
       }
     });
+
     on<TableDine>((event, emit) async {
       try {
         final connectivityResult = await Connectivity().checkConnectivity();
@@ -435,7 +436,9 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             errorResponse: null,
           );
           emit(offlineResponse);
-        } else {
+        }
+        else
+        {
           emit(GetTableModel(
             success: false,
             data: [],

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ import 'package:simple/ModelClass/User/getUserModel.dart' hide Data;
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart' hide Data;
 import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_report_service.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_orderstoday.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_user_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_waiter_service.dart';
 import 'package:simple/Reusable/constant.dart';
@@ -459,45 +461,46 @@ class ApiProvider {
       String? toDate,
       String? tableId,
       String? waiterId,
-      String? operator) async {
+      String? operatorId,
+      ) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
-    debugPrint(
-        "baseUrlOrder:${Constants.baseUrl}api/generate-order?from_date=$fromDate&to_date=$toDate&tableNo=$tableId&waiter=$waiterId&operator=$operator");
+
     try {
+      debugPrint(
+          "baseUrlOrder: ${Constants.baseUrl}api/generate-order?from_date=$fromDate&to_date=$toDate&tableNo=$tableId&waiter=$waiterId&operator=$operatorId");
+
       var dio = Dio();
       var response = await dio.request(
-        '${Constants.baseUrl}api/generate-order?from_date=$fromDate&to_date=$toDate&tableNo=$tableId&waiter=$waiterId&operator=$operator',
+        '${Constants.baseUrl}api/generate-order?from_date=$fromDate&to_date=$toDate&tableNo=$tableId&waiter=$waiterId&operator=$operatorId',
         options: Options(
           method: 'GET',
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
+          headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      if (response.statusCode == 200 && response.data != null) {
-        if (response.data['success'] == true) {
-          GetOrderListTodayModel getOrderListTodayResponse =
-              GetOrderListTodayModel.fromJson(response.data);
-          return getOrderListTodayResponse;
-        }
+
+      if (response.statusCode == 200) {
+        return GetOrderListTodayModel.fromJson(response.data);
       } else {
-        return GetOrderListTodayModel()
-          ..errorResponse = ErrorResponse(
-            message: "Error: ${response.data['message'] ?? 'Unknown error'}",
-            statusCode: response.statusCode,
-          );
-      }
-      return GetOrderListTodayModel()
-        ..errorResponse = ErrorResponse(
-          message: "Unexpected error occurred.",
-          statusCode: 500,
+        return GetOrderListTodayModel(
+          success: false,
+          data: [],
+          errorResponse: ErrorResponse(
+            message: response.statusMessage ?? "Unknown error",
+            statusCode: response.statusCode ?? 500,
+          ),
         );
-    } on DioException catch (dioError) {
-      final errorResponse = handleError(dioError);
-      return GetOrderListTodayModel()..errorResponse = errorResponse;
-    } catch (error) {
-      return GetOrderListTodayModel()..errorResponse = handleError(error);
+      }
+    } catch (e) {
+      debugPrint("❌ API Error: $e");
+      return GetOrderListTodayModel(
+        success: false,
+        data: [],
+        errorResponse: ErrorResponse(
+          message: e.toString(),
+          statusCode: 500,
+        ),
+      );
     }
   }
 
