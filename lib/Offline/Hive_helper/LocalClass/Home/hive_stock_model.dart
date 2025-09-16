@@ -4,7 +4,7 @@ import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
 part 'hive_stock_model.g.dart';
 
 // Stock Maintenance Model
-@HiveType(typeId: 10)
+@HiveType(typeId: 40)
 class HiveStockMaintenance extends HiveObject {
   @HiveField(0)
   String? id;

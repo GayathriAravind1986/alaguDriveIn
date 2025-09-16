@@ -15,6 +15,7 @@ as supplier;
 import 'package:simple/ModelClass/StockIn/get_add_product_model.dart'
 as productModel;
 import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_stock_service.dart';
 import 'package:simple/Reusable/color.dart';
@@ -23,32 +24,10 @@ import 'package:simple/UI/Authentication/login_screen.dart';
 import 'package:simple/UI/StockIn/Helper/stockIn_helper.dart';
 import 'package:simple/UI/StockIn/widget/productModel.dart';
 
-// ------------------- Hive Models (Inline for self-contained code) -------------------
-// IMPORTANT: In a real project, you would put these in separate files and
-// run `flutter packages pub run build_runner build` to generate the adapters.
-// We are including them here for a complete, runnable example within this single file.
+// import '../../Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
+import '../../Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
 
-@HiveType(typeId: 2)
-class HiveSupplier {
-  @HiveField(0)
-  final String id;
-  @HiveField(1)
-  final String name;
 
-  HiveSupplier({required this.id, required this.name});
-}
-
-@HiveType(typeId: 3)
-class HiveProduct {
-  @HiveField(0)
-  final String id;
-  @HiveField(1)
-  final String name;
-
-  HiveProduct({required this.id, required this.name});
-}
-
-// ------------------- End of Hive Models -------------------
 
 class StockView extends StatelessWidget {
   final GlobalKey<StockViewViewState>? stockKey;
@@ -86,9 +65,7 @@ class StockViewViewState extends State<StockViewView> {
   productModel.GetAddProductModel getAddProductModel =
   productModel.GetAddProductModel();
   SaveStockInModel saveStockInModel = SaveStockInModel();
-
   Key productDropdownKey = UniqueKey();
-
   String? errorMessage;
   bool stockLoad = false;
   bool saveLoad = false;
@@ -372,7 +349,7 @@ class StockViewViewState extends State<StockViewView> {
   Future<supplier.GetSupplierLocationModel?> loadSuppliersFromHive() async {
     try {
       // Corrected: Use Hive.box() instead of Hive.openBox()
-      final box = Hive.box<HiveSupplier>('suppliers_box');
+      final box = Hive.box<HiveSupplier>('suppliers');
       final supplierList = box.values.toList();
       if (supplierList.isNotEmpty) {
         final apiSuppliers = supplierList
@@ -393,21 +370,21 @@ class StockViewViewState extends State<StockViewView> {
       return null;
     }
   }
-
-  // New function to save suppliers to Hive
-  Future<void> saveSuppliersToHive(List<supplier.Data> apiData) async {
-    try {
-      // Corrected: Use Hive.box() instead of Hive.openBox()
-      final box = Hive.box<HiveSupplier>('suppliers_box');
-      await box.clear(); // Clear old data first
-      final hiveList =
-      apiData.map((e) => HiveSupplier(id: e.id!, name: e.name!)).toList();
-      await box.addAll(hiveList);
-      debugPrint("✅ Saved ${apiData.length} suppliers to Hive.");
-    } catch (e) {
-      debugPrint("❌ Error saving suppliers to Hive: $e");
-    }
-  }
+  //
+  // // New function to save suppliers to Hive
+  // Future<void> saveSuppliersToHive(List<supplier.Data> apiData) async {
+  //   try {
+  //     // Corrected: Use Hive.box() instead of Hive.openBox()
+  //     final box = Hive.box<HiveSupplier>('suppliers');
+  //     await box.clear(); // Clear old data first
+  //     final hiveList =
+  //     apiData.map((e) => HiveSupplier(id: e.id!, name: e.name!)).toList();
+  //     await box.addAll(hiveList);
+  //     debugPrint("✅ Saved ${apiData.length} suppliers to Hive.");
+  //   } catch (e) {
+  //     debugPrint("❌ Error saving suppliers to Hive: $e");
+  //   }
+  // }
 
   // New function to load products from Hive
   Future<productModel.GetAddProductModel?> loadProductsFromHive() async {
@@ -1205,6 +1182,7 @@ class StockViewViewState extends State<StockViewView> {
 
     return BlocBuilder<StockInBloc, dynamic>(
       buildWhen: ((previous, current) {
+
         if (current is location.GetLocationModel) {
           getLocationModel = current;
 
@@ -1342,6 +1320,7 @@ class StockViewViewState extends State<StockViewView> {
 
         return false;
       }),
+
       builder: (context, dynamic) {
         return mainContainer();
       },

@@ -82,7 +82,8 @@ Map<String, dynamic> buildOrderPayload({
   final computedSubtotal = items.fold<double>(
       0, (s, it) => s + ((it["subtotal"] ?? 0) as num).toDouble());
 
-  final payload = <String, dynamic>{
+  final payload = <String, dynamic>
+  {
     "date": now.toIso8601String(),
     "items": items,
     "payments": cleanedPayments,

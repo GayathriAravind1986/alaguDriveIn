@@ -7,14 +7,26 @@ import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/StockIn/getLocationModel.dart' as location;
 import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart'
 as supplier;
+import 'package:simple/ModelClass/StockIn/saveStockInModel.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_pending_stock_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_serive_stock.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_stock_service.dart';
 import 'package:simple/ModelClass/StockIn/get_add_product_model.dart'
 as productModel;
 
 // Import the Hive model classes from their proper files
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
+// import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
+// import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
+
+class OfflineSaveSuccess extends StockInEvent {
+  final String message;
+  final String payload;
+
+  OfflineSaveSuccess({required this.message, required this.payload});
+}
 
 abstract class StockInEvent {}
 
@@ -74,7 +86,8 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
       try {
         _suppliersBox ??= await Hive.openBox<HiveSupplier>('suppliers_box');
         await _suppliersBox!.clear(); // Clear old data first
-        final hiveList = apiData.map((e) => HiveSupplier(id: e.id!, name: e.name!)).toList();
+        final hiveList = apiData.map((e) =>
+            HiveSupplier(id: e.id!, name: e.name!)).toList();
         await _suppliersBox!.addAll(hiveList);
         debugPrint("✅ Saved ${apiData.length} suppliers to Hive.");
       } catch (e) {
@@ -96,7 +109,8 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
       try {
         _productsBox ??= await Hive.openBox<HiveProduct>('products_box');
         await _productsBox!.clear(); // Clear old data first
-        final hiveList = apiData.map((e) => HiveProduct(id: e.id!, name: e.name!)).toList();
+        final hiveList = apiData.map((e) =>
+            HiveProduct(id: e.id!, name: e.name!)).toList();
         await _productsBox!.addAll(hiveList);
         debugPrint("✅ Saved ${apiData.length} products to Hive.");
       } catch (e) {
@@ -165,7 +179,8 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
         // 📱 Offline → Hive
         try {
           final hiveLocation = await loadLocationFromHive();
-          debugPrint("🔍 Offline - Loaded from Hive: ${hiveLocation?.locationName}");
+          debugPrint(
+              "🔍 Offline - Loaded from Hive: ${hiveLocation?.locationName}");
 
           if (hiveLocation != null) {
             final offlineLocationModel = location.GetLocationModel(
@@ -207,7 +222,9 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
       final connectivity = await Connectivity().checkConnectivity();
       bool hasConnection = connectivity != ConnectivityResult.none;
 
-      debugPrint("🔍 StockInSupplier - hasConnection: $hasConnection, locationId: ${event.locationId}");
+      debugPrint(
+          "🔍 StockInSupplier - hasConnection: $hasConnection, locationId: ${event
+              .locationId}");
 
       if (hasConnection) {
         try {
@@ -221,7 +238,9 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
           // Fallback to offline data if API fails
           try {
             final hiveSuppliers = await loadSuppliersFromHive();
-            debugPrint("🔍 API Failed - Loaded suppliers from Hive: ${hiveSuppliers.length}");
+            debugPrint(
+                "🔍 API Failed - Loaded suppliers from Hive: ${hiveSuppliers
+                    .length}");
 
             final offlineSupplierModel = supplier.GetSupplierLocationModel(
               success: hiveSuppliers.isNotEmpty,
@@ -273,7 +292,9 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
       final connectivity = await Connectivity().checkConnectivity();
       bool hasConnection = connectivity != ConnectivityResult.none;
 
-      debugPrint("🔍 StockInAddProduct - hasConnection: $hasConnection, locationId: ${event.locationId}");
+      debugPrint(
+          "🔍 StockInAddProduct - hasConnection: $hasConnection, locationId: ${event
+              .locationId}");
 
       if (hasConnection) {
         try {
@@ -287,7 +308,8 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
           // Fallback to offline data if API fails
           try {
             final hiveProducts = await loadProductsFromHive();
-            debugPrint("🔍 API Failed - Loaded products from Hive: ${hiveProducts.length}");
+            debugPrint("🔍 API Failed - Loaded products from Hive: ${hiveProducts
+                .length}");
 
             final offlineProductModel = productModel.GetAddProductModel(
               success: hiveProducts.isNotEmpty,
@@ -333,36 +355,62 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
         }
       }
     });
+    Future<bool> isConnectedNow() async {
+      final result = await Connectivity().checkConnectivity();
+
+      if (result is ConnectivityResult) {
+        return result != ConnectivityResult.none;
+      } else if (result is List && result.isNotEmpty) {
+        final first = result.first;
+        if (first is ConnectivityResult) {
+          return first != ConnectivityResult.none;
+        }
+      }
+      return false;
+    }
+
 
     // 🔹 Save Stock In
+    // 🔹 Save Stock In
     on<SaveStockIn>((event, emit) async {
-      final connectivity = await Connectivity().checkConnectivity();
-      bool hasConnection = connectivity != ConnectivityResult.none;
+      final hasConnection = await isConnectedNow();
+      print("🔌 Connectivity status: $hasConnection");
 
       if (hasConnection) {
         try {
           final value = await ApiProvider().postSaveStockInAPI(event.orderPayloadJson);
           emit(value);
+          await HiveStockService.syncPendingStock(ApiProvider());
         } catch (error) {
-          debugPrint("❌ Save Stock API Error: $error");
           emit({
             "success": false,
-            "message": "Failed to save stock: $error"
+            "message": "Failed to save stock: $error",
           });
         }
       } else {
-        // For offline, you might want to save to a pending queue
-        emit({
-          "success": false,
-          "message": "No internet connection. Stock will be saved when online."
-        });
+        if (event.orderPayloadJson.isEmpty) {
+          print("⚠️ Payload is empty, not saving");
+          return;
+        } else {
+          await HiveStockService.savePendingStock(event.orderPayloadJson);
+          await HiveStockService.debugPrintPendingStocks();
+          print("📦 Offline save triggered: ${event.orderPayloadJson}");
+          // emit(event.orderPayloadJson);
+          emit(SaveStockInModel()
+            ..errorResponse = ErrorResponse(
+              message: "No internet. Stock saved offline.",
+              statusCode: 0,
+            ));
+        }
       }
     });
-  }
 
-  // @override
-  // Future<void> close() {
-  //   closeBoxes(); // Close boxes when bloc is closed
-  //   return super.close();
-  // }
+
+
+    // @override
+    // Future<void> close() {
+    //   closeBoxes(); // Close boxes when bloc is closed
+    //   return super.close();
+    // }
+  }
 }

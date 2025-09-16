@@ -18,12 +18,14 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_table_model.dart
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_user_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_waiter_model.dart';
 // NOTE: Removed 'hide HiveProduct' to ensure consistent typing
-import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart' hide HiveProduct;
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
 // import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_pending_stock_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_stock.dart';
 // NOTE: Removed 'hide HiveSupplier' to ensure consistent typing
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart' hide HiveSupplier;
+import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_serive_stock.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:overlay_support/overlay_support.dart';
@@ -31,8 +33,8 @@ import 'package:simple/UI/SplashScreen/splash_screen.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart';
 
 // Import the adapter files
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
+// import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
+// import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
 
 import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 
@@ -62,6 +64,7 @@ Future<void> main() async {
     // Add this to your Hive initialization
     Hive.registerAdapter(HiveUserAdapter());
     Hive.registerAdapter(HiveReportModelAdapter());
+    Hive.registerAdapter(HivePendingStockAdapter());
     // Note: If you have a separate adapter for HiveProductStock, you would register it here.
     // Hive.registerAdapter(HiveProductStockAdapter());
 
@@ -78,15 +81,23 @@ Future<void> main() async {
     await Hive.openBox<HiveStockMaintenance>('stock_maintenance');
     await Hive.openBox<HiveTable>('tables');
     await Hive.openBox<HiveLocation>('location');
-    await Hive.openBox<HiveSupplier>('suppliers_box');
+    await Hive.openBox<HiveSupplier>('suppliers');
     await Hive.openBox<HiveProduct>('products_box');
     await Hive.openBox('app_state');
     await Hive.openBox<HiveWaiter>('waiters_box');
     await Hive.openBox<HiveUser>('users_box');
-
-  } catch (e) {
+    await Hive.openBox<HivePendingStock>('pending_stock');
+  }
+  catch (e)
+  {
     debugPrint("Hive openBox error: $e");
   }
+
+  Connectivity().onConnectivityChanged.listen((result) async {
+    if (result != ConnectivityResult.none) {
+      await HiveStockService.syncPendingStock(ApiProvider());
+    }
+  });
 
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -95,14 +106,11 @@ Future<void> main() async {
   Bloc.observer = AppBlocObserver();
   await NetworkManager().initialize();
   runApp(const App());
-
 }
 
 
 class App extends StatelessWidget {
   const App({super.key});
-
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
@@ -129,7 +137,6 @@ class _MyAppState extends State<MyApp> {
   void dispose() {
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {

@@ -1,41 +1,40 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'hive_stock_model.dart';
+part of 'hive_pending_stock_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class HiveStockMaintenanceAdapter extends TypeAdapter<HiveStockMaintenance> {
+class HivePendingStockAdapter extends TypeAdapter<HivePendingStock> {
   @override
-  final int typeId = 40;
+  final int typeId = 70;
 
   @override
-  HiveStockMaintenance read(BinaryReader reader) {
+  HivePendingStock read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return HiveStockMaintenance(
-      id: fields[0] as String?,
-      name: fields[1] as String?,
-      stockMaintenance: fields[2] as bool?,
-      lastUpdated: fields[3] as DateTime?,
-    );
+    return HivePendingStock()
+      ..id = fields[0] as String?
+      ..payload = fields[1] as String?
+      ..synced = fields[2] as bool?
+      ..createdAt = fields[3] as DateTime?;
   }
 
   @override
-  void write(BinaryWriter writer, HiveStockMaintenance obj) {
+  void write(BinaryWriter writer, HivePendingStock obj) {
     writer
       ..writeByte(4)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.name)
+      ..write(obj.payload)
       ..writeByte(2)
-      ..write(obj.stockMaintenance)
+      ..write(obj.synced)
       ..writeByte(3)
-      ..write(obj.lastUpdated);
+      ..write(obj.createdAt);
   }
 
   @override
@@ -44,7 +43,7 @@ class HiveStockMaintenanceAdapter extends TypeAdapter<HiveStockMaintenance> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is HiveStockMaintenanceAdapter &&
+      other is HivePendingStockAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

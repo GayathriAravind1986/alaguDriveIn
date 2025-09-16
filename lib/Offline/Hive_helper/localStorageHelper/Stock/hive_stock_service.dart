@@ -11,7 +11,7 @@ import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart'
     as supplier;
 
 Future<void> saveProductsToHive(List<product.Data> products) async {
-  final box = await Hive.openBox<HiveProductStock>('products');
+  final box = Hive.box<HiveProductStock>('products_box');
   await box.clear();
   for (var product in products) {
     await box.put(
@@ -25,7 +25,7 @@ Future<void> saveProductsToHive(List<product.Data> products) async {
 
 // Suppliers
 Future<void> saveSuppliersToHive(List<supplier.Data> suppliers) async {
-  final box = await Hive.openBox<HiveSupplier>('suppliers');
+  final box = Hive.box<HiveSupplier>('suppliers');
   await box.clear();
   for (var supplier in suppliers) {
     await box.put(
@@ -40,7 +40,7 @@ Future<void> saveSuppliersToHive(List<supplier.Data> suppliers) async {
 // Locations
 Future<void> saveLocationToHive(location.Data apiData) async {
   try {
-    final box = await Hive.openBox<HiveLocation>('location');
+    final box = Hive.box<HiveLocation>('location');
     final hiveLocation = HiveLocation(
       id: apiData.id,
       locationName: apiData.locationName,
@@ -96,10 +96,12 @@ Future<List<HiveProductStock>> loadProductsFromHive() async {
   try {
     Box<HiveProductStock> box;
 
-    if (!Hive.isBoxOpen('products')) {
-      box = await Hive.openBox<HiveProductStock>('products');
-    } else {
-      box = Hive.box<HiveProductStock>('products');
+    if (!Hive.isBoxOpen('products_box'))
+    {
+      box = await Hive.openBox<HiveProductStock>('products_box');
+    }
+    else {
+      box = Hive.box<HiveProductStock>('products_box');
     }
 
     final products = box.values.toList();

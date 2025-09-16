@@ -491,7 +491,9 @@ class ApiProvider {
           ),
         );
       }
-    } catch (e) {
+    }
+    catch(e)
+    {
       debugPrint("❌ API Error: $e");
       return GetOrderListTodayModel(
         success: false,
