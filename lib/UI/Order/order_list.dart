@@ -336,27 +336,42 @@ class OrderViewViewState extends State<OrderViewView> {
     }
 
     return BlocBuilder<OrderTodayBloc, dynamic>(
-      buildWhen: ((previous, current) {
+      buildWhen: (previous, current) {
+        // Update order list when GetOrderListTodayModel is emitted
         if (current is GetOrderListTodayModel) {
           getOrderListTodayModel = current;
           return true;
         }
-        if (current is DeleteOrderModel) {
-          deleteOrderModel = current;
-          if (deleteOrderModel.errorResponse?.isUnauthorized == true) {
-            _handle401Error();
-            return true;
-          }
-          if (deleteOrderModel.success == true) {
-            showToast("${deleteOrderModel.message}", context, color: true);
-            context
-                .read<OrderTodayBloc>()
-                .add(OrderTodayList(todayDate, todayDate, "", "", ""));
-          } else {
-            showToast("${deleteOrderModel.message}", context, color: false);
-          }
+
+        // Handle DeleteOrder online success
+        if (current is DeleteOrderSuccessState) {
+          showToast(current.message, context, color: true);
+          setState(() {
+            getOrderListTodayModel.data?.removeWhere(
+                  (order) => order.id == current.orderId,
+            );
+          });
           return true;
         }
+
+        // Handle DeleteOrder offline saved
+        if (current is DeleteOrderOfflineSavedState) {
+          showToast(current.message, context, color: true);
+          setState(() {
+            getOrderListTodayModel.data?.removeWhere(
+                  (order) => order.id == current.orderId,
+            );
+          });
+          return true;
+        }
+
+        // Handle DeleteOrder failure
+        if (current is DeleteOrderFailureState) {
+          showToast(current.message, context, color: false);
+          return true;
+        }
+
+        // Handle view order
         if (current is GetViewOrderModel) {
           try {
             getViewOrderModel = current;
@@ -364,39 +379,38 @@ class OrderViewViewState extends State<OrderViewView> {
               _handle401Error();
               return true;
             }
+
             if (getViewOrderModel.success == true) {
               if (view == true) {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder: (context) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  },
+                  builder: (context) => const Center(child: CircularProgressIndicator()),
                 );
-                Future.delayed(Duration(seconds: 1));
-
-                Navigator.of(context).pop();
-                showDialog(
-                  context: context,
-                  builder: (context) => ThermalReceiptDialog(getViewOrderModel),
-                );
+                Future.delayed(const Duration(seconds: 1), () {
+                  Navigator.of(context).pop();
+                  showDialog(
+                    context: context,
+                    builder: (context) => ThermalReceiptDialog(getViewOrderModel),
+                  );
+                });
               } else {
                 Navigator.of(context)
                     .pushAndRemoveUntil(
-                        MaterialPageRoute(
-                            builder: (context) => DashBoardScreen(
-                                  selectTab: 0,
-                                  existingOrder: getViewOrderModel,
-                                  isEditingOrder: true,
-                                )),
-                        (Route<dynamic> route) => false)
+                  MaterialPageRoute(
+                    builder: (context) => DashBoardScreen(
+                      selectTab: 0,
+                      existingOrder: getViewOrderModel,
+                      isEditingOrder: true,
+                    ),
+                  ),
+                      (Route<dynamic> route) => false,
+                )
                     .then((value) {
                   if (value == true) {
-                    context
-                        .read<OrderTodayBloc>()
-                        .add(OrderTodayList(todayDate, todayDate, "", "", ""));
+                    context.read<OrderTodayBloc>().add(
+                      OrderTodayList(todayDate, todayDate, "", "", ""),
+                    );
                   }
                 });
               }
@@ -404,25 +418,15 @@ class OrderViewViewState extends State<OrderViewView> {
           } catch (e, stackTrace) {
             debugPrint("Error in processing view order: $e");
             print(stackTrace);
-            if (e is DioException) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Error: ${e.message}"),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Something went wrong: ${e.toString()}"),
-                ),
-              );
-            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Something went wrong: ${e.toString()}")),
+            );
           }
           return true;
         }
         return false;
-      }),
-      builder: (context, dynamic) {
+      },
+      builder: (context, dynamic state) {
         return mainContainer();
       },
     );

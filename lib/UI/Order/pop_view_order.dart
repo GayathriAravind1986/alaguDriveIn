@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
 import 'package:simple/Reusable/color.dart';
@@ -11,8 +12,7 @@ import 'package:simple/UI/Home_screen/Widget/another_imin_printer/mock_imin_prin
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/real_device_printer.dart';
 import 'package:simple/UI/IminHelper/printer_helper.dart';
 
-class ThermalReceiptDialog extends StatefulWidget
-{
+class ThermalReceiptDialog extends StatefulWidget {
   final GetViewOrderModel getViewOrderModel;
   const ThermalReceiptDialog(this.getViewOrderModel, {super.key});
 
@@ -23,6 +23,7 @@ class ThermalReceiptDialog extends StatefulWidget
 class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
   late IPrinterService printerService;
   final GlobalKey receiptKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -37,161 +38,168 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final order = widget.getViewOrderModel.data!;
+    final order = widget.getViewOrderModel.data;
+    if (order == null || order.invoice == null) {
+      return Container(
+        padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
+        alignment: Alignment.center,
+        child: Text(
+          "No Orders found",
+          style: MyTextStyle.f16(
+            greyColor,
+            weight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
     final invoice = order.invoice!;
     var size = MediaQuery.of(context).size;
-    List<Map<String, dynamic>> items = invoice.invoiceItems!
+
+    List<Map<String, dynamic>> items = (invoice.invoiceItems ?? [])
         .map((e) => {
-              'name': e.tamilname,
-              'qty': e.qty,
-              'price': (e.basePrice ?? 0).toDouble(),
-              'total': ((e.qty ?? 0) * (e.basePrice ?? 0)).toDouble(),
-            })
+      'name': e.tamilname ?? 'Unknown Item',
+      'qty': e.qty ?? 0,
+      'price': (e.basePrice ?? 0).toDouble(),
+      'total': ((e.qty ?? 0) * (e.basePrice ?? 0)).toDouble(),
+    })
         .toList();
 
-    String businessName = invoice.businessName ?? '';
-    String address = invoice.address ?? '';
-    String gst = invoice.gstNumber ?? '';
+    String businessName = invoice.businessName ?? 'Business Name';
+    String address = invoice.address ?? 'Address not available';
+    String gst = invoice.gstNumber ?? 'GST not available';
     debugPrint("gst:$gst");
     double taxAmount = (order.tax ?? 0.0).toDouble();
     String orderNumber = order.orderNumber ?? 'N/A';
-    String paymentMethod = invoice.paidBy ?? '';
-    String phone = invoice.phone ?? '';
+    String paymentMethod = invoice.paidBy ?? 'Unknown';
+    String phone = invoice.phone ?? 'Phone not available';
     double subTotal = (invoice.subtotal ?? 0.0).toDouble();
     double total = (invoice.total ?? 0.0).toDouble();
     String orderType = order.orderType ?? '';
     String orderStatus = order.orderStatus ?? '';
-    String tableName = orderType == 'LINE' || orderType == 'AC'
+
+    String tableName = (orderType == 'LINE' || orderType == 'AC')
         ? (invoice.tableNum ?? 'N/A')
         : 'N/A';
-    String waiterName = orderType == 'LINE' || orderType == 'AC'
+
+    String waiterName = (orderType == 'LINE' || orderType == 'AC')
         ? (invoice.waiterNum ?? 'N/A')
         : 'N/A';
-    String date = DateFormat('dd/MM/yyyy hh:mm a').format(
-        DateFormat('M/d/yyyy, h:mm:ss a').parse(invoice.date.toString()));
 
-    return widget.getViewOrderModel.data == null
-        ? Container(
-            padding:
-                EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
-            alignment: Alignment.center,
-            child: Text(
-              "No Orders found",
-              style: MyTextStyle.f16(
-                greyColor,
-                weight: FontWeight.w500,
-              ),
-            ))
-        : Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-            child: SingleChildScrollView(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: whiteColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Center(
-                          child: const Text(
-                            "Order Receipt",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+    String date;
+    try {
+      date = DateFormat('dd/MM/yyyy hh:mm a').format(
+          DateFormat('M/d/yyyy, h:mm:ss a').parse(invoice.date.toString()));
+    } catch (e) {
+      date = 'Date not available';
+    }
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: whiteColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        "Order Receipt",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    RepaintBoundary(
-                      key: receiptKey,
-                      child: getThermalReceiptWidget(
-                        businessName: businessName,
-                        address: address,
-                        gst: gst,
-                        items: items,
-                        tax: taxAmount,
-                        paidBy: paymentMethod,
-                        tamilTagline: '',
-                        phone: phone,
-                        subtotal: subTotal,
-                        total: total,
-                        orderNumber: orderNumber,
-                        tableName: tableName,
-                        waiterName: waiterName,
-                        orderType: orderType,
-                        date: date,
-                        status: orderStatus,
                       ),
                     ),
-                    const SizedBox(height: 20),
-
-                    // Action Buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              await Future.delayed(
-                                  const Duration(milliseconds: 300));
-                              await WidgetsBinding.instance.endOfFrame;
-                              Uint8List? imageBytes =
-                                  await captureMonochromeReceipt(receiptKey);
-
-                              if (imageBytes != null) {
-                                await printerService.init();
-                                await printerService.printBitmap(imageBytes);
-                                // await Future.delayed(
-                                //     const Duration(seconds: 2));
-                                await printerService.fullCut();
-                                Navigator.pop(context);
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("Print failed: $e")),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.print),
-                          label: const Text("Print"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: greenColor,
-                            foregroundColor: whiteColor,
-                          ),
-                        ),
-                        horizontalSpace(width: 10),
-                        SizedBox(
-                          width: size.width * 0.09,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text(
-                              "CLOSE",
-                              style: TextStyle(color: appPrimaryColor),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Close Button
-                  ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              RepaintBoundary(
+                key: receiptKey,
+                child: getThermalReceiptWidget(
+                  businessName: businessName,
+                  address: address,
+                  gst: gst,
+                  items: items,
+                  tax: taxAmount,
+                  paidBy: paymentMethod,
+                  tamilTagline: '',
+                  phone: phone,
+                  subtotal: subTotal,
+                  total: total,
+                  orderNumber: orderNumber,
+                  tableName: tableName,
+                  waiterName: waiterName,
+                  orderType: orderType,
+                  date: date,
+                  status: orderStatus,
                 ),
               ),
-            ),
-          );
+              const SizedBox(height: 20),
+
+              // Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await Future.delayed(const Duration(milliseconds: 300));
+                        await WidgetsBinding.instance.endOfFrame;
+                        Uint8List? imageBytes =
+                        await captureMonochromeReceipt(receiptKey);
+
+                        if (imageBytes != null) {
+                          await printerService.init();
+                          await printerService.printBitmap(imageBytes);
+                          await printerService.fullCut();
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Print failed: $e")),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.print),
+                    label: const Text("Print"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: greenColor,
+                      foregroundColor: whiteColor,
+                    ),
+                  ),
+                  horizontalSpace(width: 10),
+                  SizedBox(
+                    width: size.width * 0.09,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "CLOSE",
+                        style: TextStyle(color: appPrimaryColor),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

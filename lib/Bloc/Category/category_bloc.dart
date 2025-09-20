@@ -262,6 +262,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
             // Save to Hive for offline access
             await HiveService.saveCartItems(event.billingItems);
+
             final billingSession = HiveService.calculateBillingTotals(
                 event.billingItems, event.isDiscount ?? false);
             await HiveService.saveBillingSession(billingSession);

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Authentication/Post_login_model.dart';
@@ -13,6 +14,7 @@ import 'package:simple/ModelClass/Order/Get_view_order_model.dart' hide Data;
 import 'package:simple/ModelClass/Order/Post_generate_order_model.dart';
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
 import 'package:simple/ModelClass/Order/get_order_list_today_model.dart' hide Data;
+import 'package:simple/ModelClass/Products/get_products_cat_model.dart' hide Data;
 import 'package:simple/ModelClass/Report/Get_report_model.dart';
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart' hide Data;
 import 'package:simple/ModelClass/StockIn/getLocationModel.dart' hide Data;
@@ -22,8 +24,12 @@ import 'package:simple/ModelClass/StockIn/saveStockInModel.dart' hide Data;
 import 'package:simple/ModelClass/User/getUserModel.dart' hide Data;
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart' hide Data;
 import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/connectivity_service.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive-pending_delete_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_report_service.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_orderstoday.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_sync_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_user_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_waiter_service.dart';
 import 'package:simple/Reusable/constant.dart';
@@ -686,14 +692,135 @@ class ApiProvider {
 
   /// Delete Order - Fetch API Integration
   Future<DeleteOrderModel> deleteOrderAPI(String? orderId) async {
+    if (orderId == null || orderId.isEmpty) {
+      return DeleteOrderModel()
+        ..errorResponse = ErrorResponse(
+          message: "Invalid Order ID. Cannot delete.",
+          statusCode: 400,
+        );
+    }
+
+    // ✅ Check connectivity with proper handling
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+
+      bool isConnected = false;
+      if (connectivityResult is List) {
+        isConnected = connectivityResult.any((result) => result != ConnectivityResult.none);
+      } else if (connectivityResult is ConnectivityResult) {
+        isConnected = connectivityResult != ConnectivityResult.none;
+      }
+
+      if (!isConnected) {
+        // 📴 Offline: save for later sync
+        print("📴 Offline detected - saving delete request for order: $orderId");
+        final success = await HiveServicedelete.addPendingDelete(orderId);
+
+        // 🔧 FIXED: Use 503 status code consistently
+        return DeleteOrderModel()
+          ..errorResponse = ErrorResponse(
+            message: success
+                ? "No internet connection. Delete request saved for later sync."
+                : "Delete request already saved offline.",
+            statusCode: 503, // ✅ This triggers offline state in BLoC
+          );
+      }
+    } catch (e) {
+      print("❌ Connectivity check failed: $e");
+      await HiveServicedelete.addPendingDelete(orderId);
+      return DeleteOrderModel()
+        ..errorResponse = ErrorResponse(
+          message: "Connection check failed. Delete request saved offline.",
+          statusCode: 503,
+        );
+    }
+
+    // ✅ Online flow
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final token = sharedPreferences.getString("token");
+
+    if (token == null || token.isEmpty) {
+      return DeleteOrderModel()
+        ..errorResponse = ErrorResponse(
+          message: "Session expired. Please login again.",
+          statusCode: 401,
+        );
+    }
+
+    try {
+      print("🌐 Attempting to delete order $orderId via API");
+
+      final dio = Dio();
+      final response = await dio.request(
+        '${Constants.baseUrl}api/generate-order/order/$orderId',
+        options: Options(
+          method: 'DELETE',
+          headers: {'Authorization': 'Bearer $token'},
+          // connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      print("📡 API Response - Status: ${response.statusCode}");
+
+      if (response.statusCode == 200 && response.data != null) {
+        if (response.data['success'] == true) {
+          print("✅ Order $orderId deleted successfully");
+          return DeleteOrderModel.fromJson(response.data);
+        }
+      }
+
+      return DeleteOrderModel()
+        ..errorResponse = ErrorResponse(
+          message: response.data?['message'] ?? 'Failed to delete order',
+          statusCode: response.statusCode ?? 503,
+        );
+
+    } on DioException catch (dioError) {
+      print("❌ DioException: ${dioError.type}");
+
+      // Handle network errors by saving offline
+      if (dioError.type == DioExceptionType.connectionTimeout ||
+          dioError.type == DioExceptionType.receiveTimeout ||
+          dioError.type == DioExceptionType.connectionError) {
+
+        print("🔄 Network issue - saving for offline sync");
+        await HiveServicedelete.addPendingDelete(orderId);
+
+        return DeleteOrderModel()
+          ..errorResponse = ErrorResponse(
+            message: "Network timeout. Delete request saved for later sync.",
+            statusCode: 503, // Triggers offline state
+          );
+      }
+
+      return DeleteOrderModel()..errorResponse = handleError(dioError);
+    } catch (error) {
+      print("❌ Unexpected error: $error");
+      // Save offline as fallback
+      await HiveServicedelete.addPendingDelete(orderId);
+
+      return DeleteOrderModel()
+        ..errorResponse = ErrorResponse(
+          message: "Error occurred. Delete request saved for later sync.",
+          statusCode: 503,
+        );
+    }
+  }
+
+
+
+  /// products-Category - Fetch API Integration
+  /// products-Category - Fetch API Integration
+  Future<GetProductsCatModel> getProductsCatAPI(String? catId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
     try {
       var dio = Dio();
       var response = await dio.request(
-        '${Constants.baseUrl}api/generate-order/order/$orderId',
+        '${Constants.baseUrl}api/products/pos/category-products-with-category?filter=false&categoryId=$catId',
         options: Options(
-          method: 'DELETE',
+          method: 'GET',
           headers: {
             'Authorization': 'Bearer $token',
           },
@@ -701,27 +828,27 @@ class ApiProvider {
       );
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['success'] == true) {
-          DeleteOrderModel deleteOrderResponse =
-              DeleteOrderModel.fromJson(response.data);
-          return deleteOrderResponse;
+          GetProductsCatModel getProductsCatResponse =
+          GetProductsCatModel.fromJson(response.data);
+          return getProductsCatResponse;
         }
       } else {
-        return DeleteOrderModel()
+        return GetProductsCatModel()
           ..errorResponse = ErrorResponse(
             message: "Error: ${response.data['message'] ?? 'Unknown error'}",
             statusCode: response.statusCode,
           );
       }
-      return DeleteOrderModel()
+      return GetProductsCatModel()
         ..errorResponse = ErrorResponse(
           message: "Unexpected error occurred.",
           statusCode: 500,
         );
     } on DioException catch (dioError) {
       final errorResponse = handleError(dioError);
-      return DeleteOrderModel()..errorResponse = errorResponse;
+      return GetProductsCatModel()..errorResponse = errorResponse;
     } catch (error) {
-      return DeleteOrderModel()..errorResponse = handleError(error);
+      return GetProductsCatModel()..errorResponse = handleError(error);
     }
   }
 
@@ -997,7 +1124,7 @@ class ApiProvider {
   }
 
   /// handle Error Response
-  ErrorResponse handleError(Object error) {
+ static ErrorResponse handleError(Object error) {
     ErrorResponse errorResponse = ErrorResponse();
     Errors errorDescription = Errors();
 

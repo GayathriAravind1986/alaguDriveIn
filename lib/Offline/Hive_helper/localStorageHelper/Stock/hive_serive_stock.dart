@@ -1,6 +1,11 @@
+import 'package:flutter/src/widgets/framework.dart';
 import 'package:hive/hive.dart';
+import 'package:path/path.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_pending_stock_model.dart';
+
+import '../../../../Alertbox/snackBarAlert.dart';
+
 
 class HiveStockService {
   static const String _boxName = 'pending_stock';
@@ -23,6 +28,8 @@ class HiveStockService {
     await box.add(pending);
 
     print("✅ Saved pending stock offline: ${pending.id}");
+    // showToast("Stock saved offline");
+
     await debugPrintPendingStocks();
   }
 

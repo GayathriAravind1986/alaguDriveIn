@@ -1152,6 +1152,7 @@ class StockViewViewState extends State<StockViewView> {
                         context
                             .read<StockInBloc>()
                             .add(SaveStockIn(jsonEncode(payload)));
+                        showToast("Stock saved offline", context, color: true);
                       } catch (e) {
                         setState(() {
                           saveLoad = false;
@@ -1159,6 +1160,7 @@ class StockViewViewState extends State<StockViewView> {
                         showValidationSnackBar(
                             'An error occurred while saving: $e');
                       }
+                      clearStockInForm();
                     },
                     label: const Text("Save"),
                     style: ElevatedButton.styleFrom(

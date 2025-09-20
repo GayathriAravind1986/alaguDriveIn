@@ -1,32 +1,31 @@
 import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:simple/ModelClass/Report/Get_report_model.dart';
+import 'package:simple/ModelClass/Products/get_products_cat_model.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/space.dart';
-import 'package:simple/Reusable/text_styles.dart';
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/imin_abstract.dart';
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/mock_imin_printer_chrome.dart';
 import 'package:simple/UI/Home_screen/Widget/another_imin_printer/real_device_printer.dart';
-import 'package:simple/UI/IminHelper/Report_helper.dart';
+import 'package:simple/UI/IminHelper/product_helper.dart';
 
-class ThermalReportReceiptDialog extends StatefulWidget {
-  final GetReportModel getReportModel;
-  final bool showItems;
-  const ThermalReportReceiptDialog(this.getReportModel,
-      {super.key, required this.showItems});
+class ThermalProductsReceiptDialog extends StatefulWidget {
+  final GetProductsCatModel getProductsCatModel;
+  const ThermalProductsReceiptDialog(
+    this.getProductsCatModel, {
+    super.key,
+  });
 
   @override
-  State<ThermalReportReceiptDialog> createState() =>
-      _ThermalReportReceiptDialogState();
+  State<ThermalProductsReceiptDialog> createState() =>
+      _ThermalProductsReceiptDialogState();
 }
 
-class _ThermalReportReceiptDialogState
-    extends State<ThermalReportReceiptDialog> {
+class _ThermalProductsReceiptDialogState
+    extends State<ThermalProductsReceiptDialog> {
   late IPrinterService printerService;
-  final GlobalKey reportKey = GlobalKey();
+  final GlobalKey productKey = GlobalKey();
 
   @override
   void initState() {
@@ -43,60 +42,50 @@ class _ThermalReportReceiptDialogState
   @override
   Widget build(BuildContext context) {
     var size = MediaQuery.of(context).size;
-    final report = widget.getReportModel.data!;
+    final allCategories = widget.getProductsCatModel.data!.categories ?? [];
 
-    List<Map<String, dynamic>> items = report
-        .map((e) => {
-      'name': e.productName,
-      'qty': e.totalQty,
-      'price': (e.unitPrice ?? 0).toDouble(),
-      'total': (e.totalAmount ?? 0).toDouble(),
-    })
+    List<Map<String, dynamic>> itemsLine = allCategories
+        .expand((cat) => cat.products!.map((p) => {
+              "id": p.id,
+              "name": p.name,
+              "code": p.shortCode,
+              "price": p.basePrice,
+              "parcel": p.parcelPrice,
+              "ac": p.acPrice,
+              "hd": p.hdPrice,
+              "categoryName": cat.categoryName,
+            }))
         .toList();
-
-    String businessName = widget.getReportModel.businessName ?? 'Alagu Drive In';
-    String userName = widget.getReportModel.userName ?? '';
-    String address = widget.getReportModel.address ?? '';
-    String location = widget.getReportModel.location ?? 'ALANGULAM';
-
-    // Fixed: Added null checks to prevent FormatException
-    String fromDate = '';
-    if (widget.getReportModel.fromDate != null) {
-      fromDate = DateFormat('dd/MM/yyyy').format(
-        DateTime.parse(widget.getReportModel.fromDate.toString()),
-      );
-    }
-
-    String toDate = '';
-    if (widget.getReportModel.toDate != null) {
-      toDate = DateFormat('dd/MM/yyyy').format(
-        DateTime.parse(widget.getReportModel.toDate.toString()),
-      );
-    }
-
-    String phone = widget.getReportModel.phone ?? '';
-    double totalAmount = (widget.getReportModel.finalAmount ?? 0.0).toDouble();
-    int totalQty = (widget.getReportModel.finalQty ?? 0.0).toInt();
+    String businessName = widget.getProductsCatModel.data!.businessName ?? '';
+    String address = widget.getProductsCatModel.data!.address ?? '';
+    String gst = widget.getProductsCatModel.data!.gstNumber ?? '';
+    String phone = widget.getProductsCatModel.data!.phone ?? '';
+    String totalCat =
+        widget.getProductsCatModel.data!.totalCategories.toString() ?? '';
+    String totalCount =
+        widget.getProductsCatModel.data!.totalProducts.toString() ?? '';
     String date = DateFormat('dd/MM/yyyy hh:mm a').format(DateTime.now());
 
-    return widget.getReportModel.data == null
-        ? Container(
-        padding:
-        EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
-        alignment: Alignment.center,
-        child: Text(
-          "No Report found",
-          style: MyTextStyle.f16(
-            greyColor,
-            weight: FontWeight.w500,
-          ),
-        ))
-        : Dialog(
+    return
+        // widget.getProductsCatModel.data! == null
+        //   ? Container(
+        //       padding:
+        //           EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
+        //       alignment: Alignment.center,
+        //       child: Text(
+        //         "No Report found",
+        //         style: MyTextStyle.f16(
+        //           greyColor,
+        //           weight: FontWeight.w500,
+        //         ),
+        //       ))
+        //   :
+        Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding:
-      const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       child: SingleChildScrollView(
         child: Container(
+          width: size.width * 0.4,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: whiteColor,
@@ -108,11 +97,13 @@ class _ThermalReportReceiptDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Report",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  Center(
+                    child: const Text(
+                      "Products Report (Category-wise)",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -125,21 +116,17 @@ class _ThermalReportReceiptDialogState
 
               // Thermal Receipt Widget
               RepaintBoundary(
-                key: reportKey,
-                child: getReportReceiptWidget(
+                key: productKey,
+                child: getProductReceiptWidget(
                     businessName: businessName,
                     tamilTagline: "",
                     address: address,
+                    gst: gst,
                     phone: phone,
-                    items: items,
+                    itemsLine: itemsLine,
                     reportDate: date,
-                    takenBy: userName,
-                    totalQuantity: totalQty,
-                    totalAmount: totalAmount,
-                    fromDate: fromDate,
-                    toDate: toDate,
-                    location: location,
-                    showItems: widget.showItems),
+                    totalCat: totalCat,
+                    totalCount: totalCount),
               ),
 
               const SizedBox(height: 20),
@@ -151,11 +138,10 @@ class _ThermalReportReceiptDialogState
                   ElevatedButton.icon(
                     onPressed: () async {
                       try {
-                        await Future.delayed(
-                            const Duration(milliseconds: 300));
+                        await Future.delayed(const Duration(milliseconds: 300));
                         await WidgetsBinding.instance.endOfFrame;
                         Uint8List? imageBytes =
-                        await captureMonochromeReport(reportKey);
+                            await captureMonochromeProducts(productKey);
 
                         if (imageBytes != null) {
                           await printerService.init();
@@ -192,6 +178,8 @@ class _ThermalReportReceiptDialogState
                 ],
               ),
               const SizedBox(height: 10),
+
+              // Close Button
             ],
           ),
         ),

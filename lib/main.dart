@@ -7,6 +7,7 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/observer/observer.dart';
 import 'package:simple/Bloc/theme_cubit.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Order/hive_pending_delete.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/category_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_billing_session_model.dart';
@@ -26,6 +27,7 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_stock.d
 // NOTE: Removed 'hide HiveSupplier' to ensure consistent typing
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_serive_stock.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive-pending_delete_service.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:overlay_support/overlay_support.dart';
@@ -47,6 +49,8 @@ Future<void> main() async {
   // Start listening to connectivity changes
   initConnectivityListener(apiProvider);
 
+  await HiveServicedelete.initDeleteBox();
+
   try {
     // Register all adapters before opening any boxes.
     // Ensure all adapters are registered only once.
@@ -58,6 +62,7 @@ Future<void> main() async {
     Hive.registerAdapter(HiveBillingSessionAdapter());
     Hive.registerAdapter(HiveStockMaintenanceAdapter());
     Hive.registerAdapter(HiveTableAdapter());
+    Hive.registerAdapter(PendingDeleteAdapter());
     Hive.registerAdapter(HiveLocationAdapter());
     Hive.registerAdapter(HiveSupplierAdapter());
     Hive.registerAdapter(HiveWaiterAdapter());
@@ -96,6 +101,7 @@ Future<void> main() async {
   Connectivity().onConnectivityChanged.listen((result) async {
     if (result != ConnectivityResult.none) {
       await HiveStockService.syncPendingStock(ApiProvider());
+      await HiveServicedelete.syncPendingDeletes(ApiProvider());
     }
   });
 

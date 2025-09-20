@@ -11,6 +11,20 @@ class HiveService {
   static const String ORDERS_BOX = 'orders';
   static const String BILLING_SESSION_BOX = 'billing_session';
   static const String SYNC_QUEUE_BOX = 'sync_queue';
+  static Box? _pendingActionsBox;
+
+  static Future<Box> getPendingActionsBox() async {
+    if (_pendingActionsBox == null || !_pendingActionsBox!.isOpen) {
+      _pendingActionsBox = await Hive.openBox('pendingActions');
+    }
+    return _pendingActionsBox!;
+  }
+
+  static Future<void> closeBox() async {
+    if (_pendingActionsBox != null && _pendingActionsBox!.isOpen) {
+      await _pendingActionsBox!.close();
+    }
+  }
 
   // Cart Management
   static Future<void> saveCartItems(
@@ -100,7 +114,7 @@ class HiveService {
   }
 
   // Order Management
-  static Future<String> saveOfflineOrder({
+   static Future<String> saveOfflineOrder({
     required String orderPayloadJson,
     required String orderStatus,
     required String orderType,

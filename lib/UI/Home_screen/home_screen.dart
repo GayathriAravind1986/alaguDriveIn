@@ -27,6 +27,7 @@ import 'package:simple/ModelClass/Order/Update_generate_order_model.dart'
     as update;
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
+import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_order_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_helper.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_product.dart';
 import 'package:simple/Reusable/color.dart';
@@ -239,51 +240,94 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     return DateFormat('dd/MM/yyyy hh:mm a').format(dateTime);
   }
 
-  Future<void> printGenerateOrderReceipt() async {
+  Future<void> printGenerateOrderReceipt({HiveOrder? offlineOrder}) async {
     try {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
-      List<Map<String, dynamic>> items = postGenerateOrderModel.order!.items!
-          .map((e) => {
-                'name': e.name,
-                'qty': e.quantity,
-                'price': (e.unitPrice ?? 0).toDouble(),
-                'total': ((e.quantity ?? 0) * (e.unitPrice ?? 0)).toDouble(),
-              })
-          .toList();
+      // Use offlineOrder if provided, otherwise use online model
+      List<Map<String, dynamic>> items;
+      String businessName;
+      String address;
+      String gst;
+      double taxPercent;
+      String orderNumber;
+      String paymentMethod;
+      String phone;
+      double subTotal;
+      double total;
+      String orderType;
+      String orderStatus;
+      String tableName;
+      String waiterName;
+      String date;
 
-      String businessName = postGenerateOrderModel.invoice!.businessName ?? '';
-      String address = postGenerateOrderModel.invoice!.address ?? '';
-      String gst = postGenerateOrderModel.invoice!.gstNumber ?? '';
-      double taxPercent = (postGenerateOrderModel.order!.tax ?? 0.0).toDouble();
-      String orderNumber = postGenerateOrderModel.order!.orderNumber ?? 'N/A';
-      String paymentMethod = postGenerateOrderModel.invoice!.paidBy ?? '';
-      String phone = postGenerateOrderModel.invoice!.phone ?? '';
-      double subTotal =
-          (postGenerateOrderModel.invoice!.subtotal ?? 0.0).toDouble();
-      double total = (postGenerateOrderModel.invoice!.total ?? 0.0).toDouble();
-      String orderType = postGenerateOrderModel.order!.orderType ?? '';
-      String orderStatus = postGenerateOrderModel.invoice!.orderStatus ?? '';
-      String tableName = orderType == 'LINE' || orderType == 'AC'
-          ? postGenerateOrderModel.invoice!.tableName.toString()
-          : 'N/A';
-      String waiterName = orderType == 'LINE' || orderType == 'AC'
-          ? postGenerateOrderModel.invoice!.waiterName.toString()
-          : 'N/A';
-      String date = formatInvoiceDate(postGenerateOrderModel.invoice?.date);
+      if (offlineOrder != null) {
+        // Offline order mapping
+        items = offlineOrder.items!.map((e) => {
+          'name': e.name,
+          'qty': e.qty,
+          'price': (e.basePrice ?? 0).toDouble(),
+          'total': ((e.basePrice ?? 0) * (e.qty ?? 0)).toDouble(),
+        }).toList();
+
+        businessName = ''; // Store businessName in HiveOrder if needed
+        address = '';
+        gst = '';
+        taxPercent = 0;
+        orderNumber = offlineOrder.id ?? 'N/A';
+        paymentMethod = '';
+        phone = '';
+        subTotal = offlineOrder.total ?? 0.0;
+        total = offlineOrder.total ?? 0.0;
+        orderType = offlineOrder.orderType ?? '';
+        orderStatus = offlineOrder.orderStatus ?? '';
+        tableName = offlineOrder.tableId ?? 'N/A';
+        waiterName = 'N/A';
+        date = offlineOrder.createdAt.toString();
+      } else {
+        // Online order mapping (original code)
+        items = postGenerateOrderModel.order!.items!
+            .map((e) => {
+          'name': e.name,
+          'qty': e.quantity,
+          'price': (e.unitPrice ?? 0).toDouble(),
+          'total': ((e.quantity ?? 0) * (e.unitPrice ?? 0)).toDouble(),
+        })
+            .toList();
+
+        businessName = postGenerateOrderModel.invoice!.businessName ?? '';
+        address = postGenerateOrderModel.invoice!.address ?? '';
+        gst = postGenerateOrderModel.invoice!.gstNumber ?? '';
+        taxPercent = (postGenerateOrderModel.order!.tax ?? 0.0).toDouble();
+        orderNumber = postGenerateOrderModel.order!.orderNumber ?? 'N/A';
+        paymentMethod = postGenerateOrderModel.invoice!.paidBy ?? '';
+        phone = postGenerateOrderModel.invoice!.phone ?? '';
+        subTotal = (postGenerateOrderModel.invoice!.subtotal ?? 0.0).toDouble();
+        total = (postGenerateOrderModel.invoice!.total ?? 0.0).toDouble();
+        orderType = postGenerateOrderModel.order!.orderType ?? '';
+        orderStatus = postGenerateOrderModel.invoice!.orderStatus ?? '';
+        tableName = orderType == 'LINE' || orderType == 'AC'
+            ? postGenerateOrderModel.invoice!.tableName.toString()
+            : 'N/A';
+        waiterName = orderType == 'LINE' || orderType == 'AC'
+            ? postGenerateOrderModel.invoice!.waiterName.toString()
+            : 'N/A';
+        date = formatInvoiceDate(postGenerateOrderModel.invoice?.date);
+      }
+
       Navigator.of(context).pop();
+
+      // Show the same receipt dialog as before
       await showDialog(
         context: context,
         builder: (_) => Dialog(
           backgroundColor: Colors.transparent,
           insetPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
           child: SingleChildScrollView(
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -321,16 +365,14 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                       ElevatedButton.icon(
                         onPressed: () async {
                           try {
-                            await Future.delayed(
-                                const Duration(milliseconds: 300));
+                            await Future.delayed(const Duration(milliseconds: 300));
                             await WidgetsBinding.instance.endOfFrame;
                             Uint8List? imageBytes =
-                                await captureMonochromeReceipt(receiptKey);
+                            await captureMonochromeReceipt(receiptKey);
 
                             if (imageBytes != null) {
                               await printerService.init();
                               await printerService.printBitmap(imageBytes);
-                              //await Future.delayed(Duration(seconds: 3));
                               await printerService.fullCut();
                               Navigator.pop(context);
                             }
@@ -370,19 +412,16 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       Navigator.of(context).pop();
       if (e is DioException) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: ${e.message}"),
-          ),
+          SnackBar(content: Text("Error: ${e.message}")),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Something went wrong: ${e.toString()}"),
-          ),
+          SnackBar(content: Text("Something went wrong: ${e.toString()}")),
         );
       }
     }
   }
+
 
   Future<void> printUpdateOrderReceipt() async {
     try {

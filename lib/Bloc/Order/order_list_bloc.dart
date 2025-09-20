@@ -3,13 +3,47 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
+import 'package:simple/ModelClass/Order/Delete_order_model.dart';
+import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
 import 'package:simple/ModelClass/Order/get_order_list_today_model.dart';
+import 'package:simple/ModelClass/Order/get_order_list_today_model.dart' as order;
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/ModelClass/User/getUserModel.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Order/hive_ordertoday_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive-pending_delete_service.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_orderstoday.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_table_stock.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_user_service.dart';
+
+import '../Response/errorResponse.dart';
+import '../Response/errorResponse.dart' as order;
+
+// Delete Order State Classes
+class DeleteOrderInitial {
+  const DeleteOrderInitial();
+}
+
+class DeleteOrderLoadingState {
+  const DeleteOrderLoadingState();
+}
+
+class DeleteOrderSuccessState {
+  final String orderId;   // The deleted order's ID
+  final String message;   // Success message
+  DeleteOrderSuccessState({required this.orderId, required this.message});
+}
+
+class DeleteOrderOfflineSavedState {
+  final String orderId;
+  final String message;
+  DeleteOrderOfflineSavedState(this.orderId, this.message);
+}
+
+class DeleteOrderFailureState {
+  final String message;
+  DeleteOrderFailureState(this.message);
+}
+
 
 abstract class OrderTodayEvent {}
 
@@ -39,32 +73,28 @@ class WaiterDine extends OrderTodayEvent {}
 
 class UserDetails extends OrderTodayEvent {}
 
+class StockDetails extends OrderTodayEvent {}
 class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
   OrderTodayBloc() : super(dynamic) {
     on<OrderTodayList>((event, emit) async {
       final hiveService = HiveOrderTodayService();
-
       try {
         final connectivityResult = await Connectivity().checkConnectivity();
 
         ConnectivityResult result;
         if (connectivityResult is List) {
-          // Web: handle edge case
           if (connectivityResult.isNotEmpty && connectivityResult.first is ConnectivityResult) {
             result = connectivityResult.first as ConnectivityResult;
           } else {
             result = ConnectivityResult.none;
           }
         } else if (connectivityResult is ConnectivityResult) {
-          // Mobile / Desktop
           result = connectivityResult as ConnectivityResult;
         } else {
-          // Unknown / unexpected type
           result = ConnectivityResult.none;
         }
 
         final hasConnection = result != ConnectivityResult.none;
-
 
         if (hasConnection) {
           // ✅ Online mode
@@ -78,7 +108,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
             );
 
             if (value.success == true && value.data != null) {
-              // Save to Hive
+              // Save to Hive - this will now save both the list AND individual orders
               await hiveService.saveOrders(value);
             }
 
@@ -89,10 +119,10 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
             if (cached != null) {
               emit(cached);
             } else {
-              emit(GetOrderListTodayModel(
+              emit(order.GetOrderListTodayModel(
                 success: false,
                 data: [],
-                errorResponse: ErrorResponse(
+                errorResponse: order.ErrorResponse(
                   message: error.toString(),
                   statusCode: 500,
                 ),
@@ -106,10 +136,10 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
             debugPrint('📴 Loaded ${cached.data?.length ?? 0} offline orders');
             emit(cached);
           } else {
-            emit(GetOrderListTodayModel(
+            emit(order.GetOrderListTodayModel(
               success: false,
               data: [],
-              errorResponse: ErrorResponse(
+              errorResponse: order.ErrorResponse(
                 message: 'No offline order data available',
                 statusCode: 503,
               ),
@@ -122,9 +152,137 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         if (cached != null) {
           emit(cached);
         } else {
-          emit(GetOrderListTodayModel(
+          emit(order.GetOrderListTodayModel(
             success: false,
             data: [],
+            errorResponse: order.ErrorResponse(
+              message: e.toString(),
+              statusCode: 500,
+            ),
+          ));
+        }
+      }
+    });
+    // Replace your existing DeleteOrder handler in OrderTodayBloc with this:
+
+    on<DeleteOrder>((event, emit) async {
+      if (event.orderId == null || event.orderId!.isEmpty) {
+        emit(DeleteOrderFailureState("Invalid Order ID"));
+        return;
+      }
+
+      emit(DeleteOrderLoadingState());
+
+      await ApiProvider()
+          .deleteOrderAPI(event.orderId)
+          .then((result) async {
+        if (result.errorResponse != null) {
+          final statusCode = result.errorResponse!.statusCode;
+          final message = result.errorResponse!.message ?? "Unknown error";
+
+          if (statusCode == 503) {
+            // Offline save
+            await HiveServicedelete.addPendingDelete(event.orderId!);
+            emit(DeleteOrderOfflineSavedState(event.orderId!, "Delete request saved offline"));
+          } else if (statusCode == 401) {
+            emit(DeleteOrderFailureState("Unable to delete order"));
+          } else if (statusCode == 404) {
+            emit(DeleteOrderFailureState("Unable to delete order"));
+          } else {
+            emit(DeleteOrderFailureState("Unable to delete order"));
+          }
+        } else {
+          // Online success
+          emit(DeleteOrderSuccessState(orderId: event.orderId!, message: "Order deleted successfully"));
+        }
+      }).catchError((error) async {
+        // If API fails, save offline
+        try {
+          await HiveServicedelete.addPendingDelete(event.orderId!);
+          emit(DeleteOrderOfflineSavedState(
+            event.orderId!,
+            "Error occurred. Delete request saved offline for later sync.",
+          ));
+        } catch (hiveError) {
+          emit(DeleteOrderFailureState("Failed to process delete request."));
+        }
+      });
+    });
+
+
+    on<ViewOrder>((event, emit) async {
+      final hiveService = HiveOrderTodayService();
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+
+        ConnectivityResult result;
+        if (connectivityResult is List) {
+          if (connectivityResult.isNotEmpty && connectivityResult.first is ConnectivityResult) {
+            result = connectivityResult.first as ConnectivityResult;
+          } else {
+            result = ConnectivityResult.none;
+          }
+        } else if (connectivityResult is ConnectivityResult) {
+          result = connectivityResult as ConnectivityResult;
+        } else {
+          result = ConnectivityResult.none;
+        }
+
+        final hasConnection = result != ConnectivityResult.none;
+
+        if (hasConnection) {
+          // ✅ Online mode
+          try {
+            final value = await ApiProvider().viewOrderAPI(event.orderId);
+
+            if (value.success == true && value.data != null) {
+              // Save to Hive
+              await hiveService.saveOrderDetails(event.orderId!, value);
+            }
+
+            emit(value);
+          } catch (error) {
+            debugPrint("❌ ViewOrder API failed, fallback to Hive: $error");
+            final cached = await hiveService.getOrderDetails(event.orderId!);
+            if (cached != null) {
+              emit(cached);
+            } else {
+              emit(GetViewOrderModel(
+                success: false,
+                data: null,
+                errorResponse: ErrorResponse(
+                  message: error.toString(),
+                  statusCode: 500,
+                ),
+              ));
+            }
+          }
+        } else {
+          // 📴 Offline mode
+          final cached = await hiveService.getOrderDetails(event.orderId!);
+          if (cached != null) {
+            debugPrint('📴 Loaded offline order details for ID: ${event.orderId}');
+            emit(cached);
+          } else {
+            emit(GetViewOrderModel(
+              success: false,
+              data: null,
+              errorResponse: ErrorResponse(
+                message: 'No offline order details available for this order',
+                statusCode: 503,
+              ),
+            ));
+          }
+        }
+      } catch (e) {
+        debugPrint('❌ ViewOrder Bloc Error: $e');
+        final cached = await hiveService.getOrderDetails(event.orderId!);
+        if (cached != null) {
+          emit(cached);
+        } else {
+          emit(GetViewOrderModel(
+            success: false,
+            data: null,
             errorResponse: ErrorResponse(
               message: e.toString(),
               statusCode: 500,
@@ -133,20 +291,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         }
       }
     });
-    on<DeleteOrder>((event, emit) async {
-      await ApiProvider().deleteOrderAPI(event.orderId).then((value) {
-        emit(value);
-      }).catchError((error) {
-        emit(error);
-      });
-    });
-    on<ViewOrder>((event, emit) async {
-      await ApiProvider().viewOrderAPI(event.orderId).then((value) {
-        emit(value);
-      }).catchError((error) {
-        emit(error);
-      });
-    });
+
     on<TableDine>((event, emit) async {
       try {
         final connectivityResult = await Connectivity().checkConnectivity();

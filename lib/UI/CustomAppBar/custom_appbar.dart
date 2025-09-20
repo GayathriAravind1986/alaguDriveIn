@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Category/category_bloc.dart';
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
-import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service_table_stock.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/text_styles.dart';
 import 'package:simple/UI/Authentication/login_screen.dart';
@@ -53,7 +52,7 @@ class CustomAppBarView extends StatefulWidget {
 
 class CustomAppBarViewState extends State<CustomAppBarView> {
   GetStockMaintanencesModel getStockMaintanencesModel =
-      GetStockMaintanencesModel();
+  GetStockMaintanencesModel();
   bool stockLoad = false;
   @override
   void initState() {
@@ -81,63 +80,18 @@ class CustomAppBarViewState extends State<CustomAppBarView> {
           margin: EdgeInsets.only(left: 10),
           child: Row(
             children: [
-              // getStockMaintanencesModel.data?.name != null
-              //     ? Text(
-              //         getStockMaintanencesModel.data!.name.toString(),
-              //         style: TextStyle(
-              //           fontSize: 20,
-              //           fontWeight: FontWeight.bold,
-              //           color: appPrimaryColor,
-              //         ),
-              //       )
-              //     : Text(""),
               getStockMaintanencesModel.data?.name != null
-                  ? Row(
-                      children: [
-                        Text(
-                          getStockMaintanencesModel.data!.name.toString(),
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: appPrimaryColor,
-                          ),
-                        ),
-                        // Add offline indicator if data is from Hive
-                        FutureBuilder<DateTime?>(
-                          future:
-                              HiveStockTableService.getLastStockUpdateTime(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData) {
-                              final lastUpdate = snapshot.data!;
-                              final now = DateTime.now();
-                              final difference = now.difference(lastUpdate);
-
-                              if (difference.inHours > 1) {
-                                return Container(
-                                  margin: EdgeInsets.only(left: 8),
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'OFFLINE',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.orange,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                            return Container();
-                          },
-                        ),
-                      ],
-                    )
-                  : Text("Restaurant"),
+                  ? Expanded(
+                child: Text(
+                  getStockMaintanencesModel.data!.name.toString(),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: appPrimaryColor,
+                  ),
+                ),
+              )
+                  : Text(""),
               SizedBox(width: size.width * 0.2),
               Row(
                 children: [
@@ -197,25 +151,43 @@ class CustomAppBarViewState extends State<CustomAppBarView> {
                   SizedBox(width: 16),
                   (getStockMaintanencesModel.data?.stockMaintenance == true)
                       ? TextButton.icon(
-                          onPressed: () => widget.onTabSelected(3),
-                          icon: Icon(
-                            Icons.inventory,
-                            size: 30,
-                            color: widget.selectedIndex == 3
-                                ? appPrimaryColor
-                                : greyColor,
-                          ),
-                          label: Text(
-                            "Stockin",
-                            style: MyTextStyle.f16(
-                              weight: FontWeight.bold,
-                              widget.selectedIndex == 3
-                                  ? appPrimaryColor
-                                  : greyColor,
-                            ),
-                          ),
-                        )
+                    onPressed: () => widget.onTabSelected(3),
+                    icon: Icon(
+                      Icons.inventory,
+                      size: 30,
+                      color: widget.selectedIndex == 3
+                          ? appPrimaryColor
+                          : greyColor,
+                    ),
+                    label: Text(
+                      "Stockin",
+                      style: MyTextStyle.f16(
+                        weight: FontWeight.bold,
+                        widget.selectedIndex == 3
+                            ? appPrimaryColor
+                            : greyColor,
+                      ),
+                    ),
+                  )
                       : Container(),
+                  SizedBox(width: 16),
+                  TextButton.icon(
+                    onPressed: () => widget.onTabSelected(4),
+                    icon: Icon(
+                      Icons.note_alt_outlined,
+                      size: 30,
+                      color: widget.selectedIndex == 4
+                          ? appPrimaryColor
+                          : greyColor,
+                    ),
+                    label: Text(
+                      "Products",
+                      style: MyTextStyle.f16(
+                        weight: FontWeight.bold,
+                        widget.selectedIndex == 4 ? appPrimaryColor : greyColor,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -269,7 +241,7 @@ class CustomAppBarViewState extends State<CustomAppBarView> {
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen()),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 }

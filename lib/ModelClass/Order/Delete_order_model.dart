@@ -22,6 +22,7 @@ class DeleteOrderModel {
       errorResponse = null;
     }
   }
+
   bool? _success;
   String? _message;
   ErrorResponse? errorResponse;
