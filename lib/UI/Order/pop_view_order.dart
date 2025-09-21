@@ -58,7 +58,7 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
 
     List<Map<String, dynamic>> items = (invoice.invoiceItems ?? [])
         .map((e) => {
-      'name': e.tamilname ?? 'Unknown Item',
+      'name': e.name ?? 'Unknown Item',
       'qty': e.qty ?? 0,
       'price': (e.basePrice ?? 0).toDouble(),
       'total': ((e.qty ?? 0) * (e.basePrice ?? 0)).toDouble(),
@@ -146,7 +146,7 @@ class _ThermalReceiptDialogState extends State<ThermalReceiptDialog> {
                   waiterName: waiterName,
                   orderType: orderType,
                   date: date,
-                  status: orderStatus,
+                  status: orderStatus, finalTax: [],
                 ),
               ),
               const SizedBox(height: 20),

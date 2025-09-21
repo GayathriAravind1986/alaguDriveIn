@@ -37,6 +37,7 @@ class HiveOrderTodayService {
       }
     }
 
+    print(detailsBox);
     debugPrint("✅ Orders saved offline as JSON string with ${data.data?.length ?? 0} individual orders");
   }
 
@@ -75,6 +76,7 @@ class HiveOrderTodayService {
     final data = box.get('orders_today');
     if (data != null) {
       final decoded = jsonDecode(data);
+      print(decoded);
       return order.GetOrderListTodayModel.fromJson(decoded);
     }
     return null;
@@ -98,7 +100,10 @@ class HiveOrderTodayService {
     await box.put(orderId, jsonEncode(orderData.toJson()));
     await idsBox.put(orderId, true); // Mark as stored
     debugPrint("✅ Order details for $orderId saved offline");
+    print(box);
   }
+
+
 
   /// Get individual order details by order ID
   Future<view_order.GetViewOrderModel?> getOrderDetails(String orderId) async {
@@ -107,6 +112,7 @@ class HiveOrderTodayService {
       final data = box.get(orderId);
       if (data != null) {
         final decoded = jsonDecode(data);
+        print(decoded);
         return view_order.GetViewOrderModel.fromJson(decoded);
       }
       return null;

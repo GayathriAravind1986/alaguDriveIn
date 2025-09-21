@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hive/hive.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
     as category;
+import 'package:simple/UI/Home_screen/home_screen.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
     as product;
 import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart'
@@ -38,7 +40,7 @@ class FoodCategoryOffline extends FoodCategoryEvent {
 class FoodProductItem extends FoodCategoryEvent {
   String catId;
   String searchKey;
-  FoodProductItem(this.catId, this.searchKey);
+  FoodProductItem(this.catId, this.searchKey, String text);
 }
 
 class FoodProductItemOffline extends FoodCategoryEvent {
@@ -701,24 +703,42 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         throw Exception('No billing session found');
       }
 
+      // Normalize items for offline payload (ensure image, qty, etc.)
+      final normalizedItems = billingSession.items?.map((item) {
+        final map = item.toMap();
+        return {
+          "product": map["_id"] ?? map["product"],
+          "name": map["name"] ?? "",
+          "image": map["image"] ?? "",
+          "quantity": map["qty"] ?? map["quantity"] ?? 0,
+          "unitPrice": map["unitPrice"] ?? map["basePrice"] ?? 0,
+          "subtotal": ((map["qty"] ?? map["quantity"] ?? 0) *
+              (map["unitPrice"] ?? map["basePrice"] ?? 0)),
+        };
+      }).toList();
+
       // Save order for later sync
       final orderId = await HiveService.saveOfflineOrder(
-        orderPayloadJson: event.orderPayloadJson,
+        orderPayloadJson: jsonEncode({
+          ...orderData,
+          "items": normalizedItems,
+        }),
         orderStatus: orderData['orderStatus'] ?? 'PENDING_SYNC',
         orderType: orderData['orderType'] ?? 'DINE-IN',
         tableId: orderData['tableId'],
         total: billingSession.total ?? 0.0,
-        items: billingSession.items?.map((item) => item.toMap()).toList() ?? [],
+        items: normalizedItems ?? [],
         syncAction: 'CREATE',
       );
 
-      // Clear cart
+      // Clear cart/session
       await HiveService.clearCart();
       await HiveService.clearBillingSession();
 
+      // Fetch the saved order back from Hive
+
       // Create offline success response
       final offlineResponse = generate.PostGenerateOrderModel(
-        //success: true,
         invoice: generate.Invoice(
           orderNumber: orderId,
           orderStatus: 'PENDING_SYNC',
@@ -727,13 +747,11 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           tableName: orderData['tableId'],
         ),
         message: 'Order saved offline. Will sync when connection is restored.',
-        errorResponse: null,
       );
 
       emit(offlineResponse);
     } catch (e) {
       emit(generate.PostGenerateOrderModel(
-        //    success: false,
         errorResponse: ErrorResponse(
           message: 'Failed to save offline order: $e',
           statusCode: 500,
@@ -741,6 +759,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       ));
     }
   }
+
 
   Future<void> _handleOfflineOrderUpdate(
       UpdateOrder event, Emitter emit) async {

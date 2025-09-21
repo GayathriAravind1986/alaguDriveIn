@@ -20,7 +20,7 @@ Widget getThermalReceiptWidget({
   required String orderType,
   required String paidBy,
   required String date,
-  required String status,
+  required String status, required List<Map<String, dynamic>> finalTax,
 }) {
   return Container(
     width: 384, // Standard thermal printer width

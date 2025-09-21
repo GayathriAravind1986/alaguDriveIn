@@ -18,7 +18,7 @@ class HiveCartItem extends HiveObject {
   double? basePrice;
 
   @HiveField(4)
-  int? qty;
+  double? qty;
 
   @HiveField(5)
   int? availableQuantity;
@@ -40,6 +40,34 @@ class HiveCartItem extends HiveObject {
     this.createdAt,
   });
 
+  /// Convert API map -> HiveCartItem safely
+  static HiveCartItem fromMap(Map<String, dynamic> map) {
+    return HiveCartItem(
+      id: map["_id"]?.toString(),
+      name: map["name"]?.toString(),
+      image: map["image"]?.toString(),
+      basePrice: map["basePrice"] != null
+          ? (map["basePrice"] is int
+          ? (map["basePrice"] as int).toDouble()
+          : map["basePrice"] as double)
+          : 0.0,
+      qty: map["qty"] != null
+          ? (map["qty"] is int
+          ? (map["qty"] as int).toDouble()
+          : map["qty"] as double)
+          : 0.0,
+      availableQuantity: map["availableQuantity"] != null
+          ? int.tryParse(map["availableQuantity"].toString())
+          : 0,
+      selectedAddons: (map["selectedAddons"] as List<dynamic>?)
+          ?.map((addon) => HiveSelectedAddon.fromMap(
+          Map<String, dynamic>.from(addon)))
+          .toList(),
+      createdAt: DateTime.now(),
+    );
+  }
+
+  /// Convert HiveCartItem -> Map (for API payloads)
   Map<String, dynamic> toMap() {
     return {
       "_id": id,
@@ -49,22 +77,19 @@ class HiveCartItem extends HiveObject {
       "qty": qty,
       "availableQuantity": availableQuantity,
       "selectedAddons":
-          selectedAddons?.map((addon) => addon.toMap()).toList() ?? [],
+      selectedAddons?.map((addon) => addon.toMap()).toList() ?? [],
+      "createdAt": createdAt?.toIso8601String(),
     };
   }
-
-  static HiveCartItem fromMap(Map<String, dynamic> map) {
+  factory HiveCartItem.fromJson(Map<String, dynamic> json) {
     return HiveCartItem(
-      id: map["_id"],
-      name: map["name"],
-      image: map["image"],
-      basePrice: map["basePrice"]?.toDouble(),
-      qty: map["qty"],
-      availableQuantity: map["availableQuantity"],
-      selectedAddons: (map["selectedAddons"] as List<dynamic>?)
-          ?.map((addon) => HiveSelectedAddon.fromMap(addon))
-          .toList(),
-      createdAt: DateTime.now(),
+      id: json['_id'] ?? json['product'],   // handle both cases
+      name: json['name'] ?? '',
+      image: json['image'] ?? '',          // default empty string if null
+      basePrice: json['unitPrice'] ?? json['basePrice'] ?? 0,
+      qty: json['quantity'] ?? json['qty'] ?? 0,
+      // : json['subtotal'] ?? 0,
     );
   }
+
 }

@@ -56,6 +56,7 @@ Future<void> main() async {
     // Ensure all adapters are registered only once.
     Hive.registerAdapter(HiveCategoryAdapter());
     Hive.registerAdapter(HiveProductAdapter());
+    // Hive.registerAdapter(HiveAddonAdapter());
     Hive.registerAdapter(HiveCartItemAdapter());
     Hive.registerAdapter(HiveSelectedAddonAdapter());
     Hive.registerAdapter(HiveOrderAdapter());

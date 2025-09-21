@@ -38,6 +38,9 @@ dependencies:
   shared_preferences: ^2.0.15
   overlay_support:
   flutter_spinkit:
+  esc_pos_utils_plus:
+  print_bluetooth_thermal:
+  flutter_esc_pos_network:
   flutter_svg:
   cached_network_image:
   intl:

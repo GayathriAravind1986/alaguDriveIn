@@ -178,7 +178,6 @@ class HiveService {
     final saved = ordersBox.get(orderId);
     print("Orders saved in Hive after: ${ordersBox.values.length}");
     print("✅ Order saved: $saved");
-
     return orderId;
   }
 

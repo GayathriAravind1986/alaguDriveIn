@@ -29,7 +29,7 @@ class PostGenerateOrderModel {
       });
     }
     _invoice =
-        json['invoice'] != null ? Invoice.fromJson(json['invoice']) : null;
+    json['invoice'] != null ? Invoice.fromJson(json['invoice']) : null;
     if (json['errors'] != null && json['errors'] is Map<String, dynamic>) {
       errorResponse = ErrorResponse.fromJson(json['errors']);
     } else {
@@ -191,9 +191,11 @@ class Invoice {
     String? gstNumber,
     String? currencySymbol,
     String? printType,
+    String? thermalIp,
     List<InvoiceItems>? invoiceItems,
     num? subtotal,
     num? salesTax,
+    List<FinalTaxes>? finalTaxes,
     num? total,
     String? orderNumber,
     String? orderStatus,
@@ -213,8 +215,10 @@ class Invoice {
     _gstNumber = gstNumber;
     _currencySymbol = currencySymbol;
     _printType = printType;
+    _thermalIp = thermalIp;
     _invoiceItems = invoiceItems;
     _subtotal = subtotal;
+    _finalTaxes = finalTaxes;
     _salesTax = salesTax;
     _total = total;
     _orderNumber = orderNumber;
@@ -237,6 +241,7 @@ class Invoice {
     _gstNumber = json['gstNumber'];
     _currencySymbol = json['currencySymbol'];
     _printType = json['printType'];
+    _thermalIp = json['thermalIp'];
     if (json['invoice_items'] != null) {
       _invoiceItems = [];
       json['invoice_items'].forEach((v) {
@@ -244,6 +249,12 @@ class Invoice {
       });
     }
     _subtotal = json['subtotal'];
+    if (json['finalTaxes'] != null) {
+      _finalTaxes = [];
+      json['finalTaxes'].forEach((v) {
+        _finalTaxes?.add(FinalTaxes.fromJson(v));
+      });
+    }
     _salesTax = json['salesTax'];
     _total = json['total'];
     _orderNumber = json['orderNumber'];
@@ -269,8 +280,10 @@ class Invoice {
   String? _gstNumber;
   String? _currencySymbol;
   String? _printType;
+  String? _thermalIp;
   List<InvoiceItems>? _invoiceItems;
   num? _subtotal;
+  List<FinalTaxes>? _finalTaxes;
   num? _salesTax;
   num? _total;
   String? _orderNumber;
@@ -291,8 +304,10 @@ class Invoice {
     String? gstNumber,
     String? currencySymbol,
     String? printType,
+    String? thermalIp,
     List<InvoiceItems>? invoiceItems,
     num? subtotal,
+    List<FinalTaxes>? finalTaxes,
     num? salesTax,
     num? total,
     String? orderNumber,
@@ -314,8 +329,10 @@ class Invoice {
         gstNumber: gstNumber ?? _gstNumber,
         currencySymbol: currencySymbol ?? _currencySymbol,
         printType: printType ?? _printType,
+        thermalIp: thermalIp ?? _thermalIp,
         invoiceItems: invoiceItems ?? _invoiceItems,
         subtotal: subtotal ?? _subtotal,
+        finalTaxes: finalTaxes ?? _finalTaxes,
         salesTax: salesTax ?? _salesTax,
         total: total ?? _total,
         orderNumber: orderNumber ?? _orderNumber,
@@ -336,8 +353,10 @@ class Invoice {
   String? get gstNumber => _gstNumber;
   String? get currencySymbol => _currencySymbol;
   String? get printType => _printType;
+  String? get thermalIp => _thermalIp;
   List<InvoiceItems>? get invoiceItems => _invoiceItems;
   num? get subtotal => _subtotal;
+  List<FinalTaxes>? get finalTaxes => _finalTaxes;
   num? get salesTax => _salesTax;
   num? get total => _total;
   String? get orderNumber => _orderNumber;
@@ -360,11 +379,15 @@ class Invoice {
     map['gstNumber'] = _gstNumber;
     map['currencySymbol'] = _currencySymbol;
     map['printType'] = _printType;
+    map['thermalIp'] = _thermalIp;
     if (_invoiceItems != null) {
       map['invoice_items'] = _invoiceItems?.map((v) => v.toJson()).toList();
     }
     map['subtotal'] = _subtotal;
     map['salesTax'] = _salesTax;
+    if (_finalTaxes != null) {
+      map['finalTaxes'] = _finalTaxes?.map((v) => v.toJson()).toList();
+    }
     map['total'] = _total;
     map['orderNumber'] = _orderNumber;
     map['orderStatus'] = _orderStatus;
@@ -379,6 +402,48 @@ class Invoice {
     map['waiterName'] = _waiterName;
     map['orderType'] = _orderType;
     map['tipAmount'] = _tipAmount;
+    return map;
+  }
+}
+
+class FinalTaxes {
+  FinalTaxes({
+    String? name,
+    num? percentage,
+    num? amount,
+  }) {
+    _name = name;
+    _percentage = percentage;
+    _amount = amount;
+  }
+
+  FinalTaxes.fromJson(dynamic json) {
+    _name = json['name'];
+    _percentage = json['percentage'];
+    _amount = json['amount'];
+  }
+  String? _name;
+  num? _percentage;
+  num? _amount;
+  FinalTaxes copyWith({
+    String? name,
+    num? percentage,
+    num? amount,
+  }) =>
+      FinalTaxes(
+        name: name ?? _name,
+        percentage: percentage ?? _percentage,
+        amount: amount ?? _amount,
+      );
+  String? get name => _name;
+  num? get percentage => _percentage;
+  num? get amount => _amount;
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{};
+    map['name'] = _name;
+    map['percentage'] = _percentage;
+    map['amount'] = _amount;
     return map;
   }
 }
@@ -429,7 +494,6 @@ class Kot {
 class InvoiceItems {
   InvoiceItems({
     String? name,
-    String? tamilname,
     num? basePrice,
     num? qty,
     num? taxPrice,
@@ -437,7 +501,6 @@ class InvoiceItems {
     bool? isAddon,
   }) {
     _name = name;
-    _tamilname = tamilname;
     _basePrice = basePrice;
     _qty = qty;
     _taxPrice = taxPrice;
@@ -447,7 +510,6 @@ class InvoiceItems {
 
   InvoiceItems.fromJson(dynamic json) {
     _name = json['name'];
-    _tamilname = json['tamilname'];
     _basePrice = json['basePrice'];
     _qty = json['qty'];
     _taxPrice = json['taxPrice'];
@@ -455,7 +517,6 @@ class InvoiceItems {
     _isAddon = json['isAddon'];
   }
   String? _name;
-  String? _tamilname;
   num? _basePrice;
   num? _qty;
   num? _taxPrice;
@@ -463,7 +524,6 @@ class InvoiceItems {
   bool? _isAddon;
   InvoiceItems copyWith({
     String? name,
-    String? tamilname,
     num? basePrice,
     num? qty,
     num? taxPrice,
@@ -472,7 +532,6 @@ class InvoiceItems {
   }) =>
       InvoiceItems(
         name: name ?? _name,
-        tamilname: tamilname ?? _tamilname,
         basePrice: basePrice ?? _basePrice,
         qty: qty ?? _qty,
         taxPrice: taxPrice ?? _taxPrice,
@@ -480,7 +539,6 @@ class InvoiceItems {
         isAddon: isAddon ?? _isAddon,
       );
   String? get name => _name;
-  String? get tamilname => _tamilname;
   num? get basePrice => _basePrice;
   num? get qty => _qty;
   num? get taxPrice => _taxPrice;
@@ -490,7 +548,6 @@ class InvoiceItems {
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
     map['name'] = _name;
-    map['tamilname'] = _tamilname;
     map['basePrice'] = _basePrice;
     map['qty'] = _qty;
     map['taxPrice'] = _taxPrice;
@@ -513,6 +570,7 @@ class Order {
     String? id,
     String? orderNumber,
     List<Items>? items,
+    List<FinalTaxes>? finalTaxes,
     num? subtotal,
     String? orderType,
     num? tax,
@@ -522,6 +580,7 @@ class Order {
     _id = id;
     _orderNumber = orderNumber;
     _items = items;
+    _finalTaxes = finalTaxes;
     _subtotal = subtotal;
     _orderType = orderType;
     _tax = tax;
@@ -538,6 +597,12 @@ class Order {
         _items?.add(Items.fromJson(v));
       });
     }
+    if (json['finalTaxes'] != null) {
+      _finalTaxes = [];
+      json['finalTaxes'].forEach((v) {
+        _finalTaxes?.add(FinalTaxes.fromJson(v));
+      });
+    }
     _subtotal = json['subtotal'];
     _orderType = json['orderType'];
     _tax = json['tax'];
@@ -547,6 +612,7 @@ class Order {
   String? _id;
   String? _orderNumber;
   List<Items>? _items;
+  List<FinalTaxes>? _finalTaxes;
   num? _subtotal;
   String? _orderType;
   num? _tax;
@@ -556,6 +622,7 @@ class Order {
     String? id,
     String? orderNumber,
     List<Items>? items,
+    List<FinalTaxes>? finalTaxes,
     num? subtotal,
     String? orderType,
     num? tax,
@@ -566,6 +633,7 @@ class Order {
         id: id ?? _id,
         orderNumber: orderNumber ?? _orderNumber,
         items: items ?? _items,
+        finalTaxes: finalTaxes ?? _finalTaxes,
         subtotal: subtotal ?? _subtotal,
         orderType: orderType ?? _orderType,
         tax: tax ?? _tax,
@@ -575,6 +643,7 @@ class Order {
   String? get id => _id;
   String? get orderNumber => _orderNumber;
   List<Items>? get items => _items;
+  List<FinalTaxes>? get finalTaxes => _finalTaxes;
   num? get subtotal => _subtotal;
   String? get orderType => _orderType;
   num? get tax => _tax;
@@ -587,6 +656,9 @@ class Order {
     map['orderNumber'] = _orderNumber;
     if (_items != null) {
       map['items'] = _items?.map((v) => v.toJson()).toList();
+    }
+    if (_finalTaxes != null) {
+      map['finalTaxes'] = _finalTaxes?.map((v) => v.toJson()).toList();
     }
     map['subtotal'] = _subtotal;
     map['orderType'] = _orderType;
@@ -643,7 +715,6 @@ class Items {
   Items({
     String? product,
     String? name,
-    String? tamilname,
     num? quantity,
     num? unitPrice,
     List<Addons>? addons,
@@ -653,7 +724,6 @@ class Items {
   }) {
     _product = product;
     _name = name;
-    _tamilname = tamilname;
     _quantity = quantity;
     _unitPrice = unitPrice;
     _addons = addons;
@@ -665,7 +735,6 @@ class Items {
   Items.fromJson(dynamic json) {
     _product = json['product'];
     _name = json['name'];
-    _tamilname = json['tamilname'];
     _quantity = json['quantity'];
     _unitPrice = json['unitPrice'];
     if (json['addons'] != null) {
@@ -680,7 +749,6 @@ class Items {
   }
   String? _product;
   String? _name;
-  String? _tamilname;
   num? _quantity;
   num? _unitPrice;
   List<Addons>? _addons;
@@ -690,7 +758,6 @@ class Items {
   Items copyWith({
     String? product,
     String? name,
-    String? tamilname,
     num? quantity,
     num? unitPrice,
     List<Addons>? addons,
@@ -701,7 +768,6 @@ class Items {
       Items(
         product: product ?? _product,
         name: name ?? _name,
-        tamilname: tamilname ?? _tamilname,
         quantity: quantity ?? _quantity,
         unitPrice: unitPrice ?? _unitPrice,
         addons: addons ?? _addons,
@@ -711,7 +777,6 @@ class Items {
       );
   String? get product => _product;
   String? get name => _name;
-  String? get tamilname => _tamilname;
   num? get quantity => _quantity;
   num? get unitPrice => _unitPrice;
   List<Addons>? get addons => _addons;
@@ -723,7 +788,6 @@ class Items {
     final map = <String, dynamic>{};
     map['product'] = _product;
     map['name'] = _name;
-    map['tamilname'] = _tamilname;
     map['quantity'] = _quantity;
     map['unitPrice'] = _unitPrice;
     if (_addons != null) {

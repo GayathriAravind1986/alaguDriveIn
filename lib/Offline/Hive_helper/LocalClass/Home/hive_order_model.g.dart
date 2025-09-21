@@ -28,13 +28,20 @@ class HiveOrderAdapter extends TypeAdapter<HiveOrder> {
       items: (fields[8] as List?)?.cast<HiveCartItem>(),
       syncAction: fields[9] as String?,
       existingOrderId: fields[10] as String?,
+      businessName: fields[11] as String?,
+      address: fields[12] as String?,
+      gst: fields[13] as String?,
+      taxPercent: fields[14] as double?,
+      paymentMethod: fields[15] as String?,
+      phone: fields[16] as String?,
+      waiterName: fields[17] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HiveOrder obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -56,7 +63,21 @@ class HiveOrderAdapter extends TypeAdapter<HiveOrder> {
       ..writeByte(9)
       ..write(obj.syncAction)
       ..writeByte(10)
-      ..write(obj.existingOrderId);
+      ..write(obj.existingOrderId)
+      ..writeByte(11)
+      ..write(obj.businessName)
+      ..writeByte(12)
+      ..write(obj.address)
+      ..writeByte(13)
+      ..write(obj.gst)
+      ..writeByte(14)
+      ..write(obj.taxPercent)
+      ..writeByte(15)
+      ..write(obj.paymentMethod)
+      ..writeByte(16)
+      ..write(obj.phone)
+      ..writeByte(17)
+      ..write(obj.waiterName);
   }
 
   @override

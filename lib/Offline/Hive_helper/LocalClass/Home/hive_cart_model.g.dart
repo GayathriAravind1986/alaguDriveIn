@@ -21,7 +21,7 @@ class HiveCartItemAdapter extends TypeAdapter<HiveCartItem> {
       name: fields[1] as String?,
       image: fields[2] as String?,
       basePrice: fields[3] as double?,
-      qty: fields[4] as int?,
+      qty: fields[4] as double?,
       availableQuantity: fields[5] as int?,
       selectedAddons: (fields[6] as List?)?.cast<HiveSelectedAddon>(),
       createdAt: fields[7] as DateTime?,
