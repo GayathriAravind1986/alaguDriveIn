@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
+// import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_addon_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
     as product;
@@ -28,10 +29,8 @@ Future<void> saveProductsToHive(
                 ))
             .toList(),
       );
-
       await box.add(hiveProduct);
     }
-
     debugPrint('✅ Saved ${products.length} products for category: $categoryId');
   } catch (e) {
     debugPrint('❌ Error saving products to Hive: $e');

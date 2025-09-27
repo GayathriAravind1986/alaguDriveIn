@@ -1,8 +1,5 @@
 import 'package:simple/Bloc/Response/errorResponse.dart';
 
-/// success : true
-/// data : {"location":{"address":"Tenkasi main road","city":"Alangualam","state":"Tamil Nadu","zipCode":"627851","country":"India"},"_id":"68902eb61432ba566a420059","name":"Alagu Drive In","contactNumber":"+91 0000000000","email":"admin@gmail.com","gstNumber":"00000000000","currencySymbol":"₹","printType":"imin","tipEnabled":false,"createdAt":"2025-08-04T03:53:26.419Z","__v":0,"stockMaintenance":true}
-
 class GetStockMaintanencesModel {
   GetStockMaintanencesModel({
     bool? success,
@@ -11,6 +8,7 @@ class GetStockMaintanencesModel {
   }) {
     _success = success;
     _data = data;
+    this.errorResponse = errorResponse;
   }
 
   GetStockMaintanencesModel.fromJson(dynamic json) {
@@ -22,19 +20,24 @@ class GetStockMaintanencesModel {
       errorResponse = null;
     }
   }
+
   bool? _success;
   Data? _data;
   ErrorResponse? errorResponse;
+
+  bool? get success => _success;
+  Data? get data => _data;
+
   GetStockMaintanencesModel copyWith({
     bool? success,
     Data? data,
+    ErrorResponse? errorResponse,
   }) =>
       GetStockMaintanencesModel(
         success: success ?? _success,
         data: data ?? _data,
+        errorResponse: errorResponse ?? this.errorResponse,
       );
-  bool? get success => _success;
-  Data? get data => _data;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -48,19 +51,6 @@ class GetStockMaintanencesModel {
     return map;
   }
 }
-
-/// location : {"address":"Tenkasi main road","city":"Alangualam","state":"Tamil Nadu","zipCode":"627851","country":"India"}
-/// _id : "68902eb61432ba566a420059"
-/// name : "Alagu Drive In"
-/// contactNumber : "+91 0000000000"
-/// email : "admin@gmail.com"
-/// gstNumber : "00000000000"
-/// currencySymbol : "₹"
-/// printType : "imin"
-/// tipEnabled : false
-/// createdAt : "2025-08-04T03:53:26.419Z"
-/// __v : 0
-/// stockMaintenance : true
 
 class Data {
   Data({
@@ -96,8 +86,7 @@ class Data {
   }
 
   Data.fromJson(dynamic json) {
-    _location =
-    json['location'] != null ? Location.fromJson(json['location']) : null;
+    _location = json['location'] != null ? Location.fromJson(json['location']) : null;
     _id = json['_id'];
     _name = json['name'];
     _contactNumber = json['contactNumber'];
@@ -105,13 +94,22 @@ class Data {
     _gstNumber = json['gstNumber'];
     _currencySymbol = json['currencySymbol'];
     _printType = json['printType'];
-    _tipEnabled = json['tipEnabled'];
-    _stockMaintenance = json['stockMaintenance'];
+
+    // ✅ Defensive parsing for bool or int (0/1)
+    _tipEnabled = json['tipEnabled'] is bool
+        ? json['tipEnabled']
+        : (json['tipEnabled'] == 1);
+
+    _stockMaintenance = json['stockMaintenance'] is bool
+        ? json['stockMaintenance']
+        : (json['stockMaintenance'] == 1);
+
     _createdAt = json['createdAt'];
     _v = json['__v'];
     _logo = json['logo'];
     _image = json['image'];
   }
+
   Location? _location;
   String? _id;
   String? _name;
@@ -126,6 +124,22 @@ class Data {
   num? _v;
   String? _logo;
   String? _image;
+
+  Location? get location => _location;
+  String? get id => _id;
+  String? get name => _name;
+  String? get contactNumber => _contactNumber;
+  String? get email => _email;
+  String? get gstNumber => _gstNumber;
+  String? get currencySymbol => _currencySymbol;
+  String? get printType => _printType;
+  bool? get tipEnabled => _tipEnabled;
+  bool? get stockMaintenance => _stockMaintenance;
+  String? get createdAt => _createdAt;
+  num? get v => _v;
+  String? get logo => _logo;
+  String? get image => _image;
+
   Data copyWith({
     Location? location,
     String? id,
@@ -158,20 +172,6 @@ class Data {
         logo: logo ?? _logo,
         image: image ?? _image,
       );
-  Location? get location => _location;
-  String? get id => _id;
-  String? get name => _name;
-  String? get contactNumber => _contactNumber;
-  String? get email => _email;
-  String? get gstNumber => _gstNumber;
-  String? get currencySymbol => _currencySymbol;
-  String? get printType => _printType;
-  bool? get tipEnabled => _tipEnabled;
-  bool? get stockMaintenance => _stockMaintenance;
-  String? get createdAt => _createdAt;
-  num? get v => _v;
-  String? get logo => _logo;
-  String? get image => _image;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -195,12 +195,6 @@ class Data {
   }
 }
 
-/// address : "Tenkasi main road"
-/// city : "Alangualam"
-/// state : "Tamil Nadu"
-/// zipCode : "627851"
-/// country : "India"
-
 class Location {
   Location({
     String? address,
@@ -223,11 +217,19 @@ class Location {
     _zipCode = json['zipCode'];
     _country = json['country'];
   }
+
   String? _address;
   String? _city;
   String? _state;
   String? _zipCode;
   String? _country;
+
+  String? get address => _address;
+  String? get city => _city;
+  String? get state => _state;
+  String? get zipCode => _zipCode;
+  String? get country => _country;
+
   Location copyWith({
     String? address,
     String? city,
@@ -242,11 +244,6 @@ class Location {
         zipCode: zipCode ?? _zipCode,
         country: country ?? _country,
       );
-  String? get address => _address;
-  String? get city => _city;
-  String? get state => _state;
-  String? get zipCode => _zipCode;
-  String? get country => _country;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};

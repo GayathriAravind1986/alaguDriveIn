@@ -24,7 +24,6 @@ import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_order_model.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/image.dart';
 import 'package:simple/Reusable/space.dart';
@@ -201,7 +200,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   bool cartLoad = false;
   bool isToppingSelected = false;
   GlobalKey normalReceiptKey = GlobalKey();
-  GlobalKey receiptKey = GlobalKey();
   GlobalKey kotReceiptKey = GlobalKey();
   List<BluetoothInfo> _devices = [];
   bool _isScanning = false;
@@ -217,7 +215,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   late IPrinterService printerService;
   late IPrinterService printerServiceThermal;
   String serialNumber = '';
-
   String formatInvoiceDate(String? dateStr) {
     DateTime dateTime;
 
@@ -607,6 +604,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
         await printerService.init();
         await printerService.printBitmap(imageBytes);
         await printerService.fullCut();
+
         Navigator.of(context).pop();
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -629,7 +627,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
     }
   }
 
-  Future<void> printGenerateOrderReceipt({HiveOrder? offlineOrder}) async {
+  Future<void> printGenerateOrderReceipt() async {
     try {
       showDialog(
         context: context,
@@ -637,87 +635,52 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Use offlineOrder if provided, otherwise use online model
-      List<Map<String, dynamic>> items;
-      String businessName;
-      String address;
-      String gst;
-      double taxPercent;
-      String orderNumber;
-      String paymentMethod;
-      String phone;
-      double subTotal;
-      double total;
-      String orderType;
-      String orderStatus;
-      String tableName;
-      String waiterName;
-      String date;
+      List<Map<String, dynamic>> items = postGenerateOrderModel.order!.items!
+          .map((e) => {
+        'name': e.name,
+        'qty': e.quantity,
+        'price': (e.unitPrice ?? 0).toDouble(),
+        'total': ((e.quantity ?? 0) * (e.unitPrice ?? 0)).toDouble(),
+      })
+          .toList();
+      List<Map<String, dynamic>> kotItems = postGenerateOrderModel.invoice!.kot!
+          .map((e) => {
+        'name': e.name,
+        'qty': e.quantity,
+      })
+          .toList();
+      List<Map<String, dynamic>> finalTax =
+      postGenerateOrderModel.order!.finalTaxes!
+          .map((e) => {
+        'name': e.name,
+        'amt': e.amount,
+      })
+          .toList();
 
-      if (offlineOrder != null) {
-        // ✅ Handle Offline Data
-        final decoded =
-        jsonDecode(offlineOrder.orderPayloadJson.toString()) as Map<String, dynamic>;
-        print("hagnoga");
-        print(decoded);
-        final offlineItems = (decoded['items'] ?? []) as List;
-        items = offlineItems.map((e) {
-          return {
-            'name': e['name'] ?? '',
-            'qty': e['quantity'] ?? e['qty'] ?? 0,
-            'price': (e['unitPrice'] ?? e['basePrice'] ?? 0).toDouble(),
-            'total': ((e['quantity'] ?? e['qty'] ?? 0) *
-                (e['unitPrice'] ?? e['basePrice'] ?? 0))
-                .toDouble(),
-          };
-        }).toList();
-
-        businessName = "Alagu Drive In"; // fallback, since offline payload may not have this
-        address = "dJBD";
-        gst = "anlg";
-        taxPercent = (decoded['tax'] ?? 0).toDouble();
-        orderNumber = offlineOrder.id ?? "N/A";
-        paymentMethod = (decoded['payments']?[0]?['method'] ?? "CASH").toString();
-        phone = "";
-        subTotal = (decoded['subtotal'] ?? 0).toDouble();
-        total = (decoded['total'] ?? 0).toDouble();
-        orderType = decoded['orderType'] ?? "";
-        orderStatus = decoded['orderStatus'] ?? "";
-        tableName = decoded['tableNo'] ?? "N/A";
-        waiterName = decoded['waiter'] ?? "N/A";
-        date = decoded['date'] ?? DateTime.now().toString();
-      } else {
-        // ✅ Handle Online Data (your existing code)
-        items = (postGenerateOrderModel.order?.items ?? []).map((e) => {
-          'name': e.name ?? '',
-          'qty': e.quantity ?? 0,
-          'price': (e.unitPrice ?? 0).toDouble(),
-          'total': ((e.quantity ?? 0) * (e.unitPrice ?? 0)).toDouble(),
-        }).toList();
-
-        businessName = postGenerateOrderModel.invoice?.businessName ?? '';
-        address = postGenerateOrderModel.invoice?.address ?? '';
-        gst = postGenerateOrderModel.invoice?.gstNumber ?? '';
-        taxPercent = (postGenerateOrderModel.order?.tax ?? 0.0).toDouble();
-        orderNumber = postGenerateOrderModel.order?.orderNumber ?? 'N/A';
-        paymentMethod = postGenerateOrderModel.invoice?.paidBy ?? '';
-        phone = postGenerateOrderModel.invoice?.phone ?? '';
-        subTotal = (postGenerateOrderModel.invoice?.subtotal ?? 0.0).toDouble();
-        total = (postGenerateOrderModel.invoice?.total ?? 0.0).toDouble();
-        orderType = postGenerateOrderModel.order?.orderType ?? '';
-        orderStatus = postGenerateOrderModel.invoice?.orderStatus ?? '';
-        tableName = (orderType == 'LINE' || orderType == 'AC')
-            ? (postGenerateOrderModel.invoice?.tableName ?? 'N/A')
-            : 'N/A';
-        waiterName = (orderType == 'LINE' || orderType == 'AC')
-            ? (postGenerateOrderModel.invoice?.waiterName ?? 'N/A')
-            : 'N/A';
-        date = formatInvoiceDate(postGenerateOrderModel.invoice?.date);
-      }
-
+      String businessName = postGenerateOrderModel.invoice!.businessName ?? '';
+      String address = postGenerateOrderModel.invoice!.address ?? '';
+      String gst = postGenerateOrderModel.invoice!.gstNumber ?? '';
+      double taxPercent = (postGenerateOrderModel.order!.tax ?? 0.0).toDouble();
+      String orderNumber = postGenerateOrderModel.order!.orderNumber ?? 'N/A';
+      String paymentMethod = postGenerateOrderModel.invoice!.paidBy ?? '';
+      String phone = postGenerateOrderModel.invoice!.phone ?? '';
+      double subTotal =
+      (postGenerateOrderModel.invoice!.subtotal ?? 0.0).toDouble();
+      double total = (postGenerateOrderModel.invoice!.total ?? 0.0).toDouble();
+      String orderType = postGenerateOrderModel.order!.orderType ?? '';
+      String orderStatus = postGenerateOrderModel.invoice!.orderStatus ?? '';
+      String tableName = orderType == 'LINE' || orderType == 'AC'
+          ? postGenerateOrderModel.invoice!.tableName.toString()
+          : 'N/A';
+      String waiterName = orderType == 'LINE' || orderType == 'AC'
+          ? postGenerateOrderModel.invoice!.waiterName.toString()
+          : 'N/A';
+      String date = formatInvoiceDate(postGenerateOrderModel.invoice?.date);
+      ipController.text =
+          postGenerateOrderModel.invoice!.thermalIp.toString() ?? "";
+      debugPrint("ip:${ipController.text}");
       Navigator.of(context).pop();
 
-      // ✅ Common receipt UI (works for both offline & online)
       await showDialog(
         context: context,
         builder: (_) => Dialog(
@@ -734,6 +697,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
               ),
               child: Column(
                 children: [
+                  // Normal Bill Receipt
                   RepaintBoundary(
                     key: normalReceiptKey,
                     child: getThermalReceiptWidget(
@@ -741,7 +705,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                       address: address,
                       gst: gst,
                       items: items,
-                      finalTax: [], // offline doesn’t have finalTax
+                      finalTax: finalTax,
                       tax: taxPercent,
                       paidBy: paymentMethod,
                       tamilTagline: '',
@@ -756,6 +720,95 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                       status: orderStatus,
                     ),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // KOT Receipt (for kitchen)
+                  if (postGenerateOrderModel.invoice!.kot!.isNotEmpty)
+                    RepaintBoundary(
+                      key: kotReceiptKey,
+                      child: getThermalReceiptKOTWidget(
+                        businessName: businessName,
+                        address: address,
+                        gst: gst,
+                        items: kotItems,
+                        paidBy: paymentMethod,
+                        tamilTagline: '',
+                        phone: phone,
+                        subtotal: subTotal,
+                        tax: taxPercent,
+                        total: total,
+                        orderNumber: orderNumber,
+                        tableName: tableName,
+                        waiterName: waiterName,
+                        orderType: orderType,
+                        date: date,
+                        status: orderStatus,
+                      ),
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (postGenerateOrderModel.invoice!.kot!.isNotEmpty)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            _startKOTPrintingThermalOnly(
+                              context,
+                              ipController.text.trim(),
+                            );
+                          },
+                          icon: const Icon(Icons.print),
+                          label: const Text("KOT(LAN)"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: greenColor,
+                            foregroundColor: whiteColor,
+                          ),
+                        ),
+                      horizontalSpace(width: 10),
+                      // if (postGenerateOrderModel.invoice!.kot!.isNotEmpty)
+                      //   ElevatedButton.icon(
+                      //     onPressed: () {
+                      //       _selectBluetoothPrinter(context);
+                      //     },
+                      //     icon: const Icon(Icons.bluetooth),
+                      //     label: const Text("KOT(BT)"),
+                      //     style: ElevatedButton.styleFrom(
+                      //       backgroundColor: greenColor,
+                      //       foregroundColor: whiteColor,
+                      //     ),
+                      //   ),
+                      // horizontalSpace(width: 10),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          WidgetsBinding.instance
+                              .addPostFrameCallback((_) async {
+                            await _ensureIminServiceReady();
+                            await _printBillToIminOnly(context);
+                          });
+                        },
+                        icon: const Icon(Icons.print),
+                        label: const Text("Imin"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: greenColor,
+                          foregroundColor: whiteColor,
+                        ),
+                      ),
+                      horizontalSpace(width: 10),
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.09,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
+                            "CLOSE",
+                            style: TextStyle(color: appPrimaryColor),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -769,8 +822,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       );
     }
   }
-
-
 
   Future<void> printUpdateOrderReceipt() async {
     try {

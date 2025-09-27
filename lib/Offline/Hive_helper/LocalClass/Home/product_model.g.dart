@@ -60,7 +60,7 @@ class HiveProductAdapter extends TypeAdapter<HiveProduct> {
 
 class HiveAddonAdapter extends TypeAdapter<HiveAddon> {
   @override
-  final int typeId = 2;
+  final int typeId = 28;
 
   @override
   HiveAddon read(BinaryReader reader) {

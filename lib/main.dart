@@ -38,6 +38,7 @@ import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart'
 // import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
 // import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
 
+// import 'Offline/Hive_helper/LocalClass/Home/hive_addon_model.dart';
 import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 
 
@@ -52,11 +53,10 @@ Future<void> main() async {
   await HiveServicedelete.initDeleteBox();
 
   try {
-    // Register all adapters before opening any boxes.
-    // Ensure all adapters are registered only once.
+
     Hive.registerAdapter(HiveCategoryAdapter());
     Hive.registerAdapter(HiveProductAdapter());
-    // Hive.registerAdapter(HiveAddonAdapter());
+    Hive.registerAdapter(HiveAddonAdapter());
     Hive.registerAdapter(HiveCartItemAdapter());
     Hive.registerAdapter(HiveSelectedAddonAdapter());
     Hive.registerAdapter(HiveOrderAdapter());
@@ -67,12 +67,9 @@ Future<void> main() async {
     Hive.registerAdapter(HiveLocationAdapter());
     Hive.registerAdapter(HiveSupplierAdapter());
     Hive.registerAdapter(HiveWaiterAdapter());
-    // Add this to your Hive initialization
     Hive.registerAdapter(HiveUserAdapter());
     Hive.registerAdapter(HiveReportModelAdapter());
     Hive.registerAdapter(HivePendingStockAdapter());
-    // Note: If you have a separate adapter for HiveProductStock, you would register it here.
-    // Hive.registerAdapter(HiveProductStockAdapter());
 
   } catch (e) {
     debugPrint("Hive adapter registration error: $e");

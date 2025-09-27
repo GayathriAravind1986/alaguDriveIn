@@ -1,6 +1,8 @@
 import 'package:hive/hive.dart';
 
-part 'product_model.g.dart'; // This will be generated
+import '../../../../ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart';
+
+part 'product_model.g.dart';
 
 @HiveType(typeId: 1)
 class HiveProduct extends HiveObject {
@@ -22,7 +24,6 @@ class HiveProduct extends HiveObject {
   @HiveField(5)
   List<HiveAddon>? addons;
 
-  // Add isStock field
   @HiveField(6)
   bool? isStock;
 
@@ -33,11 +34,32 @@ class HiveProduct extends HiveObject {
     this.basePrice,
     this.availableQuantity,
     this.addons,
-    this.isStock, // Include in constructor
+    this.isStock,
   });
+
+  /// 🔑 Factory to create HiveProduct from API Rows
+  factory HiveProduct.fromApi(Rows row) {
+    return HiveProduct(
+      id: row.id,
+      name: row.name,
+      image: row.image,
+      basePrice: (row.basePrice ?? 0).toDouble(),
+      availableQuantity: row.availableQuantity?.toInt() ?? 0,
+      isStock: _toBool(row.isStock),
+      addons: row.addons?.map((a) => HiveAddon.fromApi(a)).toList(),
+    );
+  }
+
+  static bool? _toBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is int) return value == 1; // ✅ 1 => true, 0 => false
+    if (value is String) return value == "true" || value == "1";
+    return null;
+  }
 }
 
-@HiveType(typeId: 2)
+@HiveType(typeId: 28)
 class HiveAddon extends HiveObject {
   @HiveField(0)
   String? id;
@@ -65,4 +87,16 @@ class HiveAddon extends HiveObject {
     this.maxQuantity,
     this.isAvailable,
   });
+
+  /// 🔑 Factory to create HiveAddon from API Addons
+  factory HiveAddon.fromApi(Addons addon) {
+    return HiveAddon(
+      id: addon.id,
+      name: addon.name,
+      price: (addon.price ?? 0).toDouble(),
+      maxQuantity: addon.maxQuantity?.toInt() ?? 0,
+      isFree: HiveProduct._toBool(addon.isFree),
+      isAvailable: HiveProduct._toBool(addon.isAvailable),
+    );
+  }
 }

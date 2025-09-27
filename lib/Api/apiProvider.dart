@@ -162,7 +162,9 @@ class ApiProvider {
               GetProductByCatIdModel.fromJson(response.data);
           return getProductByCatIdResponse;
         }
-      } else {
+      }
+      else
+      {
         return GetProductByCatIdModel()
           ..errorResponse = ErrorResponse(
             message: "Error: ${response.data['message'] ?? 'Unknown error'}",

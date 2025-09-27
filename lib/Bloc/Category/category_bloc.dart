@@ -190,18 +190,17 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          // Online: fetch from API and save
           final value = await ApiProvider()
               .getProductItemAPI(event.catId, event.searchKey);
 
-          if (value.success == true && value.rows != null) {
-            // ✅ Save products for offline use
+          if (value.success == true && value.rows != null)
+          {
             await saveProductsToHive(event.catId, value.rows!);
           }
-
           emit(value);
-        } else {
-          // Offline: load from Hive
+        }
+        else
+        {
           final localProducts = await loadProductsFromHive(event.catId);
           final offlineProducts = localProducts
               .map((p) => product.Rows(

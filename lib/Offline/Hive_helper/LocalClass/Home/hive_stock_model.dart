@@ -3,7 +3,6 @@ import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
 
 part 'hive_stock_model.g.dart';
 
-// Stock Maintenance Model
 @HiveType(typeId: 40)
 class HiveStockMaintenance extends HiveObject {
   @HiveField(0)
@@ -25,6 +24,7 @@ class HiveStockMaintenance extends HiveObject {
     this.lastUpdated,
   });
 
+  /// ✅ Convert from API model to Hive model
   factory HiveStockMaintenance.fromApiModel(GetStockMaintanencesModel model) {
     return HiveStockMaintenance(
       id: model.data?.id?.toString(),
@@ -34,6 +34,7 @@ class HiveStockMaintenance extends HiveObject {
     );
   }
 
+  /// ✅ Convert back from Hive model to API model
   GetStockMaintanencesModel toApiModel() {
     return GetStockMaintanencesModel(
       success: true,

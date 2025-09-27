@@ -149,8 +149,9 @@ class CustomAppBarViewState extends State<CustomAppBarView> {
                     ),
                   ),
                   SizedBox(width: 16),
-                  (getStockMaintanencesModel.data?.stockMaintenance == true)
-                      ? TextButton.icon(
+                  // (getStockMaintanencesModel.data?.stockMaintenance == true)
+                  //     ?
+                  TextButton.icon(
                     onPressed: () => widget.onTabSelected(3),
                     icon: Icon(
                       Icons.inventory,
@@ -168,8 +169,8 @@ class CustomAppBarViewState extends State<CustomAppBarView> {
                             : greyColor,
                       ),
                     ),
-                  )
-                      : Container(),
+                  ),
+                      // : Container(),
                   SizedBox(width: 16),
                   TextButton.icon(
                     onPressed: () => widget.onTabSelected(4),
