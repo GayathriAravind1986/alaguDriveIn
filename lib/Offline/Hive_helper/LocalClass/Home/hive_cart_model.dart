@@ -1,12 +1,11 @@
 import 'package:hive/hive.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_selected_addons_model.dart';
 
 part 'hive_cart_model.g.dart';
 
 @HiveType(typeId: 2)
 class HiveCartItem extends HiveObject {
   @HiveField(0)
-  String? id;
+  String? product;
 
   @HiveField(1)
   String? name;
@@ -15,81 +14,161 @@ class HiveCartItem extends HiveObject {
   String? image;
 
   @HiveField(3)
-  double? basePrice;
+  int? quantity;
 
   @HiveField(4)
-  double? qty;
+  double? unitPrice;
 
   @HiveField(5)
-  int? availableQuantity;
+  double? basePrice;
 
   @HiveField(6)
-  List<HiveSelectedAddon>? selectedAddons;
+  double? subtotal;
 
   @HiveField(7)
-  DateTime? createdAt;
+  List<Map<String, dynamic>>? selectedAddons;
+
+  @HiveField(8)
+  bool? isFree;
+
+  @HiveField(9)
+  double? taxPrice;
+
+  @HiveField(10)
+  double? totalPrice;
+
+  @HiveField(11)
+  String? id; // Added for billing compatibility
+
+  @HiveField(12)
+  int? qty; // Added for billing compatibility
+
+  @HiveField(13)
+  int? availableQuantity; // Added for billing compatibility
 
   HiveCartItem({
-    this.id,
+    this.product,
     this.name,
     this.image,
+    this.quantity,
+    this.unitPrice,
     this.basePrice,
+    this.subtotal,
+    this.selectedAddons,
+    this.isFree,
+    this.taxPrice,
+    this.totalPrice,
+    this.id,
     this.qty,
     this.availableQuantity,
-    this.selectedAddons,
-    this.createdAt,
   });
 
-  /// Convert API map -> HiveCartItem safely
-  static HiveCartItem fromMap(Map<String, dynamic> map) {
+  /// Main factory method that handles both online and offline data structures
+  factory HiveCartItem.fromMap(Map<String, dynamic> map) {
+    // Check if this is offline data structure (has 'product' field)
+    // or online data structure (might have different field names)
+
+    final quantity = _safeInt(map["quantity"] ?? map["qty"]);
+
     return HiveCartItem(
-      id: map["_id"]?.toString(),
-      name: map["name"]?.toString(),
-      image: map["image"]?.toString(),
-      basePrice: map["basePrice"] != null
-          ? (map["basePrice"] is int
-          ? (map["basePrice"] as int).toDouble()
-          : map["basePrice"] as double)
-          : 0.0,
-      qty: map["qty"] != null
-          ? (map["qty"] is int
-          ? (map["qty"] as int).toDouble()
-          : map["qty"] as double)
-          : 0.0,
-      availableQuantity: map["availableQuantity"] != null
-          ? int.tryParse(map["availableQuantity"].toString())
-          : 0,
-      selectedAddons: (map["selectedAddons"] as List<dynamic>?)
-          ?.map((addon) => HiveSelectedAddon.fromMap(
-          Map<String, dynamic>.from(addon)))
-          .toList(),
-      createdAt: DateTime.now(),
+      // Handle product ID (can be 'product', 'productId', or '_id')
+      product: map["product"]?.toString() ??
+          map["productId"]?.toString() ??
+          map["_id"]?.toString(),
+
+      // Handle ID field
+      id: map["id"]?.toString() ??
+          map["product"]?.toString() ??
+          map["productId"]?.toString() ??
+          map["_id"]?.toString(),
+
+      // Handle name
+      name: map["name"]?.toString() ?? "",
+
+      // Handle image
+      image: map["image"]?.toString() ?? "",
+
+      // Handle quantity (can be 'quantity' or 'qty')
+      quantity: quantity,
+      qty: quantity, // Same as quantity for compatibility
+
+      // Handle available quantity
+      availableQuantity: _safeInt(map["availableQuantity"] ?? quantity),
+
+      // Handle unit price (can be 'unitPrice', 'basePrice', or 'price')
+      unitPrice: _safeDouble(map["unitPrice"] ?? map["basePrice"] ?? map["price"]),
+
+      // Handle base price
+      basePrice: _safeDouble(map["basePrice"] ?? map["unitPrice"]),
+
+      // Handle subtotal
+      subtotal: _safeDouble(map["subtotal"]),
+
+      // Handle selected addons (provide empty list if null)
+      selectedAddons: _safeAddonsList(map["selectedAddons"] ?? map["addons"]),
+
+      // Handle boolean fields
+      isFree: map["isFree"] ?? false,
+
+      // Handle tax and total prices
+      taxPrice: _safeDouble(map["taxPrice"]),
+      totalPrice: _safeDouble(map["totalPrice"]),
     );
   }
 
-  /// Convert HiveCartItem -> Map (for API payloads)
+  /// Helper method to safely convert to int
+  static int _safeInt(dynamic value) {
+    if (value == null) return 1;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 1;
+    return 1;
+  }
+
+  /// Helper method to safely convert to double
+  static double _safeDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  /// Helper method to safely convert addons list
+  static List<Map<String, dynamic>> _safeAddonsList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((item) {
+        if (item is Map<String, dynamic>) return item;
+        if (item is Map) return Map<String, dynamic>.from(item);
+        return <String, dynamic>{};
+      }).toList();
+    }
+    return [];
+  }
+
+  /// Convert HiveCartItem back to Map
   Map<String, dynamic> toMap() {
     return {
-      "_id": id,
+      "product": product,
+      "id": id,
       "name": name,
       "image": image,
-      "basePrice": basePrice,
+      "quantity": quantity,
       "qty": qty,
       "availableQuantity": availableQuantity,
-      "selectedAddons":
-      selectedAddons?.map((addon) => addon.toMap()).toList() ?? [],
-      "createdAt": createdAt?.toIso8601String(),
+      "unitPrice": unitPrice,
+      "basePrice": basePrice,
+      "subtotal": subtotal,
+      "selectedAddons": selectedAddons,
+      "isFree": isFree,
+      "taxPrice": taxPrice,
+      "totalPrice": totalPrice,
     };
   }
-  factory HiveCartItem.fromJson(Map<String, dynamic> json) {
-    return HiveCartItem(
-      id: json['_id'] ?? json['product'],   // handle both cases
-      name: json['name'] ?? '',
-      image: json['image'] ?? '',          // default empty string if null
-      basePrice: json['unitPrice'] ?? json['basePrice'] ?? 0,
-      qty: json['quantity'] ?? json['qty'] ?? 0,
-      // : json['subtotal'] ?? 0,
-    );
-  }
 
+  @override
+  String toString() {
+    return 'HiveCartItem(id: $id, product: $product, name: $name, quantity: $quantity, unitPrice: $unitPrice, subtotal: $subtotal)';
+  }
 }

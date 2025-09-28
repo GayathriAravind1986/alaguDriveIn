@@ -51,6 +51,7 @@ Future<void> main() async {
   initConnectivityListener(apiProvider);
 
   await HiveServicedelete.initDeleteBox();
+  // await HiveService.fixHiveTypeIssue();
 
   try {
 

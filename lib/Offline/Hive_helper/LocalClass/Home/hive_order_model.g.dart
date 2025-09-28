@@ -35,13 +35,24 @@ class HiveOrderAdapter extends TypeAdapter<HiveOrder> {
       paymentMethod: fields[15] as String?,
       phone: fields[16] as String?,
       waiterName: fields[17] as String?,
+      orderNumber: fields[18] as String?,
+      subtotal: fields[19] as double?,
+      taxAmount: fields[20] as double?,
+      discountAmount: fields[21] as double?,
+      kotItems: (fields[22] as List?)
+          ?.map((dynamic e) => (e as Map).cast<String, dynamic>())
+          ?.toList(),
+      finalTaxes: (fields[23] as List?)
+          ?.map((dynamic e) => (e as Map).cast<String, dynamic>())
+          ?.toList(),
+      tableName: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HiveOrder obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -77,7 +88,21 @@ class HiveOrderAdapter extends TypeAdapter<HiveOrder> {
       ..writeByte(16)
       ..write(obj.phone)
       ..writeByte(17)
-      ..write(obj.waiterName);
+      ..write(obj.waiterName)
+      ..writeByte(18)
+      ..write(obj.orderNumber)
+      ..writeByte(19)
+      ..write(obj.subtotal)
+      ..writeByte(20)
+      ..write(obj.taxAmount)
+      ..writeByte(21)
+      ..write(obj.discountAmount)
+      ..writeByte(22)
+      ..write(obj.kotItems)
+      ..writeByte(23)
+      ..write(obj.finalTaxes)
+      ..writeByte(24)
+      ..write(obj.tableName);
   }
 
   @override

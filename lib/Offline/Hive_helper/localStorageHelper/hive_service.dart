@@ -51,20 +51,20 @@ class HiveService {
   // Billing Session Management
   static Future<void> saveBillingSession(HiveBillingSession session) async {
     final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
     await billingBox.add(session);
   }
 
   static Future<HiveBillingSession?> getBillingSession() async {
     final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     return billingBox.values.isNotEmpty ? billingBox.values.first : null;
   }
 
   static Future<void> clearBillingSession() async {
     final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
   }
 
@@ -94,10 +94,10 @@ class HiveService {
     }
 
     // Simplified tax calculation (you can adjust based on your business logic)
-    // totalTax = subtotal * 0.18; // 18% tax
+    totalTax = subtotal * 0.0; // 18% tax
 
     if (isDiscountApplied) {
-      totalDiscount = subtotal * 0.1; // 10% discount
+      totalDiscount = subtotal * 0.0; // 10% discount
     }
 
     double total = subtotal + totalTax - totalDiscount;
@@ -114,7 +114,7 @@ class HiveService {
   }
 
   // Order Management
-   static Future<String> saveOfflineOrder({
+  static Future<String> saveOfflineOrder({
     required String orderPayloadJson,
     required String orderStatus,
     required String orderType,
@@ -123,69 +123,135 @@ class HiveService {
     required List<Map<String, dynamic>> items,
     String syncAction = 'CREATE',
     String? existingOrderId,
+    String? businessName,
+    String? address,
+    String? gst,
+    double? taxPercent,
+    String? paymentMethod,
+    String? phone,
+    String? waiterName,
+    // New parameters for receipt generation
+    String? orderNumber,
+    double? subtotal,
+    double? taxAmount,
+    double? discountAmount,
+    List<Map<String, dynamic>>? kotItems,
+    List<Map<String, dynamic>>? finalTaxes,
+    String? tableName,
   }) async {
-    // Make sure adapters are registered before using Hive
-    if (!Hive.isAdapterRegistered(HiveOrderAdapter().typeId)) {
-      Hive.registerAdapter(HiveOrderAdapter());
-    }
-    if (!Hive.isAdapterRegistered(HiveCartItemAdapter().typeId)) {
-      Hive.registerAdapter(HiveCartItemAdapter());
-    }
-
-    // Open the Hive box
-    final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    print("Orders saved in Hive before: ${ordersBox.values.length}");
-
-    // Generate unique ID
-    final orderId = const Uuid().v4();
-
-    // Debug logs for input
-    print("Saving Offline Order...");
-    print("OrderId: $orderId");
-    print("OrderPayloadJson type: ${orderPayloadJson.runtimeType}");
-    print("OrderPayloadJson: $orderPayloadJson");
-    print("Items raw: $items");
-
-    // Convert items to HiveCartItem
-    final hiveItems = items.map((item) {
-      try {
-        return HiveCartItem.fromMap(item);
-      } catch (e) {
-        print("❌ Error converting item to HiveCartItem: $item");
-        rethrow;
+    try {
+      // Make sure adapters are registered before using Hive
+      if (!Hive.isAdapterRegistered(HiveOrderAdapter().typeId)) {
+        Hive.registerAdapter(HiveOrderAdapter());
       }
-    }).toList();
+      if (!Hive.isAdapterRegistered(HiveCartItemAdapter().typeId)) {
+        Hive.registerAdapter(HiveCartItemAdapter());
+      }
 
-    // Create HiveOrder object
-    final order = HiveOrder(
-      id: orderId,
-      orderPayloadJson: orderPayloadJson,
-      orderStatus: orderStatus,
-      orderType: orderType,
-      tableId: tableId,
-      total: total,
-      createdAt: DateTime.now(),
-      isSynced: false,
-      items: hiveItems,
-      syncAction: syncAction,
-      existingOrderId: existingOrderId,
-    );
+      // Open the Hive box
+      final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
+      print("Orders saved in Hive before: ${ordersBox.values.length}");
 
-    // Save to Hive
-    await ordersBox.put(orderId, order);
+      // Generate unique ID
+      final orderId = const Uuid().v4();
 
-    // Confirm save
-    final saved = ordersBox.get(orderId);
-    print("Orders saved in Hive after: ${ordersBox.values.length}");
-    print("✅ Order saved: $saved");
-    return orderId;
+      // Debug logs for input
+      print("Saving Offline Order...");
+      print("OrderId: $orderId");
+      print("OrderPayloadJson type: ${orderPayloadJson.runtimeType}");
+      print("OrderPayloadJson: $orderPayloadJson");
+      print("Items raw: $items");
+
+      // Convert items to HiveCartItem with better error handling
+      List<HiveCartItem> hiveItems = [];
+
+      for (int i = 0; i < items.length; i++) {
+        try {
+          final item = items[i];
+          print("Processing item $i: $item");
+          print("Item keys: ${item.keys.toList()}");
+
+          // Validate required fields before conversion
+          if (item['name'] == null || item['name'].toString().isEmpty) {
+            print("Warning: Item $i has empty name, setting default");
+          }
+
+          final hiveItem = HiveCartItem.fromMap(item);
+          hiveItems.add(hiveItem);
+          print("Successfully converted item $i: $hiveItem");
+
+        } catch (e, stackTrace) {
+          print("❌ Error converting item $i to HiveCartItem: ${items[i]}");
+          print("❌ Error type: ${e.runtimeType}");
+          print("❌ Error message: $e");
+          print("❌ Stack trace: $stackTrace");
+
+          // Create a fallback item to prevent complete failure
+          final fallbackItem = HiveCartItem(
+            product: items[i]['product']?.toString() ?? 'unknown',
+            name: items[i]['name']?.toString() ?? 'Unknown Item',
+            quantity: items[i]['quantity'] ?? 1,
+            unitPrice: (items[i]['unitPrice'] ?? 0).toDouble(),
+            subtotal: (items[i]['subtotal'] ?? 0).toDouble(),
+            image: items[i]['image']?.toString() ?? '',
+            selectedAddons: [],
+          );
+          hiveItems.add(fallbackItem);
+          print("✅ Created fallback item: $fallbackItem");
+        }
+      }
+
+      // Create HiveOrder object with all fields
+      final order = HiveOrder(
+        id: orderId,
+        orderPayloadJson: orderPayloadJson,
+        orderStatus: orderStatus,
+        orderType: orderType,
+        tableId: tableId,
+        total: total,
+        createdAt: DateTime.now(),
+        isSynced: false,
+        items: hiveItems,
+        syncAction: syncAction,
+        existingOrderId: existingOrderId,
+        businessName: businessName,
+        address: address,
+        gst: gst,
+        taxPercent: taxPercent,
+        paymentMethod: paymentMethod,
+        phone: phone,
+        waiterName: waiterName,
+        // New fields
+        orderNumber: orderNumber,
+        subtotal: subtotal,
+        taxAmount: taxAmount,
+        discountAmount: discountAmount,
+        kotItems: kotItems,
+        finalTaxes: finalTaxes,
+        tableName: tableName,
+      );
+
+      // Save to Hive
+      await ordersBox.put(orderId, order);
+
+      // Confirm save
+      final saved = ordersBox.get(orderId);
+      print("Orders saved in Hive after: ${ordersBox.values.length}");
+      print("✅ Order saved successfully: ${saved?.id}");
+
+      return orderId;
+
+    } catch (e, stackTrace) {
+      print("❌ Critical error in saveOfflineOrder: $e");
+      print("❌ Stack trace: $stackTrace");
+      rethrow;
+    }
   }
 
   static Future<List<HiveOrder>> getPendingSyncOrders() async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
     return ordersBox.values.where((order) => order.isSynced == false).toList();
   }
-
 
   static Future<void> deleteOrder(String orderId) async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
@@ -197,7 +263,41 @@ class HiveService {
     return ordersBox.values.toList();
   }
 
-   // Sync Management
+  // In HiveService, update the offline detection:
+  static Future<bool> isLikelyOffline() async {
+    try {
+      final box = await Hive.openBox('app_state');
+      final lastOnline = box.get('last_online');
+
+      // If we never saved online timestamp, assume online
+      if (lastOnline == null) return false;
+
+      final lastOnlineTime = DateTime.fromMillisecondsSinceEpoch(lastOnline);
+      final difference = DateTime.now().difference(lastOnlineTime);
+
+      // Consider offline if no successful API call in last 10 minutes
+      // (more reasonable than 5 minutes)
+      return difference.inMinutes > 10;
+    } catch (e) {
+      // If any error, assume online to be safe
+      return false;
+    }
+  }
+
+  // Add this method to force offline mode for testing
+  static Future<void> setOfflineMode(bool isOffline) async {
+    final box = await Hive.openBox('app_state');
+    if (isOffline) {
+      // Set last online to 1 hour ago to force offline mode
+      final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
+      await box.put('last_online', oneHourAgo.millisecondsSinceEpoch);
+    } else {
+      // Set to current time to force online mode
+      await box.put('last_online', DateTime.now().millisecondsSinceEpoch);
+    }
+  }
+
+  // Sync Management
   static Future<void> syncPendingOrders(ApiProvider apiProvider) async {
     final pendingOrders = await getPendingSyncOrders();
     print("Pending orders to sync: ${pendingOrders.length}");
@@ -208,7 +308,8 @@ class HiveService {
 
         if (order.syncAction == 'CREATE') {
           // 🔹 For new orders
-          final response = await apiProvider.postGenerateOrderAPI(order.orderPayloadJson!);
+          final response = await apiProvider.postGenerateOrderAPI(
+              order.orderPayloadJson!);
           print("📤 CREATE payload: ${order.orderPayloadJson}");
           print("📥 CREATE response: ${response.toJson()}");
 
@@ -242,10 +343,11 @@ class HiveService {
     }
   }
 
-
   static Future<void> markOrderAsSynced(String orderId) async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    print("Unsynced orders left: ${ordersBox.values.where((o) => o.isSynced == false).length}");
+    print("Unsynced orders left: ${ordersBox.values
+        .where((o) => o.isSynced == false)
+        .length}");
     final order = ordersBox.get(orderId);
     if (order != null) {
       order.isSynced = true;
@@ -254,26 +356,56 @@ class HiveService {
     }
   }
 
-
   // Check if device is offline based on last successful API call
   static Future<void> saveLastOnlineTimestamp() async {
     final box = await Hive.openBox('app_state');
     await box.put('last_online', DateTime.now().millisecondsSinceEpoch);
   }
 
-  static Future<bool> isLikelyOffline() async {
+  static Future<void> fixHiveTypeIssue() async {
     try {
-      final box = await Hive.openBox('app_state');
-      final lastOnline = box.get('last_online');
-      if (lastOnline == null) return false;
+      print("🔧 Fixing Hive type mismatch issue...");
 
-      final lastOnlineTime = DateTime.fromMillisecondsSinceEpoch(lastOnline);
-      final difference = DateTime.now().difference(lastOnlineTime);
+      // Close all boxes first
+      await closeBox();
 
-      // Consider offline if no successful API call in last 5 minutes
-      return difference.inMinutes > 5;
+      // Delete existing boxes to clear corrupted data
+      await Hive.deleteBoxFromDisk(CART_BOX);
+      await Hive.deleteBoxFromDisk(ORDERS_BOX);
+      await Hive.deleteBoxFromDisk(BILLING_SESSION_BOX);
+      await Hive.deleteBoxFromDisk(SYNC_QUEUE_BOX);
+      await Hive.deleteBoxFromDisk('pendingActions');
+      await Hive.deleteBoxFromDisk('app_state');
+
+      print("✅ Cleared all existing Hive data");
+
+      // Re-register adapters with correct type IDs
+      if (!Hive.isAdapterRegistered(0)) {
+        Hive.registerAdapter(HiveBillingSessionAdapter());
+      }
+      if (!Hive.isAdapterRegistered(1)) {
+        Hive.registerAdapter(HiveCartItemAdapter());
+      }
+      if (!Hive.isAdapterRegistered(2)) {
+        Hive.registerAdapter(HiveOrderAdapter());
+      }
+
+      print("✅ Re-registered all adapters");
+
+      // Test opening boxes
+      final testCartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
+      final testOrderBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
+      final testBillingBox = await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+
+      await testCartBox.close();
+      await testOrderBox.close();
+      await testBillingBox.close();
+
+      print("✅ Hive type issue fixed successfully!");
+
     } catch (e) {
-      return false;
+      print("❌ Error fixing Hive issue: $e");
+      rethrow;
     }
   }
 }
