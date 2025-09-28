@@ -232,9 +232,10 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
 
         if (hasConnection) {
           // ✅ Online mode
-          try {
+          try
+          {
             final value = await ApiProvider().viewOrderAPI(event.orderId);
-
+            print("get order details : $value");
             if (value.success == true && value.data != null) {
               // Save to Hive
               await hiveService.saveOrderDetails(event.orderId!, value);
@@ -244,6 +245,13 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           } catch (error) {
             debugPrint("❌ ViewOrder API failed, fallback to Hive: $error");
             final cached = await hiveService.getOrderDetails(event.orderId!);
+            if (cached?.data?.id != null) {
+              emit(cached!);
+            } else {
+              debugPrint("⚠️ Cached order missing ID, treating as new order");
+            }
+
+            print("get order details $cached");
             if (cached != null) {
               emit(cached);
             } else {
@@ -260,6 +268,12 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         } else {
           // 📴 Offline mode
           final cached = await hiveService.getOrderDetails(event.orderId!);
+          if (cached?.data?.id != null) {
+            emit(cached!);
+          } else {
+            debugPrint("⚠️ Cached order missing ID, treating as new order");
+          }
+
           if (cached != null) {
             debugPrint('📴 Loaded offline order details for ID: ${event.orderId}');
             emit(cached);
@@ -277,6 +291,11 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
       } catch (e) {
         debugPrint('❌ ViewOrder Bloc Error: $e');
         final cached = await hiveService.getOrderDetails(event.orderId!);
+        if (cached?.data?.id != null) {
+          emit(cached!);
+        } else {
+          debugPrint("⚠️ Cached order missing ID, treating as new order");
+        }
         if (cached != null) {
           emit(cached);
         } else {

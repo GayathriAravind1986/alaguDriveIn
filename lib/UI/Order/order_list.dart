@@ -282,18 +282,27 @@ class OrderViewViewState extends State<OrderViewView> {
                                           widget.selectOperator == "")
                                         IconButton(
                                           padding: EdgeInsets.zero,
-                                          constraints: BoxConstraints(),
-                                          icon: Icon(Icons.edit,
-                                              color: appPrimaryColor, size: 20),
+                                          constraints: const BoxConstraints(),
+                                          icon: Icon(Icons.edit, color: appPrimaryColor, size: 20),
                                           onPressed: () {
-                                            setState(() {
-                                              view = false;
-                                            });
-                                            context
-                                                .read<OrderTodayBloc>()
-                                                .add(ViewOrder(order.id));
+                                            if (order.id == null) {
+                                              debugPrint("⚠️ Order ID is null, cannot view order");
+                                              return;
+                                            }
+
+                                            // Update UI only if widget is still mounted
+                                            if (mounted) {
+                                              setState(() {
+                                                view = false;
+                                              });
+                                            }
+
+                                            // Trigger bloc event with a safe order ID
+                                            context.read<OrderTodayBloc>().add(ViewOrder(order.id!));
+                                            debugPrint("📦 Viewing order with ID: ${order.id}");
                                           },
                                         ),
+
                                       SizedBox(width: 4),
                                       IconButton(
                                         padding: EdgeInsets.zero,

@@ -67,6 +67,7 @@ class _ThermalReportReceiptDialogState
       );
     }
 
+
     String toDate = '';
     if (widget.getReportModel.toDate != null) {
       toDate = DateFormat('dd/MM/yyyy').format(

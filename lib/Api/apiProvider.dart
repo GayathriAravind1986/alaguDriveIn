@@ -3,6 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Authentication/Post_login_model.dart';
@@ -520,9 +521,22 @@ class ApiProvider {
       String? toDate,
       String? tableId,
       String? waiterId,
-      String? operatorId) async {
+      String? operatorId,
+      ) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
+
+    // ✅ Clear old Hive data to avoid migration issues
+    // await HiveReportService.clearReports();
+
+    // ✅ Get business details from SharedPreferences for offline use
+    String businessName = sharedPreferences.getString("businessName") ?? "Alagu Drive In";
+    String userName = sharedPreferences.getString("userName") ?? "Counter1";
+    String address = sharedPreferences.getString("address") ?? "Tenkasi main road, Alangualam, Tamil Nadu 627851";
+    String phone = sharedPreferences.getString("phone") ?? "+91 0000000000";
+    String location = sharedPreferences.getString("location") ?? "ALANGULAM";
+    String gstNumber = sharedPreferences.getString("gstNumber") ?? "00000000000";
+    String currencySymbol = sharedPreferences.getString("currencySymbol") ?? "₹";
 
     debugPrint(
         "baseUrlReport:'${Constants.baseUrl}api/generate-order/sales-report?from_date=$fromDate&to_date=$toDate&limit=200&tableNo=$tableId&waiter=$waiterId&operator=$operatorId");
@@ -542,22 +556,43 @@ class ApiProvider {
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['success'] == true) {
           // ✅ API success → parse normally
-          GetReportModel getReportListTodayResponse =
-          GetReportModel.fromJson(response.data);
+          GetReportModel getReportListTodayResponse = GetReportModel.fromJson(response.data);
 
-          // ✅ Convert API reports to Hive models
-          final List<HiveReportModel> hiveReports =
-          (response.data['data'] as List).map((json) => HiveReportModel(
-            productName: json['productName'] ?? json['name'] ?? '',
-            quantity: json['totalQty'] ?? json['quantity'] ?? 0,
-            amount: (json['totalAmount'] ?? json['subtotal'] ?? 0).toDouble(),
-            date: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-            tableNo: json['tableNo']?.toString() ?? '',
-            waiterId: json['waiter']?.toString() ?? '',
-          )).toList();
+          // ✅ Extract business details from API response for saving
+          String apiBusinessName = response.data['businessName'] ?? businessName;
+          String apiUserName = response.data['UserName'] ?? userName;
+          String apiAddress = response.data['address'] ?? address;
+          String apiPhone = response.data['phone'] ?? phone;
+          String apiLocation = response.data['location'] ?? location;
+          String apiGstNumber = response.data['gstNumber'] ?? gstNumber;
+          String apiCurrencySymbol = response.data['currencySymbol'] ?? currencySymbol;
 
+          // ✅ Save business details to SharedPreferences for offline use
+          await sharedPreferences.setString("businessName", apiBusinessName);
+          await sharedPreferences.setString("userName", apiUserName);
+          await sharedPreferences.setString("address", apiAddress);
+          await sharedPreferences.setString("phone", apiPhone);
+          await sharedPreferences.setString("location", apiLocation);
+          await sharedPreferences.setString("gstNumber", apiGstNumber);
+          await sharedPreferences.setString("currencySymbol", apiCurrencySymbol);
 
+          // ✅ Convert API reports to Hive models with ALL business details
+          final List<HiveReportModel> hiveReports = (response.data['data'] as List).map((json) {
+            return HiveReportModel.fromJson(
+              json,
+              userName: apiUserName,
+              businessName: apiBusinessName,
+              address: apiAddress,
+              phone: apiPhone,
+              location: apiLocation,
+              fromDate: fromDate ?? DateFormat('dd/MM/yyyy').format(DateTime.now()),
+              toDate: toDate ?? DateFormat('dd/MM/yyyy').format(DateTime.now()),
+              gstNumber: apiGstNumber,
+              currencySymbol: apiCurrencySymbol,
+            );
+          }).toList();
 
+          await HiveReportService.clearReports();
           // ✅ Save to Hive for offline use
           await HiveReportService.saveReports(hiveReports);
 
@@ -577,29 +612,42 @@ class ApiProvider {
           statusCode: 500,
         );
     } on DioException catch (dioError) {
-      // ✅ API failed → fallback to Hive
-      final offlineReports = await HiveReportService.getReports();
+      // ✅ API failed → fallback to Hive with filtering
+      final offlineReports = await HiveReportService.getReports(
+        fromDate: fromDate != null ? DateTime.parse(fromDate) : DateTime.now().subtract(const Duration(days: 30)),
+        toDate: toDate != null ? DateTime.parse(toDate) : DateTime.now(),
+        tableNo: tableId,
+        waiterId: waiterId,
+      );
 
       if (offlineReports.isNotEmpty) {
+        // ✅ Use the FIRST report's business details with SAFE GETTERS
+        HiveReportModel firstReport = offlineReports.first;
+
         return GetReportModel(
           success: true,
           data: offlineReports
               .map((e) => Data(
             productId: null,
-            productName: e.productName ?? "Unknown",
-            unitPrice: (e.quantity ?? 0) > 0
-                ? (e.amount ?? 0) / (e.quantity ?? 1)
-                : 0,
-            totalQty: e.quantity ?? 0,
+            productName: e.productName,
+            unitPrice: e.quantity > 0 ? e.amount / e.quantity : 0,
+            totalQty: e.quantity,
             totalTax: 0,
-            totalAmount: e.amount ?? 0,
+            totalAmount: e.amount,
           ))
               .toList(),
           totalRecords: offlineReports.length,
-          finalAmount: offlineReports.fold<num>(
-              0, (sum, r) => sum + (r.amount ?? 0)),
-          finalQty: offlineReports.fold<num>(
-              0, (sum, r) => sum + (r.quantity ?? 0)),
+          finalAmount: offlineReports.fold<num>(0, (sum, r) => sum + r.amount),
+          finalQty: offlineReports.fold<num>(0, (sum, r) => sum + r.quantity),
+          userName: firstReport.userNameSafe,
+          businessName: firstReport.businessNameSafe,
+          address: firstReport.addressSafe,
+          phone: firstReport.phoneSafe,
+          location: firstReport.locationSafe,
+          fromDate: firstReport.fromDateSafe,
+          toDate: firstReport.toDateSafe,
+          gstNumber: firstReport.gstNumber ?? '',
+          currencySymbol: firstReport.currencySymbolSafe,
         );
       }
 
@@ -607,36 +655,46 @@ class ApiProvider {
       final errorResponse = handleError(dioError);
       return GetReportModel()..errorResponse = errorResponse;
     } catch (error) {
-      // Last safety fallback: Hive
-      final offlineReports = await HiveReportService.getReports();
+      // Last safety fallback: Hive with filtering
+      final offlineReports = await HiveReportService.getReports(
+        fromDate: fromDate != null ? DateTime.parse(fromDate) : DateTime.now().subtract(const Duration(days: 30)),
+        toDate: toDate != null ? DateTime.parse(toDate) : DateTime.now(),
+        tableNo: tableId,
+        waiterId: waiterId,
+      );
 
       if (offlineReports.isNotEmpty) {
+        HiveReportModel firstReport = offlineReports.first;
+
         return GetReportModel(
           success: true,
           data: offlineReports
               .map((e) => Data(
             productId: null,
-            productName: e.productName ?? "Unknown",
-            unitPrice: (e.quantity ?? 0) > 0
-                ? (e.amount ?? 0) / (e.quantity ?? 1)
-                : 0,
-            totalQty: e.quantity ?? 0,
+            productName: e.productName,
+            unitPrice: e.quantity > 0 ? e.amount / e.quantity : 0,
+            totalQty: e.quantity,
             totalTax: 0,
-            totalAmount: e.amount ?? 0,
+            totalAmount: e.amount,
           ))
               .toList(),
           totalRecords: offlineReports.length,
-          finalAmount: offlineReports.fold<num>(
-              0, (sum, r) => sum + (r.amount ?? 0)),
-          finalQty: offlineReports.fold<num>(
-              0, (sum, r) => sum + (r.quantity ?? 0)),
+          finalAmount: offlineReports.fold<num>(0, (sum, r) => sum + r.amount),
+          finalQty: offlineReports.fold<num>(0, (sum, r) => sum + r.quantity),
+          userName: firstReport.userNameSafe,
+          businessName: firstReport.businessNameSafe,
+          address: firstReport.addressSafe,
+          phone: firstReport.phoneSafe,
+          location: firstReport.locationSafe,
+          fromDate: firstReport.fromDateSafe,
+          toDate: firstReport.toDateSafe,
+          gstNumber: firstReport.gstNumber ?? '',
+          currencySymbol: firstReport.currencySymbolSafe,
         );
       }
-
       return GetReportModel()..errorResponse = handleError(error);
     }
   }
-
 
 
   /// Generate Order - Post API Integration

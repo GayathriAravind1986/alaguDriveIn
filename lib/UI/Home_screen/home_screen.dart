@@ -1065,10 +1065,15 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
 
   void loadExistingOrder(GetViewOrderModel? order) {
     if (order == null || order.data == null) return;
-    debugPrint("existOrderId:${widget.existingOrder?.data?.id}");
+
     final data = order.data!;
+    debugPrint("=========================existOrderId:${data.id}");
+    debugPrint("=====================================$data");
+
+    if (!mounted) return;
 
     setState(() {
+      // Map orderType safely
       switch (data.orderType) {
         case 'LINE':
           selectedOrderType = OrderType.line;
@@ -1088,43 +1093,66 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
         default:
           selectedOrderType = OrderType.line;
       }
+
       tableId = data.tableNo;
       waiterId = data.waiter;
-      selectedValue = data.tableName;
-      selectedValueWaiter = data.waiterName;
+
+      selectedValue = data.tableName ?? data.invoice?.tableNum ?? "";
+      selectedValueWaiter = data.waiterName ?? data.invoice?.waiterNum ?? "";
+
       isCartLoaded = true;
-      isDiscountApplied =
-          widget.existingOrder?.data!.isDiscountApplied ?? false;
-      billingItems = data.items?.map((e) {
-        final product = e.product;
-        return {
-          "_id": product?.id,
-          "name": e.name,
-          "basePrice": (product?.basePrice ?? 0),
-          "qty": e.quantity,
-          "image": product?.image,
-          "selectedAddons": e.addons?.map((addonItem) {
-            final addon = addonItem.addon;
-            return {
-              "_id": addon?.id,
-              "name": addon?.name,
-              "price": addon?.price,
-              "isFree": addon?.isFree,
-              "quantity": addonItem.quantity ?? 1,
-              "isAvailable": addon?.isAvailable,
-              "maxQuantity": addon?.maxQuantity,
-            };
-          }).toList() ??
-              [],
-        };
-      }).toList() ??
-          [];
-      context.read<FoodCategoryBloc>().add(AddToBilling(
+      isDiscountApplied = data.isDiscountApplied ?? false;
+
+      // ✅ Handle both online & offline JSON structures
+      if (data.items != null && data.items!.isNotEmpty) {
+        // ONLINE case
+        billingItems = data.items!.map((e) {
+          final product = e.product;
+          return {
+            "_id": product?.id,
+            "name": e.name,
+            "basePrice": (product?.basePrice ?? 0),
+            "qty": e.quantity,
+            "image": product?.image,
+            "selectedAddons": e.addons?.map((addonItem) {
+              final addon = addonItem.addon;
+              return {
+                "_id": addon?.id,
+                "name": addon?.name,
+                "price": addon?.price,
+                "isFree": addon?.isFree,
+                "quantity": addonItem.quantity ?? 1,
+                "isAvailable": addon?.isAvailable,
+                "maxQuantity": addon?.maxQuantity,
+              };
+            }).toList() ?? [],
+          };
+        }).toList();
+      } else {
+        // OFFLINE case: items not saved in Hive JSON
+        billingItems = [
+          {
+            "_id": data.id,
+            "name": "No item details (offline)",
+            "basePrice": data.subtotal ?? 0,
+            "qty": 1,
+            "image": null,
+            "selectedAddons": [],
+          }
+        ];
+      }
+
+      // Update Bloc
+      context.read<FoodCategoryBloc>().add(
+        AddToBilling(
           List.from(billingItems),
-          widget.existingOrder?.data!.isDiscountApplied,
-          OrderTypeX.fromApi(widget.existingOrder?.data!.orderType ?? "LINE")));
+          isDiscountApplied,
+          OrderTypeX.fromApi(data.orderType ?? "LINE"),
+        ),
+      );
     });
   }
+
 
   void resetCartState() {
     setState(() {
@@ -5754,7 +5782,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
             setState(() {
               categoryLoad = false;
             });
-            showToast("No Waiter found", context, color: false);
+            // showToast("No Waiter found", context, color: false);
           }
           return true;
         }

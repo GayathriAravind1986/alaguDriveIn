@@ -606,7 +606,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
               tableLoad = false;
               isWaiterOfflineMode = false;
             });
-            showToast("No Waiter found", context, color: false);
+            // showToast("No Waiter found", context, color: false);
           }
           return true;
         }
@@ -631,7 +631,7 @@ class OrderTabViewViewState extends State<OrderTabViewView>
               tableLoad = false;
               isUserOfflineMode = false;
             });
-            showToast("No Operator found", context, color: false);
+            // showToast("No Operator found", context, color: false);
           }
           return true;
         }

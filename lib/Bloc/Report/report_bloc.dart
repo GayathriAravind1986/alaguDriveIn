@@ -44,7 +44,7 @@ class ReportTodayBloc extends Bloc<ReportTodayEvent, dynamic> {
         } else {
           // ✅ Offline fallback
           final offlineReports = await HiveReportService.getReports(
-            fromDate: event.fromDate != null ? DateTime.parse(event.fromDate!) : null,
+            fromDate: event.fromDate != null ? DateTime.parse(event.fromDate!) : DateTime.now(),
             toDate: event.toDate != null ? DateTime.parse(event.toDate!) : null,
             tableNo: event.tableId,
             waiterId: event.waiterId,
@@ -66,8 +66,8 @@ class ReportTodayBloc extends Bloc<ReportTodayEvent, dynamic> {
               } else {
                 // ✅ Offline fallback
                 final offlineReports = await HiveReportService.getReports(
-                  fromDate: event.fromDate != null ? DateTime.parse(event.fromDate!) : null,
-                  toDate: event.toDate != null ? DateTime.parse(event.toDate!) : null,
+                  fromDate: event.fromDate != null ? DateTime.parse(event.fromDate!) : DateTime.now(),
+                  toDate: event.toDate != null ? DateTime.parse(event.toDate!) : DateTime.now(),
                   tableNo: event.tableId,
                   waiterId: event.waiterId,
                 );
@@ -90,7 +90,6 @@ class ReportTodayBloc extends Bloc<ReportTodayEvent, dynamic> {
             } catch (e) {
               // ✅ Last fallback if API fails
               final offlineReports = await HiveReportService.getReports();
-
               emit(GetReportModel(
                 success: true,
                 data: offlineReports.map((e) => Data(
@@ -112,7 +111,6 @@ class ReportTodayBloc extends Bloc<ReportTodayEvent, dynamic> {
       } catch (e) {
         // ✅ Last fallback if API fails
         final offlineReports = await HiveReportService.getReports();
-
         emit(GetReportModel(
           success: true,
           data: offlineReports.map((e) => Data(
