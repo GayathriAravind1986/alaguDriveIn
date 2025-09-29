@@ -28,6 +28,7 @@ import 'package:simple/Offline/Hive_helper/localStorageHelper/local_storage_prod
 import 'package:simple/UI/Home_screen/home_screen.dart';
 
 import '../../ModelClass/Order/Post_generate_order_model.dart';
+
 // Add this helper method at the top of your CategoryBloc class, before any other methods
 double _safeToDouble(dynamic value) {
   if (value == null) return 0.0;
@@ -51,7 +52,8 @@ class FoodCategoryOffline extends FoodCategoryEvent {
 class FoodProductItem extends FoodCategoryEvent {
   String catId;
   String searchKey;
-  FoodProductItem(this.catId, this.searchKey, String text);
+  String searchCode;
+  FoodProductItem(this.catId, this.searchKey, this.searchCode);
 }
 
 class FoodProductItemOffline extends FoodCategoryEvent {
@@ -112,12 +114,11 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             emit(GetCategoryModel(
               success: true,
               data: localData
-                  .map((cat) =>
-                  category.Data(
-                    id: cat.id,
-                    name: cat.name,
-                    image: cat.image,
-                  ))
+                  .map((cat) => category.Data(
+                        id: cat.id,
+                        name: cat.name,
+                        image: cat.image,
+                      ))
                   .toList(),
               errorResponse: null,
             ));
@@ -151,7 +152,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
                 success: false,
                 data: [],
                 errorResponse:
-                ErrorResponse(message: error.toString(), statusCode: 500),
+                    ErrorResponse(message: error.toString(), statusCode: 500),
               ));
             }
           }
@@ -163,12 +164,11 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           emit(GetCategoryModel(
             success: true,
             data: localData
-                .map((cat) =>
-                category.Data(
-                  id: cat.id,
-                  name: cat.name,
-                  image: cat.image,
-                ))
+                .map((cat) => category.Data(
+                      id: cat.id,
+                      name: cat.name,
+                      image: cat.image,
+                    ))
                 .toList(),
             errorResponse: null,
           ));
@@ -181,12 +181,11 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           emit(GetCategoryModel(
             success: true,
             data: localData
-                .map((cat) =>
-                category.Data(
-                  id: cat.id,
-                  name: cat.name,
-                  image: cat.image,
-                ))
+                .map((cat) => category.Data(
+                      id: cat.id,
+                      name: cat.name,
+                      image: cat.image,
+                    ))
                 .toList(),
             errorResponse: null,
           ));
@@ -204,41 +203,38 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          final value = await ApiProvider()
-              .getProductItemAPI(event.catId, event.searchKey);
+          final value = await ApiProvider().getProductItemAPI(
+              event.catId, event.searchKey, event.searchCode);
 
           if (value.success == true && value.rows != null) {
             await saveProductsToHive(event.catId, value.rows!);
           }
           emit(value);
-        }
-        else {
+        } else {
           final localProducts = await loadProductsFromHive(event.catId);
           final offlineProducts = localProducts
-              .map((p) =>
-              product.Rows(
-                id: p.id,
-                name: p.name,
-                image: p.image,
-                basePrice: p.basePrice,
-                availableQuantity: p.availableQuantity,
-                isStock: p.isStock ?? false,
-                addons: p.addons
-                    ?.map((a) =>
-                    product.Addons(
-                      id: a.id,
-                      name: a.name,
-                      price: a.price,
-                      isFree: a.isFree,
-                      maxQuantity: a.maxQuantity,
-                      isAvailable: a.isAvailable,
-                      quantity: 0,
-                      isSelected: false,
-                    ))
-                    .toList() ??
-                    [],
-                counter: 0,
-              ))
+              .map((p) => product.Rows(
+                    id: p.id,
+                    name: p.name,
+                    image: p.image,
+                    basePrice: p.basePrice,
+                    availableQuantity: p.availableQuantity,
+                    isStock: p.isStock ?? false,
+                    addons: p.addons
+                            ?.map((a) => product.Addons(
+                                  id: a.id,
+                                  name: a.name,
+                                  price: a.price,
+                                  isFree: a.isFree,
+                                  maxQuantity: a.maxQuantity,
+                                  isAvailable: a.isAvailable,
+                                  quantity: 0,
+                                  isSelected: false,
+                                ))
+                            .toList() ??
+                        [],
+                    counter: 0,
+                  ))
               .toList();
 
           emit(product.GetProductByCatIdModel(
@@ -395,7 +391,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           } catch (error) {
             // API failed, try to load from Hive as fallback
             final offlineTables =
-            await HiveStockTableService.getTablesAsApiFormat();
+                await HiveStockTableService.getTablesAsApiFormat();
             if (offlineTables.isNotEmpty) {
               // Create offline response matching your API model structure
               final offlineResponse = GetTableModel(
@@ -418,7 +414,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         } else {
           // Offline: Load from Hive directly
           final offlineTables =
-          await HiveStockTableService.getTablesAsApiFormat();
+              await HiveStockTableService.getTablesAsApiFormat();
           if (offlineTables.isNotEmpty) {
             debugPrint(
                 'Loading ${offlineTables.length} tables from offline storage');
@@ -444,7 +440,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         debugPrint('Error in TableDine event: $e');
         // Fallback to offline data
         final offlineTables =
-        await HiveStockTableService.getTablesAsApiFormat();
+            await HiveStockTableService.getTablesAsApiFormat();
         if (offlineTables.isNotEmpty) {
           final offlineResponse = GetTableModel(
             success: true,
@@ -452,8 +448,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             errorResponse: null,
           );
           emit(offlineResponse);
-        }
-        else {
+        } else {
           emit(GetTableModel(
             success: false,
             data: [],
@@ -478,8 +473,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             debugPrint('📡 Fetching waiters from API...');
             final value = await ApiProvider().getWaiterAPI();
             debugPrint(
-                '✅ API response - success: ${value.success}, data count: ${value
-                    .data?.length ?? 0}');
+                '✅ API response - success: ${value.success}, data count: ${value.data?.length ?? 0}');
 
             if (value.success == true && value.data != null) {
               debugPrint('💾 Saving ${value.data!.length} waiters to Hive...');
@@ -491,8 +485,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           } catch (error) {
             debugPrint('❌ API failed: $error');
             // API failed, load from Hive
-            final offlineWaiters = await HiveWaiterService
-                .getWaitersAsApiFormat();
+            final offlineWaiters =
+                await HiveWaiterService.getWaitersAsApiFormat();
             debugPrint('📂 Offline waiters found: ${offlineWaiters.length}');
 
             if (offlineWaiters.isNotEmpty) {
@@ -510,7 +504,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
                 success: false,
                 data: [], // ← Make sure this is empty array, not null
                 totalCount: 0,
-                errorResponse: ErrorResponse( // ← ADD errorResponse like table
+                errorResponse: ErrorResponse(
+                  // ← ADD errorResponse like table
                   message: error.toString(),
                   statusCode: 500,
                 ),
@@ -520,13 +515,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         } else {
           // Offline: Load from Hive directly
           debugPrint('📶 Offline mode - loading from Hive');
-          final offlineWaiters = await HiveWaiterService
-              .getWaitersAsApiFormat();
+          final offlineWaiters =
+              await HiveWaiterService.getWaitersAsApiFormat();
           debugPrint('📂 Offline waiters found: ${offlineWaiters.length}');
 
           if (offlineWaiters.isNotEmpty) {
-            debugPrint('✅ Loading ${offlineWaiters
-                .length} waiters from offline storage');
+            debugPrint(
+                '✅ Loading ${offlineWaiters.length} waiters from offline storage');
             final offlineResponse = GetWaiterModel(
               success: true,
               data: offlineWaiters,
@@ -540,7 +535,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
               success: false,
               data: [], // ← Empty array, not null
               totalCount: 0,
-              errorResponse: ErrorResponse( // ← ADD errorResponse like table
+              errorResponse: ErrorResponse(
+                // ← ADD errorResponse like table
                 message: 'No offline waiter data available',
                 statusCode: 503,
               ),
@@ -565,7 +561,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             success: false,
             data: [], // ← Empty array, not null
             totalCount: 0,
-            errorResponse: ErrorResponse( // ← ADD errorResponse like table
+            errorResponse: ErrorResponse(
+              // ← ADD errorResponse like table
               message: e.toString(),
               statusCode: 500,
             ),
@@ -595,7 +592,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           } catch (error) {
             // API failed, try to load from Hive as fallback
             final offlineStock =
-            await HiveStockTableService.getStockMaintenanceAsApiModel();
+                await HiveStockTableService.getStockMaintenanceAsApiModel();
             if (offlineStock != null) {
               emit(offlineStock);
             } else {
@@ -611,7 +608,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         } else {
           // Offline: Load from Hive directly
           final offlineStock =
-          await HiveStockTableService.getStockMaintenanceAsApiModel();
+              await HiveStockTableService.getStockMaintenanceAsApiModel();
           if (offlineStock != null) {
             debugPrint('Loading stock maintenance from offline storage');
             emit(offlineStock);
@@ -630,7 +627,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         debugPrint('Error in StockDetails event: $e');
         // Fallback to offline data
         final offlineStock =
-        await HiveStockTableService.getStockMaintenanceAsApiModel();
+            await HiveStockTableService.getStockMaintenanceAsApiModel();
         if (offlineStock != null) {
           emit(offlineStock);
         } else {
@@ -667,22 +664,20 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         totalTax: double.parse(billingSession.totalTax!.toStringAsFixed(2)),
         total: double.parse(billingSession.total!.toStringAsFixed(2)),
         totalDiscount: billingSession.totalDiscount,
-        items: billingSession.items
-            ?.map((hiveItem) {
+        items: billingSession.items?.map((hiveItem) {
           // Convert selectedAddons from Map to proper objects
           List<billing.SelectedAddons>? convertedAddons;
           if (hiveItem.selectedAddons != null &&
               hiveItem.selectedAddons!.isNotEmpty) {
             convertedAddons = hiveItem.selectedAddons!
-                .map((addon) =>
-                billing.SelectedAddons(
-                  id: addon['id']?.toString(),
-                  name: addon['name']?.toString(),
-                  price: (addon['price'] ?? 0.0).toDouble(),
-                  quantity: addon['quantity'] ?? 0,
-                  isAvailable: addon['isAvailable'] ?? true,
-                  isFree: addon['isFree'] ?? false,
-                ))
+                .map((addon) => billing.SelectedAddons(
+                      id: addon['id']?.toString(),
+                      name: addon['name']?.toString(),
+                      price: (addon['price'] ?? 0.0).toDouble(),
+                      quantity: addon['quantity'] ?? 0,
+                      isAvailable: addon['isAvailable'] ?? true,
+                      isFree: addon['isFree'] ?? false,
+                    ))
                 .toList();
           }
 
@@ -710,8 +705,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             selectedAddons: convertedAddons,
             addonTotal: addonTotal,
           );
-        })
-            .toList(),
+        }).toList(),
         errorResponse: null,
       );
 
@@ -730,8 +724,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
     }
   }
 
-  Future<void> _handleOfflineOrderCreation(GenerateOrder event,
-      Emitter emit) async {
+  Future<void> _handleOfflineOrderCreation(
+      GenerateOrder event, Emitter emit) async {
     try {
       // Parse order payload to extract details
       final orderData = jsonDecode(event.orderPayloadJson);
@@ -743,30 +737,31 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
       // Normalize items for offline payload with better null safety
       final normalizedItems = billingSession.items?.map((item) {
-        final map = item.toMap();
-        return {
-          "product": map["_id"] ?? map["product"] ?? 'unknown_product',
-          "name": map["name"]?.toString() ?? 'Unknown Item',
-          "image": map["image"]?.toString() ?? '',
-          "quantity": map["qty"] ?? map["quantity"] ?? 1,
-          "unitPrice": _safeToDouble(map["unitPrice"] ?? map["basePrice"] ?? 0),
-          "subtotal": _safeToDouble(((map["qty"] ?? map["quantity"] ?? 1) *
-              (map["unitPrice"] ?? map["basePrice"] ?? 0))),
-        };
-      }).toList() ?? [];
+            final map = item.toMap();
+            return {
+              "product": map["_id"] ?? map["product"] ?? 'unknown_product',
+              "name": map["name"]?.toString() ?? 'Unknown Item',
+              "image": map["image"]?.toString() ?? '',
+              "quantity": map["qty"] ?? map["quantity"] ?? 1,
+              "unitPrice":
+                  _safeToDouble(map["unitPrice"] ?? map["basePrice"] ?? 0),
+              "subtotal": _safeToDouble(((map["qty"] ?? map["quantity"] ?? 1) *
+                  (map["unitPrice"] ?? map["basePrice"] ?? 0))),
+            };
+          }).toList() ??
+          [];
 
       // Generate order number for offline use
-      final orderNumber = 'OFF-${DateTime
-          .now()
-          .millisecondsSinceEpoch}';
+      final orderNumber = 'OFF-${DateTime.now().millisecondsSinceEpoch}';
 
       // Create KOT items from billing session with null safety
       final kotItems = billingSession.items?.map((item) {
-        return {
-          "name": item.name?.toString() ?? 'Unknown Item',
-          "quantity": item.quantity ?? 1,
-        };
-      }).toList() ?? [];
+            return {
+              "name": item.name?.toString() ?? 'Unknown Item',
+              "quantity": item.quantity ?? 1,
+            };
+          }).toList() ??
+          [];
 
       // Create final taxes array with proper calculation
       final taxAmount = billingSession.totalTax ?? 0.0;
@@ -784,9 +779,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       // Get current timestamp
       final currentTime = DateTime.now();
       final createdAt = currentTime.toIso8601String();
-      final formattedDate = "${currentTime.day}/${currentTime
-          .month}/${currentTime.year}, ${currentTime.hour}:${currentTime
-          .minute}:${currentTime.second}";
+      final formattedDate =
+          "${currentTime.day}/${currentTime.month}/${currentTime.year}, ${currentTime.hour}:${currentTime.minute}:${currentTime.second}";
 
       // Prepare order data for Hive
       final Map<String, dynamic> hiveOrderData = {
@@ -797,11 +791,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         "tableId": orderData['tableId'],
         "tableNo": orderData['tableNo']?.toString() ?? "",
         "waiter": orderData['waiter']?.toString() ?? "",
-        "payments": orderData['payments'] ?? [{
-          "method": orderData['payments']?[0]?['method'] ?? 'CASH',
-          "amount": billingSession.total ?? 0.0
-        }
-        ],
+        "payments": orderData['payments'] ??
+            [
+              {
+                "method": orderData['payments']?[0]?['method'] ?? 'CASH',
+                "amount": billingSession.total ?? 0.0
+              }
+            ],
       };
 
       // Save order for later sync with all required fields
@@ -840,26 +836,26 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         order: Order(
           id: orderId,
           orderNumber: orderNumber,
-          items: normalizedItems.map((item) =>
-              Items(
-                product: item['product']?.toString() ?? 'unknown',
-                name: item['name']?.toString() ?? 'Unknown Item',
-                quantity: item['quantity'] ?? 1,
-                unitPrice: _safeToDouble(item['unitPrice']),
-                subtotal: _safeToDouble(item['subtotal']),
-                addons: [],
-                // Empty addons for offline
-                tax: 0,
-                id: 'offline_${DateTime
-                    .now()
-                    .millisecondsSinceEpoch}',
-              )).toList(),
-          finalTaxes: finalTax.map((tax) =>
-              FinalTaxes(
-                name: tax['name']?.toString() ?? 'Tax',
-                percentage: _safeToDouble(tax['percentage']),
-                amount: _safeToDouble(tax['amt']),
-              )).toList(),
+          items: normalizedItems
+              .map((item) => Items(
+                    product: item['product']?.toString() ?? 'unknown',
+                    name: item['name']?.toString() ?? 'Unknown Item',
+                    quantity: item['quantity'] ?? 1,
+                    unitPrice: _safeToDouble(item['unitPrice']),
+                    subtotal: _safeToDouble(item['subtotal']),
+                    addons: [],
+                    // Empty addons for offline
+                    tax: 0,
+                    id: 'offline_${DateTime.now().millisecondsSinceEpoch}',
+                  ))
+              .toList(),
+          finalTaxes: finalTax
+              .map((tax) => FinalTaxes(
+                    name: tax['name']?.toString() ?? 'Tax',
+                    percentage: _safeToDouble(tax['percentage']),
+                    amount: _safeToDouble(tax['amt']),
+                  ))
+              .toList(),
           subtotal: subtotal,
           orderType: orderData['orderType'] ?? 'DINE-IN',
           tax: taxAmount,
@@ -875,12 +871,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           printType: 'imin',
           thermalIp: "",
           subtotal: subtotal,
-          finalTaxes: finalTax.map((tax) =>
-              FinalTaxes(
-                name: tax['name']?.toString() ?? 'Tax',
-                percentage: _safeToDouble(tax['percentage']),
-                amount: _safeToDouble(tax['amt']),
-              )).toList(),
+          finalTaxes: finalTax
+              .map((tax) => FinalTaxes(
+                    name: tax['name']?.toString() ?? 'Tax',
+                    percentage: _safeToDouble(tax['percentage']),
+                    amount: _safeToDouble(tax['amt']),
+                  ))
+              .toList(),
           salesTax: taxAmount,
           total: billingSession.total ?? 0.0,
           orderNumber: orderNumber,
@@ -891,9 +888,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           // )).toList(),
           date: formattedDate,
           paidBy: orderData['payments']?[0]?['method'] ?? 'CASH',
-          transactionId: 'TXN-OFF-${DateTime
-              .now()
-              .millisecondsSinceEpoch}',
+          transactionId: 'TXN-OFF-${DateTime.now().millisecondsSinceEpoch}',
           tableNum: orderData['tableNo']?.toString() ?? "",
           tableName: orderData['tableNo']?.toString() ?? "",
           waiterName: orderData['waiter']?.toString() ?? "",
@@ -908,9 +903,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             balanceAmount: 0.0,
             status: 'COMPLETED',
             createdAt: createdAt,
-            id: 'pay_offline_${DateTime
-                .now()
-                .millisecondsSinceEpoch}',
+            id: 'pay_offline_${DateTime.now().millisecondsSinceEpoch}',
           )
         ],
       );
@@ -933,8 +926,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
     }
   }
 
-  Future<void> _handleOfflineOrderUpdate(UpdateOrder event,
-      Emitter emit) async {
+  Future<void> _handleOfflineOrderUpdate(
+      UpdateOrder event, Emitter emit) async {
     try {
       // Parse order payload to extract details
       final orderData = jsonDecode(event.orderPayloadJson);
@@ -946,25 +939,28 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
       // Normalize items for offline payload with better null safety
       final normalizedItems = billingSession.items?.map((item) {
-        final map = item.toMap();
-        return {
-          "product": map["_id"] ?? map["product"] ?? 'unknown_product',
-          "name": map["name"]?.toString() ?? 'Unknown Item',
-          "image": map["image"]?.toString() ?? '',
-          "quantity": map["qty"] ?? map["quantity"] ?? 1,
-          "unitPrice": _safeToDouble(map["unitPrice"] ?? map["basePrice"] ?? 0),
-          "subtotal": _safeToDouble(((map["qty"] ?? map["quantity"] ?? 1) *
-              (map["unitPrice"] ?? map["basePrice"] ?? 0))),
-        };
-      }).toList() ?? [];
+            final map = item.toMap();
+            return {
+              "product": map["_id"] ?? map["product"] ?? 'unknown_product',
+              "name": map["name"]?.toString() ?? 'Unknown Item',
+              "image": map["image"]?.toString() ?? '',
+              "quantity": map["qty"] ?? map["quantity"] ?? 1,
+              "unitPrice":
+                  _safeToDouble(map["unitPrice"] ?? map["basePrice"] ?? 0),
+              "subtotal": _safeToDouble(((map["qty"] ?? map["quantity"] ?? 1) *
+                  (map["unitPrice"] ?? map["basePrice"] ?? 0))),
+            };
+          }).toList() ??
+          [];
 
       // Create KOT items from billing session with null safety
       final kotItems = billingSession.items?.map((item) {
-        return {
-          "name": item.name?.toString() ?? 'Unknown Item',
-          "quantity": item.quantity ?? 1,
-        };
-      }).toList() ?? [];
+            return {
+              "name": item.name?.toString() ?? 'Unknown Item',
+              "quantity": item.quantity ?? 1,
+            };
+          }).toList() ??
+          [];
 
       // Create final taxes array with proper calculation
       final taxAmount = billingSession.totalTax ?? 0.0;
@@ -982,9 +978,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       // Get current timestamp
       final currentTime = DateTime.now();
       final createdAt = currentTime.toIso8601String();
-      final formattedDate = "${currentTime.day}/${currentTime
-          .month}/${currentTime.year}, ${currentTime.hour}:${currentTime
-          .minute}:${currentTime.second}";
+      final formattedDate =
+          "${currentTime.day}/${currentTime.month}/${currentTime.year}, ${currentTime.hour}:${currentTime.minute}:${currentTime.second}";
 
       // Prepare order data for Hive
       final Map<String, dynamic> hiveOrderData = {
@@ -995,11 +990,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         "tableId": orderData['tableId'],
         "tableNo": orderData['tableNo']?.toString() ?? "",
         "waiter": orderData['waiter']?.toString() ?? "",
-        "payments": orderData['payments'] ?? [{
-          "method": orderData['payments']?[0]?['method'] ?? 'CASH',
-          "amount": billingSession.total ?? 0.0
-        }
-        ],
+        "payments": orderData['payments'] ??
+            [
+              {
+                "method": orderData['payments']?[0]?['method'] ?? 'CASH',
+                "amount": billingSession.total ?? 0.0
+              }
+            ],
       };
 
       // Save order update for later sync with all required fields
@@ -1020,9 +1017,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         phone: '+91 0000000000',
         waiterName: orderData['waiter']?.toString() ?? "",
         // New fields for receipt generation
-        orderNumber: 'UPD-${DateTime
-            .now()
-            .millisecondsSinceEpoch}',
+        orderNumber: 'UPD-${DateTime.now().millisecondsSinceEpoch}',
         subtotal: subtotal,
         taxAmount: taxAmount,
         discountAmount: billingSession.totalDiscount ?? 0.0,
@@ -1037,33 +1032,33 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
       // Create complete offline response for update
       final offlineResponse = update.UpdateGenerateOrderModel(
-        message: 'Order update saved offline. Will sync when connection is restored.',
+        message:
+            'Order update saved offline. Will sync when connection is restored.',
         order: update.Order(
           id: event.orderId,
           // Use the existing order ID
-          orderNumber: orderData['orderNumber'] ?? 'UPD-${DateTime
-              .now()
-              .millisecondsSinceEpoch}',
-          items: normalizedItems.map((item) =>
-              update.Items(
-                product: item['product']?.toString() ?? 'unknown',
-                name: item['name']?.toString() ?? 'Unknown Item',
-                quantity: item['quantity'] ?? 1,
-                unitPrice: _safeToDouble(item['unitPrice']),
-                subtotal: _safeToDouble(item['subtotal']),
-                addons: [],
-                // Empty addons for offline
-                tax: 0,
-                id: 'update_offline_${DateTime
-                    .now()
-                    .millisecondsSinceEpoch}',
-              )).toList(),
-          finalTaxes: finalTax.map((tax) =>
-              update.FinalTaxes(
-                name: tax['name']?.toString() ?? 'Tax',
-                percentage: _safeToDouble(tax['percentage']),
-                amount: _safeToDouble(tax['amt']),
-              )).toList(),
+          orderNumber: orderData['orderNumber'] ??
+              'UPD-${DateTime.now().millisecondsSinceEpoch}',
+          items: normalizedItems
+              .map((item) => update.Items(
+                    product: item['product']?.toString() ?? 'unknown',
+                    name: item['name']?.toString() ?? 'Unknown Item',
+                    quantity: item['quantity'] ?? 1,
+                    unitPrice: _safeToDouble(item['unitPrice']),
+                    subtotal: _safeToDouble(item['subtotal']),
+                    addons: [],
+                    // Empty addons for offline
+                    tax: 0,
+                    id: 'update_offline_${DateTime.now().millisecondsSinceEpoch}',
+                  ))
+              .toList(),
+          finalTaxes: finalTax
+              .map((tax) => update.FinalTaxes(
+                    name: tax['name']?.toString() ?? 'Tax',
+                    percentage: _safeToDouble(tax['percentage']),
+                    amount: _safeToDouble(tax['amt']),
+                  ))
+              .toList(),
           subtotal: subtotal,
           orderType: orderData['orderType'] ?? 'DINE-IN',
           tax: taxAmount,
@@ -1079,17 +1074,17 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           printType: 'imin',
           thermalIp: "",
           subtotal: subtotal,
-          finalTaxes: finalTax.map((tax) =>
-              update.FinalTaxes(
-                name: tax['name']?.toString() ?? 'Tax',
-                percentage: _safeToDouble(tax['percentage']),
-                amount: _safeToDouble(tax['amt']),
-              )).toList(),
+          finalTaxes: finalTax
+              .map((tax) => update.FinalTaxes(
+                    name: tax['name']?.toString() ?? 'Tax',
+                    percentage: _safeToDouble(tax['percentage']),
+                    amount: _safeToDouble(tax['amt']),
+                  ))
+              .toList(),
           salesTax: taxAmount,
           total: billingSession.total ?? 0.0,
-          orderNumber: orderData['orderNumber'] ?? 'UPD-${DateTime
-              .now()
-              .millisecondsSinceEpoch}',
+          orderNumber: orderData['orderNumber'] ??
+              'UPD-${DateTime.now().millisecondsSinceEpoch}',
           orderStatus: 'PENDING_SYNC',
           // kot: kotItems.map((kotItem) =>
           //     update.Kot(
@@ -1098,9 +1093,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           //     )).toList(),
           date: formattedDate,
           paidBy: orderData['payments']?[0]?['method'] ?? 'CASH',
-          transactionId: 'TXN-UPD-OFF-${DateTime
-              .now()
-              .millisecondsSinceEpoch}',
+          transactionId: 'TXN-UPD-OFF-${DateTime.now().millisecondsSinceEpoch}',
           // tableNum: orderData['tableNo']?.toString() ?? "",
           tableName: orderData['tableNo']?.toString() ?? "",
           waiterName: orderData['waiter']?.toString() ?? "",
@@ -1115,15 +1108,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             balanceAmount: 0.0,
             status: 'COMPLETED',
             createdAt: createdAt,
-            id: 'pay_update_offline_${DateTime
-                .now()
-                .millisecondsSinceEpoch}',
+            id: 'pay_update_offline_${DateTime.now().millisecondsSinceEpoch}',
           )
         ],
       );
 
-      print("✅ Offline order update saved successfully for order ID: ${event
-          .orderId}");
+      print(
+          "✅ Offline order update saved successfully for order ID: ${event.orderId}");
       print("💰 Updated Total: ${billingSession.total}");
       print("📦 Updated Items count: ${normalizedItems.length}");
 

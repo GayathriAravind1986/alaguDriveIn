@@ -405,8 +405,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   }
 
   /// BT KOT Print
-  Future<void> _startKOTPrintingBluetoothOnly(
-      BuildContext context, BluetoothInfo printer) async {
+  Future<void> _startKOTPrintingBluetoothOnly(BuildContext context, BluetoothInfo printer) async {
     try {
       showDialog(
         context: context,
@@ -497,8 +496,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   }
 
   /// LAN KOT Print
-  Future<void> _startKOTPrintingThermalOnly(
-      BuildContext context, String printerIp) async {
+  Future<void> _startKOTPrintingThermalOnly(BuildContext context, String printerIp) async {
     try {
       showDialog(
         context: context,
@@ -1858,7 +1856,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                 );
                                               },
                                             );
-                                          } else {
+                                          }
+                                          else {
                                             final currentQtyInCart =
                                             getCurrentQuantity(p
                                                 .id

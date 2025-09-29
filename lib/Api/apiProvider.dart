@@ -8,18 +8,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Authentication/Post_login_model.dart';
 import 'package:simple/ModelClass/Cart/Post_Add_to_billing_model.dart';
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart' hide Data;
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart'
+    hide Data;
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart';
 import 'package:simple/ModelClass/Order/Delete_order_model.dart';
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart' hide Data;
 import 'package:simple/ModelClass/Order/Post_generate_order_model.dart';
 import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
-import 'package:simple/ModelClass/Order/get_order_list_today_model.dart' hide Data;
-import 'package:simple/ModelClass/Products/get_products_cat_model.dart' hide Data;
+import 'package:simple/ModelClass/Order/get_order_list_today_model.dart'
+    hide Data;
+import 'package:simple/ModelClass/Products/get_products_cat_model.dart'
+    hide Data;
 import 'package:simple/ModelClass/Report/Get_report_model.dart';
-import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart' hide Data;
+import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart'
+    hide Data;
 import 'package:simple/ModelClass/StockIn/getLocationModel.dart' hide Data;
-import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart' hide Data;
+import 'package:simple/ModelClass/StockIn/getSupplierLocationModel.dart'
+    hide Data;
 import 'package:simple/ModelClass/StockIn/get_add_product_model.dart' hide Data;
 import 'package:simple/ModelClass/StockIn/saveStockInModel.dart' hide Data;
 import 'package:simple/ModelClass/User/getUserModel.dart' hide Data;
@@ -143,13 +148,13 @@ class ApiProvider {
 
   /// product - Fetch API Integration
   Future<GetProductByCatIdModel> getProductItemAPI(
-      String? catId, String? searchKey) async {
+      String? catId, String? searchKey, String? searchCode) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
     try {
       var dio = Dio();
       var response = await dio.request(
-        '${Constants.baseUrl}api/products/pos/category-products?filter=false&categoryId=$catId&search=$searchKey',
+        '${Constants.baseUrl}api/products/pos/category-products?filter=false&categoryId=$catId&search=$searchKey&searchcode=$searchCode',
         options: Options(
           method: 'GET',
           headers: {
@@ -163,9 +168,7 @@ class ApiProvider {
               GetProductByCatIdModel.fromJson(response.data);
           return getProductByCatIdResponse;
         }
-      }
-      else
-      {
+      } else {
         return GetProductByCatIdModel()
           ..errorResponse = ErrorResponse(
             message: "Error: ${response.data['message'] ?? 'Unknown error'}",
@@ -192,7 +195,7 @@ class ApiProvider {
     try {
       var dio = Dio();
       var response = await dio.request(
-        '${Constants.baseUrl}api/tables',
+        '${Constants.baseUrl}api/tables?isDefault=true',
         options: Options(
           method: 'GET',
           headers: {
@@ -235,7 +238,7 @@ class ApiProvider {
       debugPrint("Attempting to fetch waiters from network...");
       var dio = Dio();
       var response = await dio.request(
-        '${Constants.baseUrl}api/waiter',
+        '${Constants.baseUrl}api/waiter?isAvailable=true&isSupplier=false',
         options: Options(
           method: 'GET',
           headers: {
@@ -244,9 +247,12 @@ class ApiProvider {
         ),
       );
 
-      if (response.statusCode == 200 && response.data != null && response.data['success'] == true) {
+      if (response.statusCode == 200 &&
+          response.data != null &&
+          response.data['success'] == true) {
         debugPrint("API call successful! Saving data to Hive.");
-        GetWaiterModel getWaiterResponse = GetWaiterModel.fromJson(response.data);
+        GetWaiterModel getWaiterResponse =
+            GetWaiterModel.fromJson(response.data);
         if (getWaiterResponse.data != null) {
           // Save the new data to Hive on successful network response
           await HiveWaiterService.saveWaiters(getWaiterResponse.data!);
@@ -261,23 +267,28 @@ class ApiProvider {
           );
       }
     } on DioException catch (dioError) {
-      debugPrint("DioException occurred! Attempting to load waiters from Hive as a fallback.");
+      debugPrint(
+          "DioException occurred! Attempting to load waiters from Hive as a fallback.");
       final offlineData = await HiveWaiterService.getWaitersAsApiFormat();
       if (offlineData.isNotEmpty) {
-        debugPrint("Successfully loaded ${offlineData.length} waiters from Hive.");
-        return GetWaiterModel(data: offlineData, totalCount: offlineData.length);
+        debugPrint(
+            "Successfully loaded ${offlineData.length} waiters from Hive.");
+        return GetWaiterModel(
+            data: offlineData, totalCount: offlineData.length);
       }
 
       debugPrint("No offline data found. Returning network error.");
       final errorResponse = handleError(dioError);
       return GetWaiterModel()..errorResponse = errorResponse;
-
     } catch (error) {
-      debugPrint("An unexpected error occurred. Attempting to load waiters from Hive.");
+      debugPrint(
+          "An unexpected error occurred. Attempting to load waiters from Hive.");
       final offlineData = await HiveWaiterService.getWaitersAsApiFormat();
       if (offlineData.isNotEmpty) {
-        debugPrint("Successfully loaded ${offlineData.length} waiters from Hive.");
-        return GetWaiterModel(data: offlineData, totalCount: offlineData.length);
+        debugPrint(
+            "Successfully loaded ${offlineData.length} waiters from Hive.");
+        return GetWaiterModel(
+            data: offlineData, totalCount: offlineData.length);
       }
       debugPrint("No offline data found. Returning generic error.");
       return GetWaiterModel()..errorResponse = handleError(error);
@@ -319,12 +330,14 @@ class ApiProvider {
           final offlineData = await HiveUserService.getUsersAsApiFormat();
           if (offlineData.isNotEmpty) {
             debugPrint("Using offline data as fallback");
-            return GetUserModel(data: offlineData, totalCount: offlineData.length);
+            return GetUserModel(
+                data: offlineData, totalCount: offlineData.length);
           }
 
           return GetUserModel()
             ..errorResponse = ErrorResponse(
-              message: response.data['message'] ?? 'API response indicates failure.',
+              message:
+                  response.data['message'] ?? 'API response indicates failure.',
               statusCode: 200,
             );
         }
@@ -334,40 +347,47 @@ class ApiProvider {
         // Try to load from Hive as fallback
         final offlineData = await HiveUserService.getUsersAsApiFormat();
         if (offlineData.isNotEmpty) {
-          debugPrint("Using offline data as fallback for status code ${response.statusCode}");
-          return GetUserModel(data: offlineData, totalCount: offlineData.length);
+          debugPrint(
+              "Using offline data as fallback for status code ${response.statusCode}");
+          return GetUserModel(
+              data: offlineData, totalCount: offlineData.length);
         }
 
         return GetUserModel()
           ..errorResponse = ErrorResponse(
-            message: response.statusMessage ?? "Request failed with status code ${response.statusCode}",
+            message: response.statusMessage ??
+                "Request failed with status code ${response.statusCode}",
             statusCode: response.statusCode,
           );
       }
     } on DioException catch (dioError) {
-      debugPrint("DioException occurred! Attempting to load users from Hive as a fallback.");
+      debugPrint(
+          "DioException occurred! Attempting to load users from Hive as a fallback.");
       final offlineData = await HiveUserService.getUsersAsApiFormat();
       if (offlineData.isNotEmpty) {
-        debugPrint("Successfully loaded ${offlineData.length} users from Hive.");
+        debugPrint(
+            "Successfully loaded ${offlineData.length} users from Hive.");
         return GetUserModel(data: offlineData, totalCount: offlineData.length);
       }
 
       debugPrint("No offline data found. Returning network error.");
       final errorResponse = handleError(dioError);
       return GetUserModel()..errorResponse = errorResponse;
-
     } catch (error) {
-      debugPrint("An unexpected error occurred. Attempting to load users from Hive.");
+      debugPrint(
+          "An unexpected error occurred. Attempting to load users from Hive.");
       final offlineData = await HiveUserService.getUsersAsApiFormat();
       if (offlineData.isNotEmpty) {
-        debugPrint("Successfully loaded ${offlineData.length} users from Hive.");
+        debugPrint(
+            "Successfully loaded ${offlineData.length} users from Hive.");
         return GetUserModel(data: offlineData, totalCount: offlineData.length);
       }
       debugPrint("No offline data found. Returning generic error.");
-      return GetUserModel()..errorResponse = ErrorResponse(
-        message: error.toString(),
-        statusCode: 500,
-      );
+      return GetUserModel()
+        ..errorResponse = ErrorResponse(
+          message: error.toString(),
+          statusCode: 500,
+        );
     }
   }
 
@@ -466,12 +486,12 @@ class ApiProvider {
 
   /// orderToday - Fetch API Integration
   Future<GetOrderListTodayModel> getOrderTodayAPI(
-      String? fromDate,
-      String? toDate,
-      String? tableId,
-      String? waiterId,
-      String? operatorId,
-      ) async {
+    String? fromDate,
+    String? toDate,
+    String? tableId,
+    String? waiterId,
+    String? operatorId,
+  ) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
 
@@ -500,9 +520,7 @@ class ApiProvider {
           ),
         );
       }
-    }
-    catch(e)
-    {
+    } catch (e) {
       debugPrint("❌ API Error: $e");
       return GetOrderListTodayModel(
         success: false,
@@ -517,12 +535,12 @@ class ApiProvider {
 
   /// ReportToday - Fetch API Integration
   Future<GetReportModel> getReportTodayAPI(
-      String? fromDate,
-      String? toDate,
-      String? tableId,
-      String? waiterId,
-      String? operatorId,
-      ) async {
+    String? fromDate,
+    String? toDate,
+    String? tableId,
+    String? waiterId,
+    String? operatorId,
+  ) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
 
@@ -530,13 +548,17 @@ class ApiProvider {
     // await HiveReportService.clearReports();
 
     // ✅ Get business details from SharedPreferences for offline use
-    String businessName = sharedPreferences.getString("businessName") ?? "Alagu Drive In";
+    String businessName =
+        sharedPreferences.getString("businessName") ?? "Alagu Drive In";
     String userName = sharedPreferences.getString("userName") ?? "Counter1";
-    String address = sharedPreferences.getString("address") ?? "Tenkasi main road, Alangualam, Tamil Nadu 627851";
+    String address = sharedPreferences.getString("address") ??
+        "Tenkasi main road, Alangualam, Tamil Nadu 627851";
     String phone = sharedPreferences.getString("phone") ?? "+91 0000000000";
     String location = sharedPreferences.getString("location") ?? "ALANGULAM";
-    String gstNumber = sharedPreferences.getString("gstNumber") ?? "00000000000";
-    String currencySymbol = sharedPreferences.getString("currencySymbol") ?? "₹";
+    String gstNumber =
+        sharedPreferences.getString("gstNumber") ?? "00000000000";
+    String currencySymbol =
+        sharedPreferences.getString("currencySymbol") ?? "₹";
 
     debugPrint(
         "baseUrlReport:'${Constants.baseUrl}api/generate-order/sales-report?from_date=$fromDate&to_date=$toDate&limit=200&tableNo=$tableId&waiter=$waiterId&operator=$operatorId");
@@ -556,16 +578,19 @@ class ApiProvider {
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['success'] == true) {
           // ✅ API success → parse normally
-          GetReportModel getReportListTodayResponse = GetReportModel.fromJson(response.data);
+          GetReportModel getReportListTodayResponse =
+              GetReportModel.fromJson(response.data);
 
           // ✅ Extract business details from API response for saving
-          String apiBusinessName = response.data['businessName'] ?? businessName;
+          String apiBusinessName =
+              response.data['businessName'] ?? businessName;
           String apiUserName = response.data['UserName'] ?? userName;
           String apiAddress = response.data['address'] ?? address;
           String apiPhone = response.data['phone'] ?? phone;
           String apiLocation = response.data['location'] ?? location;
           String apiGstNumber = response.data['gstNumber'] ?? gstNumber;
-          String apiCurrencySymbol = response.data['currencySymbol'] ?? currencySymbol;
+          String apiCurrencySymbol =
+              response.data['currencySymbol'] ?? currencySymbol;
 
           // ✅ Save business details to SharedPreferences for offline use
           await sharedPreferences.setString("businessName", apiBusinessName);
@@ -574,10 +599,12 @@ class ApiProvider {
           await sharedPreferences.setString("phone", apiPhone);
           await sharedPreferences.setString("location", apiLocation);
           await sharedPreferences.setString("gstNumber", apiGstNumber);
-          await sharedPreferences.setString("currencySymbol", apiCurrencySymbol);
+          await sharedPreferences.setString(
+              "currencySymbol", apiCurrencySymbol);
 
           // ✅ Convert API reports to Hive models with ALL business details
-          final List<HiveReportModel> hiveReports = (response.data['data'] as List).map((json) {
+          final List<HiveReportModel> hiveReports =
+              (response.data['data'] as List).map((json) {
             return HiveReportModel.fromJson(
               json,
               userName: apiUserName,
@@ -585,7 +612,8 @@ class ApiProvider {
               address: apiAddress,
               phone: apiPhone,
               location: apiLocation,
-              fromDate: fromDate ?? DateFormat('dd/MM/yyyy').format(DateTime.now()),
+              fromDate:
+                  fromDate ?? DateFormat('dd/MM/yyyy').format(DateTime.now()),
               toDate: toDate ?? DateFormat('dd/MM/yyyy').format(DateTime.now()),
               gstNumber: apiGstNumber,
               currencySymbol: apiCurrencySymbol,
@@ -614,7 +642,9 @@ class ApiProvider {
     } on DioException catch (dioError) {
       // ✅ API failed → fallback to Hive with filtering
       final offlineReports = await HiveReportService.getReports(
-        fromDate: fromDate != null ? DateTime.parse(fromDate) : DateTime.now().subtract(const Duration(days: 30)),
+        fromDate: fromDate != null
+            ? DateTime.parse(fromDate)
+            : DateTime.now().subtract(const Duration(days: 30)),
         toDate: toDate != null ? DateTime.parse(toDate) : DateTime.now(),
         tableNo: tableId,
         waiterId: waiterId,
@@ -628,13 +658,13 @@ class ApiProvider {
           success: true,
           data: offlineReports
               .map((e) => Data(
-            productId: null,
-            productName: e.productName,
-            unitPrice: e.quantity > 0 ? e.amount / e.quantity : 0,
-            totalQty: e.quantity,
-            totalTax: 0,
-            totalAmount: e.amount,
-          ))
+                    productId: null,
+                    productName: e.productName,
+                    unitPrice: e.quantity > 0 ? e.amount / e.quantity : 0,
+                    totalQty: e.quantity,
+                    totalTax: 0,
+                    totalAmount: e.amount,
+                  ))
               .toList(),
           totalRecords: offlineReports.length,
           finalAmount: offlineReports.fold<num>(0, (sum, r) => sum + r.amount),
@@ -657,7 +687,9 @@ class ApiProvider {
     } catch (error) {
       // Last safety fallback: Hive with filtering
       final offlineReports = await HiveReportService.getReports(
-        fromDate: fromDate != null ? DateTime.parse(fromDate) : DateTime.now().subtract(const Duration(days: 30)),
+        fromDate: fromDate != null
+            ? DateTime.parse(fromDate)
+            : DateTime.now().subtract(const Duration(days: 30)),
         toDate: toDate != null ? DateTime.parse(toDate) : DateTime.now(),
         tableNo: tableId,
         waiterId: waiterId,
@@ -670,13 +702,13 @@ class ApiProvider {
           success: true,
           data: offlineReports
               .map((e) => Data(
-            productId: null,
-            productName: e.productName,
-            unitPrice: e.quantity > 0 ? e.amount / e.quantity : 0,
-            totalQty: e.quantity,
-            totalTax: 0,
-            totalAmount: e.amount,
-          ))
+                    productId: null,
+                    productName: e.productName,
+                    unitPrice: e.quantity > 0 ? e.amount / e.quantity : 0,
+                    totalQty: e.quantity,
+                    totalTax: 0,
+                    totalAmount: e.amount,
+                  ))
               .toList(),
           totalRecords: offlineReports.length,
           finalAmount: offlineReports.fold<num>(0, (sum, r) => sum + r.amount),
@@ -695,7 +727,6 @@ class ApiProvider {
       return GetReportModel()..errorResponse = handleError(error);
     }
   }
-
 
   /// Generate Order - Post API Integration
   Future<PostGenerateOrderModel> postGenerateOrderAPI(
@@ -721,7 +752,7 @@ class ApiProvider {
       if (response.statusCode == 201 && response.data != null) {
         try {
           PostGenerateOrderModel postGenerateOrderResponse =
-          PostGenerateOrderModel.fromJson(response.data);
+              PostGenerateOrderModel.fromJson(response.data);
           return postGenerateOrderResponse;
         } catch (e) {
           return PostGenerateOrderModel()
@@ -744,12 +775,6 @@ class ApiProvider {
     }
   }
 
-
-
-
-
-
-
   /// Delete Order - Fetch API Integration
   Future<DeleteOrderModel> deleteOrderAPI(String? orderId) async {
     if (orderId == null || orderId.isEmpty) {
@@ -766,14 +791,16 @@ class ApiProvider {
 
       bool isConnected = false;
       if (connectivityResult is List) {
-        isConnected = connectivityResult.any((result) => result != ConnectivityResult.none);
+        isConnected = connectivityResult
+            .any((result) => result != ConnectivityResult.none);
       } else if (connectivityResult is ConnectivityResult) {
         isConnected = connectivityResult != ConnectivityResult.none;
       }
 
       if (!isConnected) {
         // 📴 Offline: save for later sync
-        print("📴 Offline detected - saving delete request for order: $orderId");
+        print(
+            "📴 Offline detected - saving delete request for order: $orderId");
         final success = await HiveServicedelete.addPendingDelete(orderId);
 
         // 🔧 FIXED: Use 503 status code consistently
@@ -835,7 +862,6 @@ class ApiProvider {
           message: response.data?['message'] ?? 'Failed to delete order',
           statusCode: response.statusCode ?? 503,
         );
-
     } on DioException catch (dioError) {
       print("❌ DioException: ${dioError.type}");
 
@@ -843,7 +869,6 @@ class ApiProvider {
       if (dioError.type == DioExceptionType.connectionTimeout ||
           dioError.type == DioExceptionType.receiveTimeout ||
           dioError.type == DioExceptionType.connectionError) {
-
         print("🔄 Network issue - saving for offline sync");
         await HiveServicedelete.addPendingDelete(orderId);
 
@@ -868,8 +893,6 @@ class ApiProvider {
     }
   }
 
-
-
   /// products-Category - Fetch API Integration
   /// products-Category - Fetch API Integration
   Future<GetProductsCatModel> getProductsCatAPI(String? catId) async {
@@ -889,7 +912,7 @@ class ApiProvider {
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['success'] == true) {
           GetProductsCatModel getProductsCatResponse =
-          GetProductsCatModel.fromJson(response.data);
+              GetProductsCatModel.fromJson(response.data);
           return getProductsCatResponse;
         }
       } else {
@@ -1184,7 +1207,7 @@ class ApiProvider {
   }
 
   /// handle Error Response
- static ErrorResponse handleError(Object error) {
+  static ErrorResponse handleError(Object error) {
     ErrorResponse errorResponse = ErrorResponse();
     Errors errorDescription = Errors();
 
