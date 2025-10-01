@@ -7,6 +7,10 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/observer/observer.dart';
 import 'package:simple/Bloc/theme_cubit.dart';
+import 'package:flutter/foundation.dart';
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart';
+import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
+as product;
 import 'package:simple/Offline/Hive_helper/LocalClass/Order/hive_pending_delete.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/category_model.dart';
@@ -27,6 +31,7 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_stock.d
 // NOTE: Removed 'hide HiveSupplier' to ensure consistent typing
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_serive_stock.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/bulk_product.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive-pending_delete_service.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
@@ -41,17 +46,15 @@ import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart'
 // import 'Offline/Hive_helper/LocalClass/Home/hive_addon_model.dart';
 import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   // Initialize your ApiProvider
   final apiProvider = ApiProvider();
-  // Start listening to connectivity changes
   initConnectivityListener(apiProvider);
 
   await HiveServicedelete.initDeleteBox();
-  // await HiveService.fixHiveTypeIssue();
+
 
   try {
 
@@ -77,7 +80,6 @@ Future<void> main() async {
   }
 
   try {
-    // Open all the necessary boxes.
     await Hive.openBox<HiveCategory>('categories');
     await Hive.openBox<HiveCartItem>('cart_items');
     await Hive.openBox<HiveOrder>('orders');

@@ -101,7 +101,7 @@ class ApiProvider {
   }
 
   /// Category - Fetch API Integration
-  Future<GetCategoryModel> getCategoryAPI() async {
+  static Future<GetCategoryModel> getCategoryAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
     debugPrint("token:$token");
@@ -147,7 +147,7 @@ class ApiProvider {
   }
 
   /// product - Fetch API Integration
-  Future<GetProductByCatIdModel> getProductItemAPI(
+  static Future<GetProductByCatIdModel> getProductItemAPI(
       String? catId, String? searchKey, String? searchCode) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
@@ -894,8 +894,7 @@ class ApiProvider {
   }
 
   /// products-Category - Fetch API Integration
-  /// products-Category - Fetch API Integration
-  Future<GetProductsCatModel> getProductsCatAPI(String? catId) async {
+ static Future<GetProductsCatModel> getProductsCatAPI(String? catId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
     try {

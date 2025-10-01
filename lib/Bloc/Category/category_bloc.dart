@@ -129,7 +129,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           }
 
           try {
-            final value = await ApiProvider().getCategoryAPI();
+            final value = await ApiProvider.getCategoryAPI();
 
             if (value.success == true && value.data != null) {
               // FIXED: Check if data actually changed before saving/emitting
@@ -203,7 +203,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          final value = await ApiProvider().getProductItemAPI(
+          final value = await ApiProvider.getProductItemAPI(
               event.catId, event.searchKey, event.searchCode);
 
           if (value.success == true && value.rows != null) {

@@ -26,20 +26,23 @@ class ProductCategoryBloc extends Bloc<ProductCategoryEvent, dynamic> {
 
       if (isConnected) {
         try {
-          final GetCategoryModel response = await ApiProvider().getCategoryAPI();
-
+          final GetCategoryModel response = await ApiProvider.getCategoryAPI();
           // Check if response is valid and successful
           if (response.success == true && response.data != null) {
             emit(response);
-            await cacheService.saveCategories(response);
+            await ProductCacheService.saveCategories(response);
             print("Categories saved to cache");
-          } else {
-            // API returned unsuccessful, try cache
+          }
+          else
+          {
             final cachedData = await cacheService.getCategories();
-            if (cachedData != null) {
+            if (cachedData != null)
+            {
               print("Using cached categories due to API error");
               emit(cachedData);
-            } else {
+            }
+            else
+            {
               emit("API error and no cached data available");
             }
           }
@@ -74,20 +77,24 @@ class ProductCategoryBloc extends Bloc<ProductCategoryEvent, dynamic> {
 
       if (isConnected) {
         try {
-          final GetProductsCatModel response = await ApiProvider().getProductsCatAPI(event.catId);
+          final GetProductsCatModel response = await ApiProvider.getProductsCatAPI(event.catId);
 
           // Check if response is valid and successful
           if (response.success == true && response.data != null) {
             emit(response);
-            await cacheService.saveProductsCat(event.catId, response);
+            await ProductCacheService.saveProductsCat(event.catId, response);
             print("Products saved to cache for category: ${event.catId}");
-          } else {
+          }
+          else
+          {
             // API returned unsuccessful, try cache
             final cachedData = await cacheService.getProductsCat(event.catId);
             if (cachedData != null) {
               print("Using cached products due to API error");
               emit(cachedData);
-            } else {
+            }
+            else
+            {
               emit("API error and no cached products available");
             }
           }

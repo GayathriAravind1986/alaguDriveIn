@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,10 +6,25 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:simple/Alertbox/snackBarAlert.dart';
 import 'package:simple/Bloc/Authentication/login_bloc.dart';
 import 'package:simple/ModelClass/Authentication/Post_login_model.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/bulk_product.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/customTextfield.dart';
 import 'package:simple/Reusable/space.dart';
 import 'package:simple/UI/DashBoard/custom_tabbar.dart';
+
+
+Future<void> _initializeAppData() async {
+  try {
+    debugPrint('🚀 Initializing app data...');
+
+    await BulkDataService.fetchAllCategoriesWithProducts();
+    await BulkDataService.fetchAndCacheAllCategoriesAndProducts();
+
+    debugPrint('🎉 App data initialization complete!');
+  } catch (e) {
+    debugPrint('❌ App data initialization failed: $e');
+  }
+}
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({
@@ -195,7 +211,7 @@ class LoginScreenViewState extends State<LoginScreenView> {
     return Scaffold(
         backgroundColor: whiteColor,
         body: BlocBuilder<LoginInBloc, dynamic>(
-          buildWhen: ((previous, current) {
+          buildWhen: ((previous, current)  {
             if (current is PostLoginModel) {
               postLoginModel = current;
               if (postLoginModel.success == true) {
@@ -204,6 +220,15 @@ class LoginScreenViewState extends State<LoginScreenView> {
                 });
                 showToast('${postLoginModel.message}', context, color: true);
                 if (postLoginModel.user!.role == "OPERATOR") {
+                  final connectivityResult =  Connectivity().checkConnectivity();
+                  bool hasConnection = connectivityResult != ConnectivityResult.none;
+
+                  debugPrint('🌐 Connectivity: $hasConnection');
+
+                  if(hasConnection)
+                  {
+                     _initializeAppData();
+                  }
                   Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
                           builder: (context) => const DashBoardScreen(

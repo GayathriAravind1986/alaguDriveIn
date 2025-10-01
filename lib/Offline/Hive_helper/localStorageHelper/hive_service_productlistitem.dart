@@ -7,7 +7,7 @@ class ProductCacheService {
   static const String _boxName = "appCacheBox";
 
   /// Get cache box - use single box for all data
-  Future<Box> _getBox() async {
+  static Future<Box> _getBox() async {
     try {
       if (Hive.isBoxOpen(_boxName)) {
         return Hive.box(_boxName);
@@ -20,7 +20,7 @@ class ProductCacheService {
   }
 
   /// Save categories
-  Future<void> saveCategories(GetCategoryModel model) async {
+  static Future<void> saveCategories(GetCategoryModel model) async {
     try {
       final box = await _getBox();
       final jsonString = jsonEncode(model.toJson());
@@ -53,7 +53,7 @@ class ProductCacheService {
   }
 
   /// Save products by category
-  Future<void> saveProductsCat(String catId, GetProductsCatModel model) async {
+  static Future<void> saveProductsCat(String catId, GetProductsCatModel model) async {
     try {
       final box = await _getBox();
       final key = "products_$catId";
