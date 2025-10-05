@@ -55,9 +55,7 @@ Future<void> main() async {
 
   await HiveServicedelete.initDeleteBox();
 
-
   try {
-
     Hive.registerAdapter(HiveCategoryAdapter());
     Hive.registerAdapter(HiveProductAdapter());
     Hive.registerAdapter(HiveAddonAdapter());
@@ -110,6 +108,7 @@ Future<void> main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+
   Bloc.observer = AppBlocObserver();
   await NetworkManager().initialize();
   runApp(const App());

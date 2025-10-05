@@ -1,9 +1,11 @@
+// lib/Offline/Hive_helper/hive_order_today_service.dart
 import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Order/get_order_list_today_model.dart' as order;
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart' as view_order;
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart'; // << new import
 
 /// Service for saving & retrieving orders in Hive (with full API format)
 class HiveOrderTodayService {
@@ -19,7 +21,6 @@ class HiveOrderTodayService {
     final detailsBox = await Hive.openBox(_orderDetailsBox);
     final idsBox = await Hive.openBox(_orderIdsBox);
 
-    // Save the entire order list JSON
     await box.put('orders_today', jsonEncode(data.toJson()));
 
     // Save each order detail in full API format
@@ -31,9 +32,43 @@ class HiveOrderTodayService {
             success: true,
             data: view_order.Data.fromJson(orderItem.toJson()),
           );
-
           await detailsBox.put(orderItem.id!, jsonEncode(fullOrder.toJson()));
           await idsBox.put(orderItem.id!, true);
+        }
+      }
+
+      // After saving all, determine "latest" order id to persist as last-online id.
+      // Strategy: try to parse trailing digits and pick maximum numeric; fallback to last element raw id.
+      String? bestRaw;
+      int bestNum = -1;
+      int bestNumLen = 0;
+      final regex = RegExp(r'(\d+)$');
+
+      for (var orderItem in data.data!) {
+        if (orderItem.id == null) continue;
+        final raw = orderItem.id!;
+        final match = regex.firstMatch(raw);
+        if (match != null) {
+          final digits = match.group(1)!;
+          final num = int.tryParse(digits) ?? -1;
+          if (num > bestNum) {
+            bestNum = num;
+            bestRaw = raw;
+            bestNumLen = digits.length;
+          }
+        } else {
+          // if none have digits, just pick the last available as fallback
+          if (bestRaw == null) bestRaw = raw;
+        }
+      }
+
+      if (bestRaw != null) {
+        try {
+          // Save the raw id, HiveService will extract prefix + numeric details
+          await HiveService.saveLastOnlineOrderIdRaw(bestRaw);
+          debugPrint("💾 Saved last online order id (from list): $bestRaw (num: $bestNum)");
+        } catch (e) {
+          debugPrint("❌ Failed saving last online order id: $e");
         }
       }
     }

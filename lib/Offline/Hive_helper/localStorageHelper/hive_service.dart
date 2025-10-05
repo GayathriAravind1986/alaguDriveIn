@@ -139,8 +139,8 @@ class HiveService {
     List<Map<String, dynamic>>? finalTaxes,
     String? tableName,
   }) async {
-    try {
-      // Make sure adapters are registered before using Hive
+    try
+    {
       if (!Hive.isAdapterRegistered(HiveOrderAdapter().typeId)) {
         Hive.registerAdapter(HiveOrderAdapter());
       }
@@ -153,7 +153,11 @@ class HiveService {
       print("Orders saved in Hive before: ${ordersBox.values.length}");
 
       // Generate unique ID
-      final orderId = const Uuid().v4();
+      // inside saveOfflineOrder(...)
+      final orderId = await HiveService.generateNextOfflineOrderIdString();
+// then use orderId as the Hive key
+
+
 
       // Debug logs for input
       print("Saving Offline Order...");
@@ -230,9 +234,14 @@ class HiveService {
         finalTaxes: finalTaxes,
         tableName: tableName,
       );
+      // String _orderBox = 'orders_today_box';
+      // final box = await Hive.openBox(_orderBox);
+      // box.put('orders_today',order);
 
       // Save to Hive
       await ordersBox.put(orderId, order);
+
+      // await ordersBox.put(orderId, order);
 
       // Confirm save
       final saved = ordersBox.get(orderId);
@@ -407,5 +416,120 @@ class HiveService {
       print("❌ Error fixing Hive issue: $e");
       rethrow;
     }
+  }
+  // ==================== LAST ONLINE / OFFLINE ID MANAGEMENT ====================
+
+  static const String LAST_ONLINE_ORDER_ID_BOX = 'last_online_order_id_box';
+
+  /// Save the last online order ID as raw string (ex: 'ORD-00123' or '1250').
+  /// Internally extracts trailing number, prefix, and numeric length to allow
+  /// generating next sequential offline IDs preserving prefix/padding.
+  static Future<void> saveLastOnlineOrderIdRaw(String orderIdRaw) async {
+    final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
+
+    await box.put('last_online_order_id_raw', orderIdRaw);
+
+    final match = RegExp(r'(\d+)$').firstMatch(orderIdRaw);
+    if (match != null) {
+      final numericStr = match.group(1)!;
+      final numeric = int.tryParse(numericStr) ?? 0;
+      final prefix = orderIdRaw.substring(0, orderIdRaw.length - numericStr.length);
+      await box.put('last_online_order_id_numeric', numeric);
+      await box.put('last_online_order_id_numeric_len', numericStr.length);
+      await box.put('last_online_order_id_prefix', prefix);
+    } else {
+      // No trailing number: treat full raw as prefix and start numbering from 0
+      await box.put('last_online_order_id_numeric', 0);
+      await box.put('last_online_order_id_numeric_len', 0);
+      await box.put('last_online_order_id_prefix', '${orderIdRaw}-');
+    }
+  }
+
+  /// Get the last online order id raw string (or null if none)
+  static Future<String?> getLastOnlineOrderIdRaw() async {
+    final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
+    final raw = box.get('last_online_order_id_raw');
+    if (raw == null) return null;
+    return raw.toString();
+  }
+
+  /// Get the numeric value stored (0 if none)
+  static Future<int> getLastOnlineOrderIdNumeric() async {
+    final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
+    final val = box.get('last_online_order_id_numeric', defaultValue: 0);
+    if (val is int) return val;
+    if (val is String) return int.tryParse(val) ?? 0;
+    return 0;
+  }
+
+  /// Generate next offline order id preserving prefix and padding if possible.
+  /// Example:
+  ///   last raw = "ORD-00123" -> returns "ORD-00124"
+  ///   last raw = "1250" -> returns "1251"
+  ///   none saved -> returns "OFF-0001"
+  static Future<String> generateNextOfflineOrderIdString({String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
+    final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
+    final rawDynamic = box.get('last_online_order_id_raw');
+    final prefixDynamic = box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
+    final numericDynamic = box.get('last_online_order_id_numeric', defaultValue: 0);
+    final numericLenDynamic = box.get('last_online_order_id_numeric_len', defaultValue: defaultPadding);
+
+    String prefix = prefixDynamic?.toString() ?? defaultPrefix;
+    int numeric = (numericDynamic is int) ? numericDynamic : int.tryParse(numericDynamic?.toString() ?? '') ?? 0;
+    int numericLen = (numericLenDynamic is int) ? numericLenDynamic : int.tryParse(numericLenDynamic?.toString() ?? '') ?? defaultPadding;
+
+    if (rawDynamic == null) {
+      // First offline id when nothing is saved yet
+      final newNumeric = 1;
+      final id = '$prefix${newNumeric.toString().padLeft(numericLen, '0')}';
+      await box.put('last_online_order_id_raw', id);
+      await box.put('last_online_order_id_numeric', newNumeric);
+      await box.put('last_online_order_id_numeric_len', numericLen);
+      await box.put('last_online_order_id_prefix', prefix);
+      return id;
+    }
+    else
+    {
+      numeric = numeric + 1;
+      final id = '$prefix${numeric.toString().padLeft(numericLen, '0')}';
+      // persist new values
+      await box.put('last_online_order_id_raw', id);
+      await box.put('last_online_order_id_numeric', numeric);
+      await box.put('last_online_order_id_numeric_len', numericLen);
+      await box.put('last_online_order_id_prefix', prefix);
+      return id;
+    }
+  }
+
+  /// Generate next offline order numeric (returns int) and updates stored numeric and raw.
+  static Future<int> generateNextOfflineOrderIdInt({String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
+    final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
+    final numericDynamic = box.get('last_online_order_id_numeric', defaultValue: 0);
+    final prefixDynamic = box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
+    final numericLenDynamic = box.get('last_online_order_id_numeric_len', defaultValue: defaultPadding);
+
+    int numeric = (numericDynamic is int) ? numericDynamic : int.tryParse(numericDynamic?.toString() ?? '') ?? 0;
+    final prefix = prefixDynamic?.toString() ?? defaultPrefix;
+    final numericLen = (numericLenDynamic is int) ? numericLenDynamic : int.tryParse(numericLenDynamic?.toString() ?? '') ?? defaultPadding;
+
+    numeric = numeric + 1;
+    final raw = '$prefix${numeric.toString().padLeft(numericLen, '0')}';
+
+    await box.put('last_online_order_id_numeric', numeric);
+    await box.put('last_online_order_id_raw', raw);
+    await box.put('last_online_order_id_numeric_len', numericLen);
+    await box.put('last_online_order_id_prefix', prefix);
+
+    return numeric;
+  }
+
+  /// Reset the stored last-online order tracking
+  static Future<void> resetLastOnlineOrderId() async {
+    final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
+    await box.delete('last_online_order_id_raw');
+    await box.delete('last_online_order_id_numeric');
+    await box.delete('last_online_order_id_numeric_len');
+    await box.delete('last_online_order_id_prefix');
+    print("🔄 Reset last online order id tracking");
   }
 }

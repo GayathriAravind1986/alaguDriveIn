@@ -133,9 +133,10 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           // 📴 Offline mode
           final cached = await hiveService.getOrders();
           if (cached != null) {
-            debugPrint('📴 Loaded ${cached.data?.length ?? 0} offline orders');
+            // debugPrint('📴 Loaded ${cached.data?.length ?? 0} offline orders');
             emit(cached);
-          } else {
+          } else
+          {
             emit(order.GetOrderListTodayModel(
               success: false,
               data: [],
