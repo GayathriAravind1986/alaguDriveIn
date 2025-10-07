@@ -107,6 +107,12 @@ class Rows {
     num? saleQuantity,
     num? availableQuantity,
     bool? isStock,
+    num? acPrice,
+    num? hdPrice,
+    num? parcelPrice,
+    num? swiggyPrice,
+    bool? stockMaintenance,
+    String? shortCode,
   }) {
     _id = id;
     _name = name;
@@ -127,6 +133,12 @@ class Rows {
     _saleQuantity = saleQuantity;
     _availableQuantity = availableQuantity;
     _isStock = isStock;
+    _acPrice = acPrice;
+    _hdPrice = hdPrice;
+    _parcelPrice = parcelPrice;
+    _shortCode = shortCode;
+    _swiggyPrice = swiggyPrice;
+    _stockMaintenance = stockMaintenance;
   }
 
   Rows.fromJson(dynamic json) : counter = 0 {
@@ -157,6 +169,12 @@ class Rows {
     _saleQuantity = json['saleQuantity'];
     _availableQuantity = json['availableQuantity'];
     _isStock = json['isStock'];
+    _acPrice = json['acPrice'];
+    _hdPrice = json['hdPrice'];
+    _parcelPrice = json['parcelPrice'];
+    _shortCode = json['shortCode'];
+    _swiggyPrice = json['swiggyPrice'];
+    _stockMaintenance = json['stockMaintenance'];
   }
   String? _id;
   String? _name;
@@ -177,6 +195,12 @@ class Rows {
   num? _saleQuantity;
   num? _availableQuantity;
   bool? _isStock;
+  num? _acPrice;
+  num? _hdPrice;
+  num? _parcelPrice;
+  String? _shortCode;
+  num? _swiggyPrice;
+  bool? _stockMaintenance;
   Rows copyWith({
     String? id,
     String? name,
@@ -197,6 +221,12 @@ class Rows {
     num? saleQuantity,
     num? availableQuantity,
     bool? isStock,
+    num? acPrice,
+    num? hdPrice,
+    num? parcelPrice,
+    String? shortCode,
+    num? swiggyPrice,
+    bool? stockMaintenance,
   }) =>
       Rows(
         id: id ?? _id,
@@ -218,6 +248,12 @@ class Rows {
         saleQuantity: saleQuantity ?? _saleQuantity,
         availableQuantity: availableQuantity ?? _availableQuantity,
         isStock: isStock ?? _isStock,
+        acPrice: acPrice ?? _acPrice,
+        hdPrice: hdPrice ?? _hdPrice,
+        parcelPrice: parcelPrice ?? _parcelPrice,
+        shortCode: shortCode ?? _shortCode,
+        swiggyPrice: swiggyPrice ?? _swiggyPrice,
+        stockMaintenance: stockMaintenance ?? _stockMaintenance,
       );
   String? get id => _id;
   String? get name => _name;
@@ -238,6 +274,12 @@ class Rows {
   num? get saleQuantity => _saleQuantity;
   num? get availableQuantity => _availableQuantity;
   bool? get isStock => _isStock;
+  num? get acPrice => _acPrice;
+  num? get hdPrice => _hdPrice;
+  num? get parcelPrice => _parcelPrice;
+  String? get shortCode => _shortCode;
+  num? get swiggyPrice => _swiggyPrice;
+  bool? get stockMaintenance => _stockMaintenance;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -267,6 +309,12 @@ class Rows {
     map['saleQuantity'] = _saleQuantity;
     map['availableQuantity'] = _availableQuantity;
     map['isStock'] = _isStock;
+    map['acPrice'] = _acPrice;
+    map['hdPrice'] = _hdPrice;
+    map['parcelPrice'] = _parcelPrice;
+    map['shortCode'] = _shortCode;
+    map['swiggyPrice'] = _swiggyPrice;
+    map['stockMaintenance'] = _stockMaintenance;
     return map;
   }
 }

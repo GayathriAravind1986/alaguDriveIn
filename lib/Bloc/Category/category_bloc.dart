@@ -89,7 +89,6 @@ class SyncPendingOrders extends FoodCategoryEvent {}
 
 class LoadOfflineCart extends FoodCategoryEvent {}
 
-// Add new states
 class SyncCompleteState {
   final bool success;
   final String? error;
@@ -211,8 +210,32 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           }
           emit(value);
         } else {
-          final localProducts = await loadProductsFromHive(event.catId);
-          final offlineProducts = localProducts
+          final localProducts = await loadProductsFromHive(event.catId,
+              searchKey: event.searchKey ?? "",
+              searchCode: event.searchCode ?? "");
+
+          final filteredProducts = localProducts.where((p) {
+            if ((event.searchKey.isEmpty) && (event.searchCode.isEmpty)) {
+              return true;
+            }
+            bool matches = false;
+            if (event.searchKey.isNotEmpty) {
+              matches = p.name
+                      ?.toLowerCase()
+                      .contains(event.searchKey.toLowerCase()) ??
+                  false;
+            }
+            if (event.searchCode.isNotEmpty) {
+              matches = matches ||
+                  (p.shortCode
+                          ?.toLowerCase()
+                          .contains(event.searchCode.toLowerCase()) ??
+                      false);
+            }
+            return matches;
+          }).toList();
+
+          final offlineProducts = filteredProducts
               .map((p) => product.Rows(
                     id: p.id,
                     name: p.name,
@@ -220,6 +243,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
                     basePrice: p.basePrice,
                     availableQuantity: p.availableQuantity,
                     isStock: p.isStock ?? false,
+                    shortCode: p.shortCode,
                     addons: p.addons
                             ?.map((a) => product.Addons(
                                   id: a.id,
@@ -263,15 +287,12 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          // Online: Try API first
           try {
             final value = await ApiProvider().postAddToBillingAPI(
               event.billingItems,
               event.isDiscount,
               event.orderType?.apiValue,
             );
-
-            // Save to Hive for offline access
             await HiveService.saveCartItems(event.billingItems);
 
             final billingSession = HiveService.calculateBillingTotals(
@@ -281,15 +302,12 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
             emit(value);
           } catch (error) {
-            // API failed, fall back to offline calculation
             await _handleOfflineBilling(event, emit);
           }
         } else {
-          // Offline: Use Hive
           await _handleOfflineBilling(event, emit);
         }
       } catch (e) {
-        // Connectivity check failed, try offline
         await _handleOfflineBilling(event, emit);
       }
     });
@@ -303,23 +321,18 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          // Online: Try API
           try {
             final value = await ApiProvider()
                 .postGenerateOrderAPI(event.orderPayloadJson);
-
-            // Clear cart after successful order
             await HiveService.clearCart();
             await HiveService.clearBillingSession();
             await HiveService.saveLastOnlineTimestamp();
 
             emit(value);
           } catch (error) {
-            // API failed, save for later sync
             await _handleOfflineOrderCreation(event, emit);
           }
         } else {
-          // Offline: Save for later sync
           await _handleOfflineOrderCreation(event, emit);
         }
       } catch (e) {
@@ -336,7 +349,6 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          // Online: Try API
           try {
             final value = await ApiProvider()
                 .updateGenerateOrderAPI(event.orderPayloadJson, event.orderId);
@@ -347,11 +359,9 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
             emit(value);
           } catch (error) {
-            // API failed, save for later sync
             await _handleOfflineOrderUpdate(event, emit);
           }
         } else {
-          // Offline: Save for later sync
           await _handleOfflineOrderUpdate(event, emit);
         }
       } catch (e) {
@@ -359,7 +369,6 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       }
     });
 
-    // Add sync event
     on<SyncPendingOrders>((event, emit) async {
       try {
         await HiveService.syncPendingOrders(ApiProvider());
@@ -378,24 +387,18 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             .any((result) => result != ConnectivityResult.none);
 
         if (hasConnection) {
-          // Online: Try to fetch from API first
           try {
             final value = await ApiProvider().getTableAPI();
 
             if (value.success == true && value.data != null) {
-              // Save tables to Hive for offline use
               await HiveStockTableService.saveTables(value.data!);
             }
-
             emit(value);
           } catch (error) {
-            // API failed, try to load from Hive as fallback
             final offlineTables =
                 await HiveStockTableService.getTablesAsApiFormat();
             if (offlineTables.isNotEmpty) {
-              // Create offline response matching your API model structure
               final offlineResponse = GetTableModel(
-                // Replace with your actual table model
                 success: true,
                 data: offlineTables,
                 errorResponse: null,
@@ -412,7 +415,6 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             }
           }
         } else {
-          // Offline: Load from Hive directly
           final offlineTables =
               await HiveStockTableService.getTablesAsApiFormat();
           if (offlineTables.isNotEmpty) {

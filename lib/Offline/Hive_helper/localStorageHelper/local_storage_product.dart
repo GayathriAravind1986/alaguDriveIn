@@ -5,7 +5,6 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
 import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
     as product;
 
-
 Future<void> saveProductsToHive(
     String categoryId, List<product.Rows> products) async {
   try {
@@ -19,6 +18,7 @@ Future<void> saveProductsToHive(
         basePrice: product.basePrice?.toDouble() ?? 0.0,
         availableQuantity: product.availableQuantity?.toInt() ?? 0,
         isStock: product.isStock ?? false,
+        shortCode: product.shortCode,
         addons: product.addons
             ?.map((addon) => HiveAddon(
                   id: addon.id,
@@ -38,21 +38,28 @@ Future<void> saveProductsToHive(
   }
 }
 
-Future<List<HiveProduct>> loadProductsFromHive(String categoryId,
-    {String searchKey = ""}) async {
+Future<List<HiveProduct>> loadProductsFromHive(
+  String categoryId, {
+  String searchKey = "",
+  String searchCode = "",
+}) async {
   try {
     final box = await Hive.openBox<HiveProduct>('products_$categoryId');
     List<HiveProduct> products = box.values.toList();
-    if (searchKey.isNotEmpty) {
-      products = products
-          .where((product) =>
-              product.name?.toLowerCase().contains(searchKey.toLowerCase()) ??
-              false)
-          .toList();
+
+    if (searchKey.isNotEmpty || searchCode.isNotEmpty) {
+      products = products.where((product) {
+        final name = product.name?.toLowerCase() ?? "";
+        final code = product.shortCode?.toLowerCase() ?? "";
+        final key = searchKey.toLowerCase();
+        final codeKey = searchCode.toLowerCase();
+        final matchesName = key.isEmpty ? false : name.contains(key);
+        final matchesCode = codeKey.isEmpty ? false : code.contains(codeKey);
+
+        return matchesName || matchesCode;
+      }).toList();
     }
 
-    debugPrint(
-        '✅ Loaded ${products.length} products from Hive for category: $categoryId');
     return products;
   } catch (e) {
     debugPrint('❌ Error loading products from Hive: $e');

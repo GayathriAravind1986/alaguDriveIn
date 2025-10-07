@@ -87,6 +87,10 @@ class ApiProvider {
             "role",
             postLoginResponse.user!.role.toString(),
           );
+          sharedPreferences.setString(
+            "userId",
+            postLoginResponse.user!.id.toString(),
+          );
           return postLoginResponse;
         }
       }
@@ -894,7 +898,7 @@ class ApiProvider {
   }
 
   /// products-Category - Fetch API Integration
- static Future<GetProductsCatModel> getProductsCatAPI(String? catId) async {
+  static Future<GetProductsCatModel> getProductsCatAPI(String? catId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
     try {

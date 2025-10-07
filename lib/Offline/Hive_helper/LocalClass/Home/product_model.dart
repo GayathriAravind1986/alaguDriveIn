@@ -27,6 +27,9 @@ class HiveProduct extends HiveObject {
   @HiveField(6)
   bool? isStock;
 
+  @HiveField(7)
+  String? shortCode;
+
   HiveProduct({
     this.id,
     this.name,
@@ -35,6 +38,7 @@ class HiveProduct extends HiveObject {
     this.availableQuantity,
     this.addons,
     this.isStock,
+    this.shortCode,
   });
 
   /// 🔑 Factory to create HiveProduct from API Rows
@@ -43,6 +47,7 @@ class HiveProduct extends HiveObject {
       id: row.id,
       name: row.name,
       image: row.image,
+      shortCode: row.shortCode,
       basePrice: (row.basePrice ?? 0).toDouble(),
       availableQuantity: row.availableQuantity?.toInt() ?? 0,
       isStock: _toBool(row.isStock),
