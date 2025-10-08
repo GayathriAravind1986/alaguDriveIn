@@ -1,4 +1,6 @@
 // hive_service.dart
+import 'dart:convert';
+
 import 'package:hive/hive.dart';
 import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_billing_session_model.dart';
@@ -89,7 +91,6 @@ class HiveService {
           itemTotal += (addonPrice * addonQty);
         }
       }
-
       subtotal += itemTotal;
     }
 
@@ -315,38 +316,67 @@ class HiveService {
       try {
         print("Syncing order ${order.id} (${order.syncAction})...");
 
+        // Decode JSON and sanitize it before sending
+        Map<String, dynamic> payload = {};
+        try {
+          payload = Map<String, dynamic>.from(jsonDecode(order.orderPayloadJson ?? '{}'));
+        } catch (e) {
+          print("⚠️ Error parsing orderPayloadJson for ${order.id}: $e");
+          continue;
+        }
+
+        // 🧹 Remove unwanted fields for PARCEL orders
+        if (payload['orderType'] == 'PARCEL') {
+          payload.remove('tableNo');
+          payload.remove('tableId');
+          payload.remove('waiter');
+        }
+
+        // 🧹 Remove null or empty fields in general
+        payload.removeWhere((key, value) =>
+        value == null ||
+            (value is String && value.trim().isEmpty) ||
+            (value is List && value.isEmpty));
+
+        final cleanedPayload = jsonEncode(payload);
+
+        // 🔹 CREATE or UPDATE
         if (order.syncAction == 'CREATE') {
-          // 🔹 For new orders
-          final response = await apiProvider.postGenerateOrderAPI(
-              order.orderPayloadJson!);
-          print("📤 CREATE payload: ${order.orderPayloadJson}");
+          final response = await apiProvider.postGenerateOrderAPI(cleanedPayload);
+          print("📤 CREATE payload: $cleanedPayload");
           print("📥 CREATE response: ${response.toJson()}");
 
           if (response.order != null) {
             await markOrderAsSynced(order.id!);
             print("✅ Order created & synced");
+          } else {
+            print("❌ Create failed for order ${order.id}");
           }
         } else if (order.syncAction == 'UPDATE') {
-          // 🔹 For existing orders
           if (order.existingOrderId == null) {
             print("❌ Missing existingOrderId for UPDATE order: ${order.id}");
             continue;
           }
 
           final response = await apiProvider.updateGenerateOrderAPI(
-            order.orderPayloadJson!,
-            order.existingOrderId!, // use server order ID
+            cleanedPayload,
+            order.existingOrderId!,
           );
 
-          print("📤 UPDATE payload: ${order.orderPayloadJson}");
+          print("📤 UPDATE payload: $cleanedPayload");
           print("📥 UPDATE response: ${response.toJson()}");
 
           if (response.order != null) {
             await markOrderAsSynced(order.id!);
             print("✅ Order updated & synced");
+          } else {
+            print("❌ Update failed for order ${order.id}");
           }
         }
-      } catch (e) {
+
+      }
+      catch (e)
+      {
         print("❌ Failed to sync order ${order.id}: $e");
       }
     }

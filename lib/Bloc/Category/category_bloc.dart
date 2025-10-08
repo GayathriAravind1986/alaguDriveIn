@@ -140,7 +140,6 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
                 await saveCategoriesToHive(value.data!);
               }
             }
-
             // Always emit the latest API response
             emit(value);
           } catch (error) {
@@ -172,7 +171,9 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             errorResponse: null,
           ));
         }
-      } catch (e) {
+      }
+      catch (e)
+      {
         debugPrint('Error in FoodCategory event: $e');
         // Fallback logic remains the same
         final localData = await loadCategoriesFromHive();
@@ -215,11 +216,15 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
               searchCode: event.searchCode ?? "");
 
           final filteredProducts = localProducts.where((p) {
-            if ((event.searchKey.isEmpty) && (event.searchCode.isEmpty)) {
+            if ((event.searchKey.isEmpty) && (event.searchCode.isEmpty))
+            {
               return true;
             }
+
             bool matches = false;
-            if (event.searchKey.isNotEmpty) {
+
+            if (event.searchKey.isNotEmpty)
+            {
               matches = p.name
                       ?.toLowerCase()
                       .contains(event.searchKey.toLowerCase()) ??
@@ -260,15 +265,16 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
                     counter: 0,
                   ))
               .toList();
-
           emit(product.GetProductByCatIdModel(
             success: true,
             rows: offlineProducts,
             stockMaintenance: true,
             errorResponse: null,
-          ));
+          )
+          );
         }
-      } catch (e) {
+      }
+      catch (e) {
         emit(product.GetProductByCatIdModel(
           success: false,
           rows: [],
@@ -286,8 +292,10 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         hasConnection = connectivityResult
             .any((result) => result != ConnectivityResult.none);
 
-        if (hasConnection) {
-          try {
+        if (hasConnection)
+        {
+          try
+          {
             final value = await ApiProvider().postAddToBillingAPI(
               event.billingItems,
               event.isDiscount,
@@ -299,7 +307,6 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
                 event.billingItems, event.isDiscount ?? false);
             await HiveService.saveBillingSession(billingSession);
             await HiveService.saveLastOnlineTimestamp();
-
             emit(value);
           } catch (error) {
             await _handleOfflineBilling(event, emit);
@@ -316,10 +323,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       try {
         final connectivityResult = await Connectivity().checkConnectivity();
         bool hasConnection = false;
-
         hasConnection = connectivityResult
             .any((result) => result != ConnectivityResult.none);
-
         if (hasConnection) {
           try {
             final value = await ApiProvider()

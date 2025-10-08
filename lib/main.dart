@@ -49,13 +49,11 @@ import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  // Initialize your ApiProvider
   final apiProvider = ApiProvider();
   initConnectivityListener(apiProvider);
-
   await HiveServicedelete.initDeleteBox();
-
-  try {
+  try
+  {
     Hive.registerAdapter(HiveCategoryAdapter());
     Hive.registerAdapter(HiveProductAdapter());
     Hive.registerAdapter(HiveAddonAdapter());
