@@ -53,20 +53,20 @@ class HiveService {
   // Billing Session Management
   static Future<void> saveBillingSession(HiveBillingSession session) async {
     final billingBox =
-    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
     await billingBox.add(session);
   }
 
   static Future<HiveBillingSession?> getBillingSession() async {
     final billingBox =
-    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     return billingBox.values.isNotEmpty ? billingBox.values.first : null;
   }
 
   static Future<void> clearBillingSession() async {
     final billingBox =
-    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
   }
 
@@ -140,8 +140,7 @@ class HiveService {
     List<Map<String, dynamic>>? finalTaxes,
     String? tableName,
   }) async {
-    try
-    {
+    try {
       if (!Hive.isAdapterRegistered(HiveOrderAdapter().typeId)) {
         Hive.registerAdapter(HiveOrderAdapter());
       }
@@ -157,8 +156,6 @@ class HiveService {
       // inside saveOfflineOrder(...)
       final orderId = await HiveService.generateNextOfflineOrderIdString();
 // then use orderId as the Hive key
-
-
 
       // Debug logs for input
       print("Saving Offline Order...");
@@ -184,7 +181,6 @@ class HiveService {
           final hiveItem = HiveCartItem.fromMap(item);
           hiveItems.add(hiveItem);
           print("Successfully converted item $i: $hiveItem");
-
         } catch (e, stackTrace) {
           print("❌ Error converting item $i to HiveCartItem: ${items[i]}");
           print("❌ Error type: ${e.runtimeType}");
@@ -238,7 +234,6 @@ class HiveService {
       // String _orderBox = 'orders_today_box';
       // final box = await Hive.openBox(_orderBox);
       // box.put('orders_today',order);
-
       // Save to Hive
       await ordersBox.put(orderId, order);
 
@@ -248,9 +243,9 @@ class HiveService {
       final saved = ordersBox.get(orderId);
       print("Orders saved in Hive after: ${ordersBox.values.length}");
       print("✅ Order saved successfully: ${saved?.id}");
+      print("✅ Order saved successfully: ${saved?.tableName}");
 
       return orderId;
-
     } catch (e, stackTrace) {
       print("❌ Critical error in saveOfflineOrder: $e");
       print("❌ Stack trace: $stackTrace");
@@ -319,7 +314,8 @@ class HiveService {
         // Decode JSON and sanitize it before sending
         Map<String, dynamic> payload = {};
         try {
-          payload = Map<String, dynamic>.from(jsonDecode(order.orderPayloadJson ?? '{}'));
+          payload = Map<String, dynamic>.from(
+              jsonDecode(order.orderPayloadJson ?? '{}'));
         } catch (e) {
           print("⚠️ Error parsing orderPayloadJson for ${order.id}: $e");
           continue;
@@ -334,7 +330,7 @@ class HiveService {
 
         // 🧹 Remove null or empty fields in general
         payload.removeWhere((key, value) =>
-        value == null ||
+            value == null ||
             (value is String && value.trim().isEmpty) ||
             (value is List && value.isEmpty));
 
@@ -342,7 +338,8 @@ class HiveService {
 
         // 🔹 CREATE or UPDATE
         if (order.syncAction == 'CREATE') {
-          final response = await apiProvider.postGenerateOrderAPI(cleanedPayload);
+          final response =
+              await apiProvider.postGenerateOrderAPI(cleanedPayload);
           print("📤 CREATE payload: $cleanedPayload");
           print("📥 CREATE response: ${response.toJson()}");
 
@@ -373,10 +370,7 @@ class HiveService {
             print("❌ Update failed for order ${order.id}");
           }
         }
-
-      }
-      catch (e)
-      {
+      } catch (e) {
         print("❌ Failed to sync order ${order.id}: $e");
       }
     }
@@ -384,9 +378,8 @@ class HiveService {
 
   static Future<void> markOrderAsSynced(String orderId) async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    print("Unsynced orders left: ${ordersBox.values
-        .where((o) => o.isSynced == false)
-        .length}");
+    print(
+        "Unsynced orders left: ${ordersBox.values.where((o) => o.isSynced == false).length}");
     final order = ordersBox.get(orderId);
     if (order != null) {
       order.isSynced = true;
@@ -434,14 +427,14 @@ class HiveService {
       // Test opening boxes
       final testCartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
       final testOrderBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-      final testBillingBox = await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+      final testBillingBox =
+          await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
 
       await testCartBox.close();
       await testOrderBox.close();
       await testBillingBox.close();
 
       print("✅ Hive type issue fixed successfully!");
-
     } catch (e) {
       print("❌ Error fixing Hive issue: $e");
       rethrow;
@@ -463,7 +456,8 @@ class HiveService {
     if (match != null) {
       final numericStr = match.group(1)!;
       final numeric = int.tryParse(numericStr) ?? 0;
-      final prefix = orderIdRaw.substring(0, orderIdRaw.length - numericStr.length);
+      final prefix =
+          orderIdRaw.substring(0, orderIdRaw.length - numericStr.length);
       await box.put('last_online_order_id_numeric', numeric);
       await box.put('last_online_order_id_numeric_len', numericStr.length);
       await box.put('last_online_order_id_prefix', prefix);
@@ -497,16 +491,24 @@ class HiveService {
   ///   last raw = "ORD-00123" -> returns "ORD-00124"
   ///   last raw = "1250" -> returns "1251"
   ///   none saved -> returns "OFF-0001"
-  static Future<String> generateNextOfflineOrderIdString({String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
+  static Future<String> generateNextOfflineOrderIdString(
+      {String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
     final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
     final rawDynamic = box.get('last_online_order_id_raw');
-    final prefixDynamic = box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
-    final numericDynamic = box.get('last_online_order_id_numeric', defaultValue: 0);
-    final numericLenDynamic = box.get('last_online_order_id_numeric_len', defaultValue: defaultPadding);
+    final prefixDynamic =
+        box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
+    final numericDynamic =
+        box.get('last_online_order_id_numeric', defaultValue: 0);
+    final numericLenDynamic = box.get('last_online_order_id_numeric_len',
+        defaultValue: defaultPadding);
 
     String prefix = prefixDynamic?.toString() ?? defaultPrefix;
-    int numeric = (numericDynamic is int) ? numericDynamic : int.tryParse(numericDynamic?.toString() ?? '') ?? 0;
-    int numericLen = (numericLenDynamic is int) ? numericLenDynamic : int.tryParse(numericLenDynamic?.toString() ?? '') ?? defaultPadding;
+    int numeric = (numericDynamic is int)
+        ? numericDynamic
+        : int.tryParse(numericDynamic?.toString() ?? '') ?? 0;
+    int numericLen = (numericLenDynamic is int)
+        ? numericLenDynamic
+        : int.tryParse(numericLenDynamic?.toString() ?? '') ?? defaultPadding;
 
     if (rawDynamic == null) {
       // First offline id when nothing is saved yet
@@ -517,9 +519,7 @@ class HiveService {
       await box.put('last_online_order_id_numeric_len', numericLen);
       await box.put('last_online_order_id_prefix', prefix);
       return id;
-    }
-    else
-    {
+    } else {
       numeric = numeric + 1;
       final id = '$prefix${numeric.toString().padLeft(numericLen, '0')}';
       // persist new values
@@ -532,15 +532,23 @@ class HiveService {
   }
 
   /// Generate next offline order numeric (returns int) and updates stored numeric and raw.
-  static Future<int> generateNextOfflineOrderIdInt({String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
+  static Future<int> generateNextOfflineOrderIdInt(
+      {String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
     final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
-    final numericDynamic = box.get('last_online_order_id_numeric', defaultValue: 0);
-    final prefixDynamic = box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
-    final numericLenDynamic = box.get('last_online_order_id_numeric_len', defaultValue: defaultPadding);
+    final numericDynamic =
+        box.get('last_online_order_id_numeric', defaultValue: 0);
+    final prefixDynamic =
+        box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
+    final numericLenDynamic = box.get('last_online_order_id_numeric_len',
+        defaultValue: defaultPadding);
 
-    int numeric = (numericDynamic is int) ? numericDynamic : int.tryParse(numericDynamic?.toString() ?? '') ?? 0;
+    int numeric = (numericDynamic is int)
+        ? numericDynamic
+        : int.tryParse(numericDynamic?.toString() ?? '') ?? 0;
     final prefix = prefixDynamic?.toString() ?? defaultPrefix;
-    final numericLen = (numericLenDynamic is int) ? numericLenDynamic : int.tryParse(numericLenDynamic?.toString() ?? '') ?? defaultPadding;
+    final numericLen = (numericLenDynamic is int)
+        ? numericLenDynamic
+        : int.tryParse(numericLenDynamic?.toString() ?? '') ?? defaultPadding;
 
     numeric = numeric + 1;
     final raw = '$prefix${numeric.toString().padLeft(numericLen, '0')}';

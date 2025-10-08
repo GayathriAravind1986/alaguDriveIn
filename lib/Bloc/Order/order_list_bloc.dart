@@ -6,7 +6,8 @@ import 'package:simple/Bloc/Response/errorResponse.dart';
 import 'package:simple/ModelClass/Order/Delete_order_model.dart';
 import 'package:simple/ModelClass/Order/Get_view_order_model.dart';
 import 'package:simple/ModelClass/Order/get_order_list_today_model.dart';
-import 'package:simple/ModelClass/Order/get_order_list_today_model.dart' as order;
+import 'package:simple/ModelClass/Order/get_order_list_today_model.dart'
+    as order;
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/ModelClass/User/getUserModel.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Order/hive_ordertoday_model.dart';
@@ -28,8 +29,8 @@ class DeleteOrderLoadingState {
 }
 
 class DeleteOrderSuccessState {
-  final String orderId;   // The deleted order's ID
-  final String message;   // Success message
+  final String orderId; // The deleted order's ID
+  final String message; // Success message
   DeleteOrderSuccessState({required this.orderId, required this.message});
 }
 
@@ -43,7 +44,6 @@ class DeleteOrderFailureState {
   final String message;
   DeleteOrderFailureState(this.message);
 }
-
 
 abstract class OrderTodayEvent {}
 
@@ -74,22 +74,105 @@ class WaiterDine extends OrderTodayEvent {}
 class UserDetails extends OrderTodayEvent {}
 
 class StockDetails extends OrderTodayEvent {}
+
 class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
   OrderTodayBloc() : super(dynamic) {
+    // on<OrderTodayList>((event, emit) async {
+    //   final hiveService = HiveOrderTodayService();
+    //   try {
+    //     final connectivityResult = await Connectivity().checkConnectivity();
+    //
+    //     ConnectivityResult result;
+    //     if (connectivityResult is List) {
+    //       if (connectivityResult.isNotEmpty && connectivityResult.first is ConnectivityResult) {
+    //         result = connectivityResult.first as ConnectivityResult;
+    //       } else {
+    //         result = ConnectivityResult.none;
+    //       }
+    //     } else if (connectivityResult is ConnectivityResult) {
+    //       result = connectivityResult as ConnectivityResult;
+    //     } else {
+    //       result = ConnectivityResult.none;
+    //     }
+    //
+    //     final hasConnection = result != ConnectivityResult.none;
+    //
+    //     if (hasConnection) {
+    //       // ✅ Online mode
+    //       try {
+    //         final value = await ApiProvider().getOrderTodayAPI(
+    //           event.fromDate,
+    //           event.toDate,
+    //           event.tableId,
+    //           event.waiterId,
+    //           event.userId,
+    //         );
+    //
+    //         if (value.success == true && value.data != null) {
+    //           // Save to Hive - this will now save both the list AND individual orders
+    //           await hiveService.saveOrders(value);
+    //         }
+    //
+    //         emit(value);
+    //       } catch (error) {
+    //         debugPrint("❌ API failed, fallback to Hive: $error");
+    //         final cached = await hiveService.getOrders();
+    //         if (cached != null) {
+    //           emit(cached);
+    //         } else {
+    //           emit(order.GetOrderListTodayModel(
+    //             success: false,
+    //             data: [],
+    //             errorResponse: order.ErrorResponse(
+    //               message: error.toString(),
+    //               statusCode: 500,
+    //             ),
+    //           ));
+    //         }
+    //       }
+    //     } else {
+    //       // 📴 Offline mode
+    //       final cached = await hiveService.getOrders();
+    //       if (cached != null) {
+    //         // debugPrint('📴 Loaded ${cached.data?.length ?? 0} offline orders');
+    //         emit(cached);
+    //       } else
+    //       {
+    //         emit(order.GetOrderListTodayModel(
+    //           success: false,
+    //           data: [],
+    //           errorResponse: order.ErrorResponse(
+    //             message: 'No offline order data available',
+    //             statusCode: 503,
+    //           ),
+    //         ));
+    //       }
+    //     }
+    //   } catch (e) {
+    //     debugPrint('❌ Bloc Error: $e');
+    //     final cached = await hiveService.getOrders();
+    //     if (cached != null) {
+    //       emit(cached);
+    //     } else {
+    //       emit(order.GetOrderListTodayModel(
+    //         success: false,
+    //         data: [],
+    //         errorResponse: order.ErrorResponse(
+    //           message: e.toString(),
+    //           statusCode: 500,
+    //         ),
+    //       ));
+    //     }
+    //   }
+    // });
     on<OrderTodayList>((event, emit) async {
       final hiveService = HiveOrderTodayService();
       try {
         final connectivityResult = await Connectivity().checkConnectivity();
 
         ConnectivityResult result;
-        if (connectivityResult is List) {
-          if (connectivityResult.isNotEmpty && connectivityResult.first is ConnectivityResult) {
-            result = connectivityResult.first as ConnectivityResult;
-          } else {
-            result = ConnectivityResult.none;
-          }
-        } else if (connectivityResult is ConnectivityResult) {
-          result = connectivityResult as ConnectivityResult;
+        if (connectivityResult.isNotEmpty) {
+          result = connectivityResult.first;
         } else {
           result = ConnectivityResult.none;
         }
@@ -108,16 +191,15 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
             );
 
             if (value.success == true && value.data != null) {
-              // Save to Hive - this will now save both the list AND individual orders
               await hiveService.saveOrders(value);
             }
 
             emit(value);
           } catch (error) {
-            debugPrint("❌ API failed, fallback to Hive: $error");
             final cached = await hiveService.getOrders();
             if (cached != null) {
-              emit(cached);
+              final filtered = _applyFilters(cached, event);
+              emit(filtered);
             } else {
               emit(order.GetOrderListTodayModel(
                 success: false,
@@ -133,10 +215,9 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           // 📴 Offline mode
           final cached = await hiveService.getOrders();
           if (cached != null) {
-            // debugPrint('📴 Loaded ${cached.data?.length ?? 0} offline orders');
-            emit(cached);
-          } else
-          {
+            final filtered = _applyFilters(cached, event);
+            emit(filtered);
+          } else {
             emit(order.GetOrderListTodayModel(
               success: false,
               data: [],
@@ -151,7 +232,8 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         debugPrint('❌ Bloc Error: $e');
         final cached = await hiveService.getOrders();
         if (cached != null) {
-          emit(cached);
+          final filtered = _applyFilters(cached, event);
+          emit(filtered);
         } else {
           emit(order.GetOrderListTodayModel(
             success: false,
@@ -164,7 +246,6 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         }
       }
     });
-    // Replace your existing DeleteOrder handler in OrderTodayBloc with this:
 
     on<DeleteOrder>((event, emit) async {
       if (event.orderId == null || event.orderId!.isEmpty) {
@@ -174,9 +255,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
 
       emit(DeleteOrderLoadingState());
 
-      await ApiProvider()
-          .deleteOrderAPI(event.orderId)
-          .then((result) async {
+      await ApiProvider().deleteOrderAPI(event.orderId).then((result) async {
         if (result.errorResponse != null) {
           final statusCode = result.errorResponse!.statusCode;
           final message = result.errorResponse!.message ?? "Unknown error";
@@ -184,7 +263,8 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           if (statusCode == 503) {
             // Offline save
             await HiveServicedelete.addPendingDelete(event.orderId!);
-            emit(DeleteOrderOfflineSavedState(event.orderId!, "Delete request saved offline"));
+            emit(DeleteOrderOfflineSavedState(
+                event.orderId!, "Delete request saved offline"));
           } else if (statusCode == 401) {
             emit(DeleteOrderFailureState("Unable to delete order"));
           } else if (statusCode == 404) {
@@ -194,7 +274,8 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           }
         } else {
           // Online success
-          emit(DeleteOrderSuccessState(orderId: event.orderId!, message: "Order deleted successfully"));
+          emit(DeleteOrderSuccessState(
+              orderId: event.orderId!, message: "Order deleted successfully"));
         }
       }).catchError((error) async {
         // If API fails, save offline
@@ -210,21 +291,14 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
       });
     });
 
-
     on<ViewOrder>((event, emit) async {
       final hiveService = HiveOrderTodayService();
       try {
         final connectivityResult = await Connectivity().checkConnectivity();
 
         ConnectivityResult result;
-        if (connectivityResult is List) {
-          if (connectivityResult.isNotEmpty && connectivityResult.first is ConnectivityResult) {
-            result = connectivityResult.first as ConnectivityResult;
-          } else {
-            result = ConnectivityResult.none;
-          }
-        } else if (connectivityResult is ConnectivityResult) {
-          result = connectivityResult as ConnectivityResult;
+        if (connectivityResult.isNotEmpty) {
+          result = connectivityResult.first;
         } else {
           result = ConnectivityResult.none;
         }
@@ -233,8 +307,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
 
         if (hasConnection) {
           // ✅ Online mode
-          try
-          {
+          try {
             final value = await ApiProvider().viewOrderAPI(event.orderId);
             print("get order details : $value");
             if (value.success == true && value.data != null) {
@@ -276,7 +349,8 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           }
 
           if (cached != null) {
-            debugPrint('📴 Loaded offline order details for ID: ${event.orderId}');
+            debugPrint(
+                '📴 Loaded offline order details for ID: ${event.orderId}');
             emit(cached);
           } else {
             emit(GetViewOrderModel(
@@ -334,7 +408,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           } catch (error) {
             // API failed, try to load from Hive as fallback
             final offlineTables =
-            await HiveStockTableService.getTablesAsApiFormat();
+                await HiveStockTableService.getTablesAsApiFormat();
             if (offlineTables.isNotEmpty) {
               // Create offline response matching your API model structure
               final offlineResponse = GetTableModel(
@@ -357,7 +431,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         } else {
           // Offline: Load from Hive directly
           final offlineTables =
-          await HiveStockTableService.getTablesAsApiFormat();
+              await HiveStockTableService.getTablesAsApiFormat();
           if (offlineTables.isNotEmpty) {
             debugPrint(
                 'Loading ${offlineTables.length} tables from offline storage');
@@ -383,7 +457,7 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         debugPrint('Error in TableDine event: $e');
         // Fallback to offline data
         final offlineTables =
-        await HiveStockTableService.getTablesAsApiFormat();
+            await HiveStockTableService.getTablesAsApiFormat();
         if (offlineTables.isNotEmpty) {
           final offlineResponse = GetTableModel(
             success: true,
@@ -421,8 +495,10 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           // Online: Try API first
           try {
             debugPrint('📡 Fetching users from API...');
-            final value = await ApiProvider().getUserDetailsAPI(); // This now has offline support
-            debugPrint('✅ API response - success: ${value.success}, data count: ${value.data?.length ?? 0}');
+            final value = await ApiProvider()
+                .getUserDetailsAPI(); // This now has offline support
+            debugPrint(
+                '✅ API response - success: ${value.success}, data count: ${value.data?.length ?? 0}');
 
             if (value.success == true && value.data != null) {
               debugPrint('💾 Saving ${value.data!.length} users to Hive...');
@@ -466,7 +542,8 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
           debugPrint('📂 Offline users found: ${offlineUsers.length}');
 
           if (offlineUsers.isNotEmpty) {
-            debugPrint('✅ Loading ${offlineUsers.length} users from offline storage');
+            debugPrint(
+                '✅ Loading ${offlineUsers.length} users from offline storage');
             final offlineResponse = GetUserModel(
               success: true,
               data: offlineUsers,
@@ -513,5 +590,58 @@ class OrderTodayBloc extends Bloc<OrderTodayEvent, dynamic> {
         }
       }
     });
+  }
+  order.GetOrderListTodayModel _applyFilters(
+    order.GetOrderListTodayModel cached,
+    OrderTodayList event,
+  ) {
+    if (cached.data == null || cached.data!.isEmpty) {
+      return cached;
+    }
+    final hasTableFilter = event.tableId.isNotEmpty &&
+        event.tableId != "0" &&
+        event.tableId.toLowerCase() != "all";
+    final hasWaiterFilter = event.waiterId.isNotEmpty &&
+        event.waiterId != "0" &&
+        event.waiterId.toLowerCase() != "all";
+    final hasUserFilter = event.userId.isNotEmpty &&
+        event.userId != "0" &&
+        event.userId.toLowerCase() != "all";
+    final hasDateFilter = event.fromDate.isNotEmpty || event.toDate.isNotEmpty;
+    if (!hasTableFilter &&
+        !hasWaiterFilter &&
+        !hasUserFilter &&
+        !hasDateFilter) {
+      return cached;
+    }
+
+    final filteredData = cached.data!.where((orderItem) {
+      if (hasTableFilter) {
+        final orderTableId = orderItem.tableNo?.toString() ?? '';
+        if (orderTableId != event.tableId) {
+          return false;
+        }
+      }
+
+      if (hasWaiterFilter) {
+        final orderWaiterId = orderItem.waiter?.toString() ?? '';
+        if (orderWaiterId != event.waiterId) {
+          return false;
+        }
+      }
+      if (hasUserFilter) {
+        final orderUserId = orderItem.operator?.id.toString() ?? '';
+        if (orderUserId != event.userId) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+    return order.GetOrderListTodayModel(
+      success: cached.success,
+      data: filteredData,
+      errorResponse: cached.errorResponse,
+    );
   }
 }

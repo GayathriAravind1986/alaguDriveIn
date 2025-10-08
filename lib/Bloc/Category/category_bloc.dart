@@ -171,9 +171,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             errorResponse: null,
           ));
         }
-      }
-      catch (e)
-      {
+      } catch (e) {
         debugPrint('Error in FoodCategory event: $e');
         // Fallback logic remains the same
         final localData = await loadCategoriesFromHive();
@@ -216,15 +214,13 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
               searchCode: event.searchCode ?? "");
 
           final filteredProducts = localProducts.where((p) {
-            if ((event.searchKey.isEmpty) && (event.searchCode.isEmpty))
-            {
+            if ((event.searchKey.isEmpty) && (event.searchCode.isEmpty)) {
               return true;
             }
 
             bool matches = false;
 
-            if (event.searchKey.isNotEmpty)
-            {
+            if (event.searchKey.isNotEmpty) {
               matches = p.name
                       ?.toLowerCase()
                       .contains(event.searchKey.toLowerCase()) ??
@@ -270,11 +266,9 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             rows: offlineProducts,
             stockMaintenance: true,
             errorResponse: null,
-          )
-          );
+          ));
         }
-      }
-      catch (e) {
+      } catch (e) {
         emit(product.GetProductByCatIdModel(
           success: false,
           rows: [],
@@ -292,10 +286,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         hasConnection = connectivityResult
             .any((result) => result != ConnectivityResult.none);
 
-        if (hasConnection)
-        {
-          try
-          {
+        if (hasConnection) {
+          try {
             final value = await ApiProvider().postAddToBillingAPI(
               event.billingItems,
               event.isDiscount,
@@ -919,6 +911,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       print("📄 Order number: $orderNumber");
       print("💰 Total: ${billingSession.total}");
       print("📦 Items count: ${normalizedItems.length}");
+      print("📦 TableName SaveOffline: ${orderData['tableName']}");
+      print("📦 TableName SaveOfflineHiveOrder: ${orderData['tableNo']}");
 
       emit(offlineResponse);
     } catch (e, stackTrace) {

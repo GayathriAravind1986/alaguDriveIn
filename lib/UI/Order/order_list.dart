@@ -100,9 +100,9 @@ class OrderViewViewState extends State<OrderViewView> {
 
     // Refresh online orders
     context.read<OrderTodayBloc>().add(
-      OrderTodayList(todayDate, todayDate, widget.selectedTableName ?? "",
-          widget.selectedWaiterName ?? "", widget.selectOperator ?? ""),
-    );
+          OrderTodayList(todayDate, todayDate, widget.selectedTableName ?? "",
+              widget.selectedWaiterName ?? "", widget.selectOperator ?? ""),
+        );
 
     // Refresh offline orders - only pending sync
     _loadPendingSyncOrders();
@@ -191,9 +191,9 @@ class OrderViewViewState extends State<OrderViewView> {
 
     // Filter online orders
     final filteredOnlineOrders = getOrderListTodayModel.data?.where((order) {
-      if (widget.type == "All") return true;
-      return order.orderType?.toUpperCase() == type;
-    }).toList() ??
+          if (widget.type == "All") return true;
+          return order.orderType?.toUpperCase() == type;
+        }).toList() ??
         [];
 
     // Filter pending sync orders
@@ -204,8 +204,10 @@ class OrderViewViewState extends State<OrderViewView> {
 
     // Combine both lists, marking pending sync orders
     final combinedOrders = [
-      ...filteredOnlineOrders.map((order) => _OrderItem(order: order, isPendingSync: false)),
-      ...filteredPendingOrders.map((order) => _OrderItem(order: order, isPendingSync: true)),
+      ...filteredOnlineOrders
+          .map((order) => _OrderItem(order: order, isPendingSync: false)),
+      ...filteredPendingOrders
+          .map((order) => _OrderItem(order: order, isPendingSync: true)),
     ];
 
     return combinedOrders;
@@ -226,32 +228,20 @@ class OrderViewViewState extends State<OrderViewView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Pending Sync Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  "SYNC PENDING",
-                  style: MyTextStyle.f10(Colors.white, weight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 4),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Flexible(
                     child: Text(
                       "Order: ${hiveOrder.orderNumber ?? 'Local'}",
-                      style: MyTextStyle.f14(appPrimaryColor, weight: FontWeight.bold),
+                      style: MyTextStyle.f14(appPrimaryColor,
+                          weight: FontWeight.bold),
                     ),
                   ),
                   Text(
                     "₹${hiveOrder.total?.toStringAsFixed(2)}",
-                    style: MyTextStyle.f14(appPrimaryColor, weight: FontWeight.bold),
+                    style: MyTextStyle.f14(appPrimaryColor,
+                        weight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -278,7 +268,9 @@ class OrderViewViewState extends State<OrderViewView> {
                   Text(
                     "Status: ${hiveOrder.orderStatus}",
                     style: TextStyle(
-                      color: hiveOrder.orderStatus == 'COMPLETED' ? greenColor : orangeColor,
+                      color: hiveOrder.orderStatus == 'COMPLETED'
+                          ? greenColor
+                          : orangeColor,
                     ),
                   ),
                 ],
@@ -286,12 +278,6 @@ class OrderViewViewState extends State<OrderViewView> {
 
               const SizedBox(height: 6),
               Text("Table: ${hiveOrder.tableName ?? 'N/A'}"),
-
-              // 🔹 Sync Status - Always "Pending" since we only show pending ones
-              Text(
-                "Sync: Pending",
-                style: MyTextStyle.f12(Colors.orange),
-              ),
 
               const Spacer(),
               // NO BUTTONS HERE as requested (no View, Edit, Print, Delete)
@@ -315,9 +301,8 @@ class OrderViewViewState extends State<OrderViewView> {
     } else {
       // Online order card (original logic for online orders)
       final order = orderItem.order as Data;
-      final payment = order.payments?.isNotEmpty == true
-          ? order.payments!.first
-          : null;
+      final payment =
+          order.payments?.isNotEmpty == true ? order.payments!.first : null;
 
       return Card(
         elevation: 2,
@@ -336,12 +321,14 @@ class OrderViewViewState extends State<OrderViewView> {
                   Flexible(
                     child: Text(
                       "Order ID: ${order.orderNumber ?? '--'}",
-                      style: MyTextStyle.f14(appPrimaryColor, weight: FontWeight.bold),
+                      style: MyTextStyle.f14(appPrimaryColor,
+                          weight: FontWeight.bold),
                     ),
                   ),
                   Text(
                     "₹${order.total?.toStringAsFixed(2) ?? '0.00'}",
-                    style: MyTextStyle.f14(appPrimaryColor, weight: FontWeight.bold),
+                    style: MyTextStyle.f14(appPrimaryColor,
+                        weight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -354,7 +341,7 @@ class OrderViewViewState extends State<OrderViewView> {
                   ),
                   Text(
                     payment?.paymentMethod != null &&
-                        payment!.paymentMethod!.isNotEmpty
+                            payment!.paymentMethod!.isNotEmpty
                         ? "Payment: ${payment.paymentMethod}: ₹${payment.amount?.toStringAsFixed(2) ?? '0.00'}"
                         : "Payment: N/A",
                     style: MyTextStyle.f12(greyColor),
@@ -370,7 +357,9 @@ class OrderViewViewState extends State<OrderViewView> {
                   Text(
                     "Status: ${order.orderStatus}",
                     style: TextStyle(
-                      color: order.orderStatus == 'COMPLETED' ? greenColor : orangeColor,
+                      color: order.orderStatus == 'COMPLETED'
+                          ? greenColor
+                          : orangeColor,
                     ),
                   ),
                 ],
@@ -389,7 +378,8 @@ class OrderViewViewState extends State<OrderViewView> {
                       IconButton(
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.remove_red_eye, color: appPrimaryColor, size: 20),
+                        icon: const Icon(Icons.remove_red_eye,
+                            color: appPrimaryColor, size: 20),
                         onPressed: () {
                           setState(() {
                             view = true;
@@ -406,10 +396,12 @@ class OrderViewViewState extends State<OrderViewView> {
                         IconButton(
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.edit, color: appPrimaryColor, size: 20),
+                          icon: const Icon(Icons.edit,
+                              color: appPrimaryColor, size: 20),
                           onPressed: () {
                             if (order.id == null) {
-                              debugPrint("⚠️ Order ID is null, cannot view order");
+                              debugPrint(
+                                  "⚠️ Order ID is null, cannot view order");
                               return;
                             }
 
@@ -419,16 +411,18 @@ class OrderViewViewState extends State<OrderViewView> {
                               });
                             }
 
-                            context.read<OrderTodayBloc>().add(ViewOrder(order.id!));
+                            context
+                                .read<OrderTodayBloc>()
+                                .add(ViewOrder(order.id!));
                             debugPrint("📦 Viewing order with ID: ${order.id}");
                           },
                         ),
-
                       const SizedBox(width: 4),
                       IconButton(
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.print_outlined, color: appPrimaryColor, size: 20),
+                        icon: const Icon(Icons.print_outlined,
+                            color: appPrimaryColor, size: 20),
                         onPressed: () {
                           setState(() {
                             view = true;
@@ -443,7 +437,8 @@ class OrderViewViewState extends State<OrderViewView> {
                         IconButton(
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.delete, color: appPrimaryColor, size: 20),
+                          icon: const Icon(Icons.delete,
+                              color: appPrimaryColor, size: 20),
                           onPressed: () {
                             context
                                 .read<OrderTodayBloc>()
@@ -475,29 +470,40 @@ class OrderViewViewState extends State<OrderViewView> {
             children: [
               Text("Type: ${order.orderType}"),
               Text("Table: ${order.tableName ?? 'N/A'}"),
-              Text("Status: ${order.orderStatus}", style: TextStyle(color: order.orderStatus == 'COMPLETED' ? greenColor : orangeColor)),
-              Text("Created: ${DateFormat('yyyy-MM-dd HH:mm').format(order.createdAt!)}"),
-              const Text("Sync Status: Pending", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+              Text("Status: ${order.orderStatus}",
+                  style: TextStyle(
+                      color: order.orderStatus == 'COMPLETED'
+                          ? greenColor
+                          : orangeColor)),
+              Text(
+                  "Created: ${DateFormat('yyyy-MM-dd HH:mm').format(order.createdAt!)}"),
+              const Text("Sync Status: Pending",
+                  style: TextStyle(
+                      color: Colors.orange, fontWeight: FontWeight.bold)),
               const Divider(),
-              const Text("Items:", style: TextStyle(fontWeight: FontWeight.bold)),
-              ...order.items!.map((item) =>
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(child: Text("${item.name} x ${item.quantity}")),
-                        Text("₹${item.subtotal?.toStringAsFixed(2)}")
-                      ],
-                    ),
-                  )
-              ).toList(),
+              const Text("Items:",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              ...order.items!
+                  .map((item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 2.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                                child: Text("${item.name} x ${item.quantity}")),
+                            Text("₹${item.subtotal?.toStringAsFixed(2)}")
+                          ],
+                        ),
+                      ))
+                  .toList(),
               const Divider(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("TOTAL:", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text("₹${order.total!.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("TOTAL:",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text("₹${order.total!.toStringAsFixed(2)}",
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 10),
@@ -554,7 +560,8 @@ class OrderViewViewState extends State<OrderViewView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Delete Pending Order?"),
-        content: const Text("Are you sure you want to delete this pending sync order? This action is local and permanent."),
+        content: const Text(
+            "Are you sure you want to delete this pending sync order? This action is local and permanent."),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -589,22 +596,22 @@ class OrderViewViewState extends State<OrderViewView> {
     // Show loading if both online and offline are loading
     if (widget.isLoading && _isLoadingOfflineOrders) {
       return Container(
-          padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
+          padding:
+              EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
           alignment: Alignment.center,
-          child: const SpinKitChasingDots(color: appPrimaryColor, size: 30)
-      );
+          child: const SpinKitChasingDots(color: appPrimaryColor, size: 30));
     }
 
     // Show empty state if no orders
     if (filteredOrders.isEmpty) {
       return Container(
-          padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
+          padding:
+              EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
           alignment: Alignment.center,
           child: Text(
             "No Orders Today !!!",
             style: MyTextStyle.f16(greyColor, weight: FontWeight.w500),
-          )
-      );
+          ));
     }
 
     return Padding(
@@ -639,7 +646,7 @@ class OrderViewViewState extends State<OrderViewView> {
           showToast(current.message, context, color: true);
           setState(() {
             getOrderListTodayModel.data?.removeWhere(
-                  (order) => order.id == current.orderId,
+              (order) => order.id == current.orderId,
             );
           });
           return true;
@@ -650,7 +657,7 @@ class OrderViewViewState extends State<OrderViewView> {
           showToast(current.message, context, color: true);
           setState(() {
             getOrderListTodayModel.data?.removeWhere(
-                  (order) => order.id == current.orderId,
+              (order) => order.id == current.orderId,
             );
           });
           return true;
@@ -677,13 +684,15 @@ class OrderViewViewState extends State<OrderViewView> {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                  builder: (context) =>
+                      const Center(child: CircularProgressIndicator()),
                 );
                 Future.delayed(const Duration(seconds: 1), () {
                   Navigator.of(context).pop();
                   showDialog(
                     context: context,
-                    builder: (context) => ThermalReceiptDialog(getViewOrderModel),
+                    builder: (context) =>
+                        ThermalReceiptDialog(getViewOrderModel),
                   );
                 });
               } else {
@@ -697,13 +706,13 @@ class OrderViewViewState extends State<OrderViewView> {
                       isEditingOrder: true,
                     ),
                   ),
-                      (Route<dynamic> route) => false,
+                  (Route<dynamic> route) => false,
                 )
                     .then((value) {
                   if (value == true) {
                     context.read<OrderTodayBloc>().add(
-                      OrderTodayList(todayDate, todayDate, "", "", ""),
-                    );
+                          OrderTodayList(todayDate, todayDate, "", "", ""),
+                        );
                   }
                 });
               }
@@ -733,7 +742,7 @@ class OrderViewViewState extends State<OrderViewView> {
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen()),
-          (Route<dynamic> route) => false,
+      (Route<dynamic> route) => false,
     );
   }
 }
