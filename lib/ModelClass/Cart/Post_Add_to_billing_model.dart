@@ -5,7 +5,8 @@ import 'package:simple/Bloc/Response/errorResponse.dart';
 /// totalTax : 43.2
 /// total : 283.2
 
-class PostAddToBillingModel {
+class PostAddToBillingModel
+{
   PostAddToBillingModel({
     List<Items>? items,
     num? subtotal,
@@ -14,7 +15,8 @@ class PostAddToBillingModel {
     num? total,
     DiscountSummary? discountSummary,
     ErrorResponse? errorResponse,
-  }) {
+  })
+  {
     _items = items;
     _subtotal = subtotal;
     _totalDiscount = totalDiscount;
@@ -107,7 +109,8 @@ class DiscountSummary {
     num? totalDiscountsApplied,
     num? totalDiscountAmount,
     num? averageDiscountPerItem,
-  }) {
+  })
+  {
     _totalDiscountsApplied = totalDiscountsApplied;
     _totalDiscountAmount = totalDiscountAmount;
     _averageDiscountPerItem = averageDiscountPerItem;
@@ -143,6 +146,7 @@ class DiscountSummary {
     map['averageDiscountPerItem'] = _averageDiscountPerItem;
     return map;
   }
+
 }
 
 class Items {

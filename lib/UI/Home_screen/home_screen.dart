@@ -324,8 +324,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
       _devices.clear();
     });
 
-    try {
-      // Check if Bluetooth is enabled
+    try
+    {
       final bool result = await PrintBluetoothThermal.bluetoothEnabled;
       if (!result) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -387,9 +387,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                   return ListTile(
                     leading: const Icon(Icons.print),
                     title: Text(
-                        printer.name), // Changed from printer.name ?? "Unknown"
+                        printer.name),
                     subtitle: Text(printer
-                        .macAdress), // Changed from printer.address ?? ""
+                        .macAdress),
                     onTap: () {
                       Navigator.pop(context);
                       _startKOTPrintingBluetoothOnly(context, printer);
@@ -1769,7 +1769,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                         padding: EdgeInsets.all(20),
                                                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                                                       ),
-                                                                      child: Text('Cancel', style: MyTextStyle.f14(blackColor)),
+                                                                      child: Text('Cancel', style: MyTextStyle.f14(blackColor)
+                                                                      ),
                                                                     ),
                                                                     SizedBox(width: 8),
                                                                     ElevatedButton(
@@ -1788,7 +1789,8 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           canAdd = true;
                                                                         }
 
-                                                                        if (!canAdd) {
+                                                                        if (!canAdd)
+                                                                        {
                                                                           showToast("Cannot add more items. Stock limit reached.", context, color: false);
                                                                           return;
                                                                         }
@@ -1802,7 +1804,9 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                           if (index != -1) {
                                                                             billingItems[index]['qty'] = billingItems[index]['qty'] + 1;
                                                                             updateControllerText(p.id.toString(), billingItems[index]['qty']);
-                                                                          } else {
+                                                                          }
+                                                                          else
+                                                                          {
                                                                             billingItems.add({
                                                                               "_id": p.id,
                                                                               "basePrice": p.basePrice,
@@ -1826,7 +1830,6 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                                                             updateControllerText(p.id.toString(), 1);
                                                                           }
                                                                           context.read<FoodCategoryBloc>().add(AddToBilling(List.from(billingItems), isDiscountApplied, selectedOrderType));
-
                                                                           setState(() {
                                                                             for (var addon in p.addons!) {
                                                                               addon.isSelected = false;
@@ -1857,13 +1860,13 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                               },
                                             );
                                           }
-                                          else {
+                                          else
+                                          {
                                             final currentQtyInCart =
                                             getCurrentQuantity(p
                                                 .id
                                                 .toString());
                                             bool canAdd;
-
                                             if (p.isStock ==
                                                 true) {
                                               if ((widget.isEditingOrder ==

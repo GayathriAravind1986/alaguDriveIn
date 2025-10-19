@@ -52,15 +52,14 @@ class HiveService {
 
   // Billing Session Management
   static Future<void> saveBillingSession(HiveBillingSession session) async {
-    final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    final billingBox = await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
     await billingBox.add(session);
   }
 
-  static Future<HiveBillingSession?> getBillingSession() async {
-    final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+  static Future<HiveBillingSession?> getBillingSession() async
+  {
+    final billingBox = await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     return billingBox.values.isNotEmpty ? billingBox.values.first : null;
   }
 
