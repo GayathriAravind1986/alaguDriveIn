@@ -294,9 +294,14 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
               event.orderType?.apiValue,
             );
             await HiveService.saveCartItems(event.billingItems);
-
+            if (event.orderType != null) {
+              await HiveService.saveOrderType(event.orderType!.apiValue);
+            }
             final billingSession = HiveService.calculateBillingTotals(
-                event.billingItems, event.isDiscount ?? false);
+              event.billingItems,
+              event.isDiscount ?? false,
+              orderType: event.orderType?.apiValue,
+            );
             await HiveService.saveBillingSession(billingSession);
             await HiveService.saveLastOnlineTimestamp();
             emit(value);
@@ -648,9 +653,15 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
   Future<void> _handleOfflineBilling(AddToBilling event, Emitter emit) async {
     try {
+      if (event.orderType != null) {
+        await HiveService.saveOrderType(event.orderType!.apiValue);
+      }
       // Calculate totals offline
       final billingSession = HiveService.calculateBillingTotals(
-          event.billingItems, event.isDiscount ?? false);
+        event.billingItems,
+        event.isDiscount ?? false,
+        orderType: event.orderType?.apiValue,
+      );
 
       // Save to Hive
       await HiveService.saveCartItems(event.billingItems);
@@ -665,6 +676,8 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         totalDiscount: billingSession.totalDiscount,
         items: billingSession.items?.map((hiveItem) {
           // Convert selectedAddons from Map to proper objects
+          double itemPrice =
+              hiveItem.getPriceForOrderType(event.orderType?.apiValue);
           List<billing.SelectedAddons>? convertedAddons;
           if (hiveItem.selectedAddons != null &&
               hiveItem.selectedAddons!.isNotEmpty) {
@@ -697,7 +710,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             // Use product as ID
             name: hiveItem.name,
             image: hiveItem.image,
-            basePrice: hiveItem.basePrice ?? hiveItem.unitPrice,
+            basePrice: itemPrice,
             qty: hiveItem.quantity,
             availableQuantity: hiveItem.quantity,
             // Use same as qty for offline

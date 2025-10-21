@@ -13,6 +13,7 @@ class HiveService {
   static const String ORDERS_BOX = 'orders';
   static const String BILLING_SESSION_BOX = 'billing_session';
   static const String SYNC_QUEUE_BOX = 'sync_queue';
+  static const String orderTypeBoxName = 'order_type';
   static Box? _pendingActionsBox;
 
   static Future<Box> getPendingActionsBox() async {
@@ -70,46 +71,127 @@ class HiveService {
     await billingBox.clear();
   }
 
+  /// Save current order type
+  static Future<void> saveOrderType(String orderType) async {
+    final box = await Hive.openBox<String>(orderTypeBoxName);
+    await box.put('current_order_type', orderType);
+  }
+
+  /// Get current order type
+  static Future<String?> getCurrentOrderType() async {
+    final box = await Hive.openBox<String>(orderTypeBoxName);
+    return box.get('current_order_type');
+  }
+
   // Calculate billing totals offline
+  // static HiveBillingSession calculateBillingTotals(List<Map<String, dynamic>> billingItems, bool isDiscountApplied) {
+  //   double subtotal = 0.0;
+  //   double totalTax = 0.0;
+  //   double totalDiscount = 0.0;
+  //
+  //   for (var item in billingItems) {
+  //     double basePrice = (item['basePrice'] ?? 0.0).toDouble();
+  //     int qty = item['qty'] ?? 1;
+  //     double itemTotal = basePrice * qty;
+  //
+  //     // Calculate addon costs
+  //     List<dynamic> selectedAddons = item['selectedAddons'] ?? [];
+  //     for (var addon in selectedAddons) {
+  //       if (!(addon['isFree'] ?? false)) {
+  //         double addonPrice = (addon['price'] ?? 0.0).toDouble();
+  //         int addonQty = addon['quantity'] ?? 0;
+  //         itemTotal += (addonPrice * addonQty);
+  //       }
+  //     }
+  //     subtotal += itemTotal;
+  //   }
+  //
+  //   // Simplified tax calculation (you can adjust based on your business logic)
+  //   totalTax = subtotal * 0.0; // 18% tax
+  //
+  //   if (isDiscountApplied) {
+  //     totalDiscount = subtotal * 0.0; // 10% discount
+  //   }
+  //
+  //   double total = subtotal + totalTax - totalDiscount;
+  //
+  //   return HiveBillingSession(
+  //     items: billingItems.map((item) => HiveCartItem.fromMap(item)).toList(),
+  //     isDiscountApplied: isDiscountApplied,
+  //     subtotal: subtotal,
+  //     totalTax: totalTax,
+  //     total: total,
+  //     totalDiscount: totalDiscount,
+  //     lastUpdated: DateTime.now(),
+  //   );
+  // }
   static HiveBillingSession calculateBillingTotals(
-      List<Map<String, dynamic>> billingItems, bool isDiscountApplied) {
+    List<Map<String, dynamic>> billingItems,
+    bool isDiscount, {
+    String? orderType,
+  }) {
     double subtotal = 0.0;
     double totalTax = 0.0;
     double totalDiscount = 0.0;
 
-    for (var item in billingItems) {
-      double basePrice = (item['basePrice'] ?? 0.0).toDouble();
-      int qty = item['qty'] ?? 1;
-      double itemTotal = basePrice * qty;
+    List<HiveCartItem> hiveItems = [];
 
-      // Calculate addon costs
-      List<dynamic> selectedAddons = item['selectedAddons'] ?? [];
-      for (var addon in selectedAddons) {
-        if (!(addon['isFree'] ?? false)) {
-          double addonPrice = (addon['price'] ?? 0.0).toDouble();
-          int addonQty = addon['quantity'] ?? 0;
-          itemTotal += (addonPrice * addonQty);
+    for (var item in billingItems) {
+      final hiveItem = HiveCartItem.fromMap(item);
+
+      // Get the correct price based on order type
+      double itemPrice = hiveItem.getPriceForOrderType(orderType);
+      int itemQty = hiveItem.quantity ?? 1;
+
+      // Calculate addon total
+      double addonTotal = 0.0;
+      if (hiveItem.selectedAddons != null) {
+        for (var addon in hiveItem.selectedAddons!) {
+          if (!(addon['isFree'] ?? false)) {
+            double addonPrice = (addon['price'] ?? 0.0).toDouble();
+            int addonQty = addon['quantity'] ?? 0;
+            addonTotal += (addonPrice * addonQty);
+          }
         }
       }
-      subtotal += itemTotal;
+
+      // Calculate item subtotal (base price + addons) * quantity
+      double itemSubtotal = (itemPrice + addonTotal) * itemQty;
+
+      // Update hiveItem with calculated values
+      hiveItem.unitPrice = itemPrice;
+      hiveItem.basePrice = itemPrice;
+      hiveItem.subtotal = itemSubtotal;
+
+      // Calculate tax for this item
+      double itemTax = itemSubtotal * 0.18;
+      hiveItem.taxPrice = itemTax;
+
+      // Calculate total price including tax
+      hiveItem.totalPrice = itemSubtotal + itemTax;
+
+      subtotal += itemSubtotal;
+      totalTax += itemTax;
+
+      hiveItems.add(hiveItem);
     }
 
-    // Simplified tax calculation (you can adjust based on your business logic)
-    totalTax = subtotal * 0.0; // 18% tax
-
-    if (isDiscountApplied) {
-      totalDiscount = subtotal * 0.0; // 10% discount
+    // Apply discount if applicable
+    if (isDiscount) {
+      totalDiscount = subtotal * 0.1; // 10% discount
+      subtotal -= totalDiscount;
     }
 
-    double total = subtotal + totalTax - totalDiscount;
+    double total = subtotal + totalTax;
 
     return HiveBillingSession(
-      items: billingItems.map((item) => HiveCartItem.fromMap(item)).toList(),
-      isDiscountApplied: isDiscountApplied,
+      isDiscountApplied: isDiscount,
       subtotal: subtotal,
       totalTax: totalTax,
       total: total,
       totalDiscount: totalDiscount,
+      items: hiveItems,
+      orderType: orderType,
       lastUpdated: DateTime.now(),
     );
   }
