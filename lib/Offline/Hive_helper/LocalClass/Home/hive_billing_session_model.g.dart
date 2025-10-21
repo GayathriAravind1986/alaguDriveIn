@@ -24,13 +24,14 @@ class HiveBillingSessionAdapter extends TypeAdapter<HiveBillingSession> {
       total: fields[4] as double?,
       totalDiscount: fields[5] as double?,
       lastUpdated: fields[6] as DateTime?,
+      orderType: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HiveBillingSession obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.items)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class HiveBillingSessionAdapter extends TypeAdapter<HiveBillingSession> {
       ..writeByte(5)
       ..write(obj.totalDiscount)
       ..writeByte(6)
-      ..write(obj.lastUpdated);
+      ..write(obj.lastUpdated)
+      ..writeByte(7)
+      ..write(obj.orderType);
   }
 
   @override

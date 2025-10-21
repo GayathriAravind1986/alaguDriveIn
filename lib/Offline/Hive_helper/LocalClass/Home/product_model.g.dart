@@ -25,13 +25,17 @@ class HiveProductAdapter extends TypeAdapter<HiveProduct> {
       addons: (fields[5] as List?)?.cast<HiveAddon>(),
       isStock: fields[6] as bool?,
       shortCode: fields[7] as String?,
+      parcelPrice: fields[8] as double?,
+      acPrice: fields[9] as double?,
+      swiggyPrice: fields[10] as double?,
+      hdPrice: fields[11] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HiveProduct obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +51,15 @@ class HiveProductAdapter extends TypeAdapter<HiveProduct> {
       ..writeByte(6)
       ..write(obj.isStock)
       ..writeByte(7)
-      ..write(obj.shortCode);
+      ..write(obj.shortCode)
+      ..writeByte(8)
+      ..write(obj.parcelPrice)
+      ..writeByte(9)
+      ..write(obj.acPrice)
+      ..writeByte(10)
+      ..write(obj.swiggyPrice)
+      ..writeByte(11)
+      ..write(obj.hdPrice);
   }
 
   @override

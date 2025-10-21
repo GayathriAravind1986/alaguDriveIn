@@ -172,6 +172,7 @@
 //     return 'HiveCartItem(id: $id, product: $product, name: $name, quantity: $quantity, unitPrice: $unitPrice, subtotal: $subtotal)';
 //   }
 // }
+import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
 
 part 'hive_cart_model.g.dart';
@@ -255,27 +256,33 @@ class HiveCartItem extends HiveObject {
   });
 
   /// Get price based on order type
-  double getPriceForOrderType(String? orderType) {
+  double getPriceByOrderType(String? orderType) {
+    debugPrint("orderTypeInCartModel:$orderType");
     if (orderType == null) return unitPrice ?? basePrice ?? 0.0;
-
-    switch (orderType.toLowerCase()) {
-      case 'ac':
-        return acPrice ?? unitPrice ?? basePrice ?? 0.0;
-      case 'swiggy':
-        return swiggyPrice ?? unitPrice ?? basePrice ?? 0.0;
-      case 'parcel':
-        return parcelPrice ?? unitPrice ?? basePrice ?? 0.0;
-      case 'hd':
-        return hdPrice ?? unitPrice ?? basePrice ?? 0.0;
+    debugPrint("UnitPriceInCartModel:$unitPrice");
+    debugPrint("BasePriceInCartModel:$basePrice");
+    debugPrint("AcPriceInCartModel:$acPrice");
+    switch (orderType.toUpperCase()) {
+      case 'AC':
+        return acPrice ?? basePrice ?? 0.0;
+      case 'PARCEL':
+        return parcelPrice ?? basePrice ?? 0.0;
+      case 'SWIGGY':
+        return swiggyPrice ?? basePrice ?? 0.0;
+      case 'HD':
+        return hdPrice ?? basePrice ?? 0.0;
       default:
-        return unitPrice ?? basePrice ?? 0.0;
+        return basePrice ?? 0.0;
     }
   }
 
   /// Main factory method that handles both online and offline data structures
   factory HiveCartItem.fromMap(Map<String, dynamic> map) {
     final quantity = _safeInt(map["quantity"] ?? map["qty"]);
-
+    print("🔍 fromMap input:");
+    print("   acPrice: ${map['acPrice']}");
+    print("   parcelPrice: ${map['parcelPrice']}");
+    print("   Keys: ${map.keys.toList()}");
     return HiveCartItem(
       product: map["product"]?.toString() ??
           map["productId"]?.toString() ??

@@ -29,7 +29,17 @@ class HiveProduct extends HiveObject {
 
   @HiveField(7)
   String? shortCode;
+  @HiveField(8)
+  double? parcelPrice;
 
+  @HiveField(9)
+  double? acPrice;
+
+  @HiveField(10)
+  double? swiggyPrice;
+
+  @HiveField(11)
+  double? hdPrice;
   HiveProduct({
     this.id,
     this.name,
@@ -39,6 +49,10 @@ class HiveProduct extends HiveObject {
     this.addons,
     this.isStock,
     this.shortCode,
+    this.parcelPrice,
+    this.acPrice,
+    this.swiggyPrice,
+    this.hdPrice,
   });
 
   /// 🔑 Factory to create HiveProduct from API Rows
@@ -52,6 +66,10 @@ class HiveProduct extends HiveObject {
       availableQuantity: row.availableQuantity?.toInt() ?? 0,
       isStock: _toBool(row.isStock),
       addons: row.addons?.map((a) => HiveAddon.fromApi(a)).toList(),
+      parcelPrice: (row.parcelPrice ?? row.basePrice ?? 0).toDouble(),
+      acPrice: (row.acPrice ?? row.basePrice ?? 0).toDouble(),
+      swiggyPrice: (row.swiggyPrice ?? row.basePrice ?? 0).toDouble(),
+      hdPrice: (row.hdPrice ?? row.basePrice ?? 0).toDouble(),
     );
   }
 

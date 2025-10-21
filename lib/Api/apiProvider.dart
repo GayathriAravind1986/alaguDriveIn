@@ -20,7 +20,8 @@ import 'package:simple/ModelClass/Order/get_order_list_today_model.dart'
 import 'package:simple/ModelClass/Products/get_products_cat_model.dart'
     hide Data;
 import 'package:simple/ModelClass/Report/Get_report_model.dart';
-import 'package:simple/ModelClass/ShopDetails/getShopDetailsModel.dart' hide Data;
+import 'package:simple/ModelClass/ShopDetails/getShopDetailsModel.dart'
+    hide Data;
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart'
     hide Data;
 import 'package:simple/ModelClass/StockIn/getLocationModel.dart' hide Data;
@@ -68,8 +69,7 @@ class ApiProvider {
         '${Constants.baseUrl}auth/users/login'.trim(),
         options: Options(
           method: 'POST',
-          headers:
-          {
+          headers: {
             'Content-Type': 'application/json',
           },
         ),
@@ -401,8 +401,7 @@ class ApiProvider {
   Future<GetStockMaintanencesModel> getStockDetailsAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
-    try
-    {
+    try {
       var dio = Dio();
       var response = await dio.request(
         '${Constants.baseUrl}api/shops',
@@ -440,13 +439,10 @@ class ApiProvider {
     }
   }
 
-  // In your ApiProvider class
+  /// ShopDetails - API Integration
   Future<GetShopDetailsModel> getShopDetailsAPI() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
-
-    print("🔑 API Call - Token: ${token != null ? 'Available' : 'Missing'}");
-    print("🌐 API URL: ${Constants.baseUrl}api/location/byuser");
 
     try {
       var dio = Dio();
@@ -459,21 +455,13 @@ class ApiProvider {
           },
         ),
       );
-
-      print("📡 API Response Status: ${response.statusCode}");
-      print("📦 API Response Data: ${response.data}");
-
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['success'] == true) {
-          GetShopDetailsModel getShopDetailsResponse = GetShopDetailsModel.fromJson(response.data);
-          print("✅ API Success - Shop Name: ${getShopDetailsResponse.data?.name}");
+          GetShopDetailsModel getShopDetailsResponse =
+              GetShopDetailsModel.fromJson(response.data);
           return getShopDetailsResponse;
-        } else {
-          print("❌ API returned success: false");
-          print("   - Message: ${response.data['message']}");
         }
       } else {
-        print("❌ API Error - Status: ${response.statusCode}");
         return GetShopDetailsModel()
           ..errorResponse = ErrorResponse(
             message: "Error: ${response.data['message'] ?? 'Unknown error'}",
@@ -486,11 +474,9 @@ class ApiProvider {
           statusCode: 500,
         );
     } on DioException catch (dioError) {
-      print("❌ Dio Error: ${dioError.message}");
       final errorResponse = handleError(dioError);
       return GetShopDetailsModel()..errorResponse = errorResponse;
     } catch (error) {
-      print("❌ General Error: $error");
       return GetShopDetailsModel()..errorResponse = handleError(error);
     }
   }
@@ -502,8 +488,7 @@ class ApiProvider {
       String? orderType) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
-    try
-    {
+    try {
       final dataMap = {
         "items": billingItems,
         "isApplicableDiscount": isDiscount,
@@ -533,23 +518,17 @@ class ApiProvider {
               message: "Failed to parse response: $e",
             );
         }
-      }
-      else
-      {
+      } else {
         return PostAddToBillingModel()
           ..errorResponse = ErrorResponse(
             message: "Error: ${response.data['message'] ?? 'Unknown error'}",
             statusCode: response.statusCode,
           );
       }
-    }
-    on DioException catch (dioError)
-    {
+    } on DioException catch (dioError) {
       final errorResponse = handleError(dioError);
       return PostAddToBillingModel()..errorResponse = errorResponse;
-    }
-    catch (error)
-    {
+    } catch (error) {
       return PostAddToBillingModel()..errorResponse = handleError(error);
     }
   }
@@ -564,8 +543,7 @@ class ApiProvider {
   ) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     var token = sharedPreferences.getString("token");
-    try
-    {
+    try {
       debugPrint(
           "baseUrlOrder: ${Constants.baseUrl}api/generate-order?from_date=$fromDate&to_date=$toDate&tableNo=$tableId&waiter=$waiterId&operator=$operatorId");
 

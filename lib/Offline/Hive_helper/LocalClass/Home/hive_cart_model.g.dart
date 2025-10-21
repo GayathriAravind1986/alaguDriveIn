@@ -33,13 +33,17 @@ class HiveCartItemAdapter extends TypeAdapter<HiveCartItem> {
       id: fields[11] as String?,
       qty: fields[12] as int?,
       availableQuantity: fields[13] as int?,
+      acPrice: fields[14] as double?,
+      swiggyPrice: fields[15] as double?,
+      parcelPrice: fields[16] as double?,
+      hdPrice: fields[17] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HiveCartItem obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.product)
       ..writeByte(1)
@@ -67,7 +71,15 @@ class HiveCartItemAdapter extends TypeAdapter<HiveCartItem> {
       ..writeByte(12)
       ..write(obj.qty)
       ..writeByte(13)
-      ..write(obj.availableQuantity);
+      ..write(obj.availableQuantity)
+      ..writeByte(14)
+      ..write(obj.acPrice)
+      ..writeByte(15)
+      ..write(obj.swiggyPrice)
+      ..writeByte(16)
+      ..write(obj.parcelPrice)
+      ..writeByte(17)
+      ..write(obj.hdPrice);
   }
 
   @override
