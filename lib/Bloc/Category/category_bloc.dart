@@ -319,12 +319,17 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             if (event.orderType != null) {
               await HiveService.saveOrderType(event.orderType!.apiValue);
             }
-            await HiveService.saveCartItems(event.billingItems);
-
+            if (event.categoryId != null) {
+              await HiveService.saveCartItems(
+                  event.billingItems, event.categoryId);
+            } else {
+              await HiveService.saveCartItems(event.billingItems);
+            }
             final billingSession = await HiveService.calculateBillingTotals(
               event.billingItems,
               event.isDiscount ?? false,
               orderType: event.orderType?.apiValue,
+              categoryId: event.categoryId,
             );
             await HiveService.saveBillingSession(billingSession);
             await HiveService.saveLastOnlineTimestamp();
@@ -765,6 +770,7 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         event.billingItems,
         event.isDiscount ?? false,
         orderType: event.orderType?.apiValue,
+        categoryId: event.categoryId,
       );
       await HiveService.saveBillingSession(billingSession);
 
@@ -775,19 +781,14 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         total: double.parse(billingSession.total!.toStringAsFixed(2)),
         totalDiscount: billingSession.totalDiscount,
         items: billingSession.items?.map((hiveItem) {
-          // Convert selectedAddons from Map to proper objects
-          debugPrint(
-              "💰 HiveItem prices => base: ${hiveItem.basePrice}, parcel: ${hiveItem.parcelPrice}, ac: ${hiveItem.acPrice}, swiggy: ${hiveItem.swiggyPrice}, hd: ${hiveItem.hdPrice}");
           double itemPrice =
               hiveItem.getPriceByOrderType(event.orderType?.apiValue);
-          debugPrint("orderTypeOffline:${event.orderType?.apiValue}");
-          debugPrint("itemPriceOffline:$itemPrice");
           List<billing.SelectedAddons>? convertedAddons;
           if (hiveItem.selectedAddons != null &&
               hiveItem.selectedAddons!.isNotEmpty) {
             convertedAddons = hiveItem.selectedAddons!
                 .map((addon) => billing.SelectedAddons(
-                      id: addon['id']?.toString(),
+                      id: addon['_id']?.toString(),
                       name: addon['name']?.toString(),
                       price: (addon['price'] ?? 0.0).toDouble(),
                       quantity: addon['quantity'] ?? 0,
@@ -825,9 +826,6 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
       emit(offlineResponse);
     } catch (e, stackTrace) {
-      print("❌ Error in _handleOfflineBilling: $e");
-      print("❌ Stack trace: $stackTrace");
-
       emit(billing.PostAddToBillingModel(
         errorResponse: ErrorResponse(
           message: 'Offline billing calculation failed: $e',
@@ -864,12 +862,12 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
       final gstNumber = _getShopDetail(shopData?.gstNumber, '00000000000');
       final thermalIp = shopData?.thermalIp ?? '';
 
-      print("\n📦 USING SHOP DETAILS:");
-      print("   - businessName: '$businessName'");
-      print("   - address: '$address'");
-      print("   - phone: '$phone'");
-      print("   - gstNumber: '$gstNumber'");
-      print("   - thermalIp: '$thermalIp'");
+      debugPrint("\n📦 USING SHOP DETAILS:");
+      debugPrint("   - businessName: '$businessName'");
+      debugPrint("   - address: '$address'");
+      debugPrint("   - phone: '$phone'");
+      debugPrint("   - gstNumber: '$gstNumber'");
+      debugPrint("   - thermalIp: '$thermalIp'");
 
       // Normalize items for offline payload with better null safety
       final normalizedItems = billingSession.items?.map((item) {
@@ -1038,15 +1036,15 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
         ],
       );
 
-      print("✅ Offline order created successfully with ID: $orderId");
-      print("🏪 Using businessName: '$businessName'");
-      print("📱 Using phone: '$phone'");
-      print("✅ ========== OFFLINE ORDER CREATION COMPLETED ==========\n");
+      debugPrint("✅ Offline order created successfully with ID: $orderId");
+      debugPrint("🏪 Using businessName: '$businessName'");
+      debugPrint("📱 Using phone: '$phone'");
+      debugPrint("✅ ========== OFFLINE ORDER CREATION COMPLETED ==========\n");
 
       emit(offlineResponse);
     } catch (e, stackTrace) {
-      print("❌ Failed to save offline order: $e");
-      print("❌ Stack trace: $stackTrace");
+      debugPrint("❌ Failed to save offline order: $e");
+      debugPrint("❌ Stack trace: $stackTrace");
       emit(PostGenerateOrderModel(
         errorResponse: ErrorResponse(
           message: 'Failed to save offline order: $e',

@@ -20,7 +20,8 @@ Widget getThermalReceiptWidget({
   required String orderType,
   required String paidBy,
   required String date,
-  required String status, required List<Map<String, dynamic>> finalTax,
+  required String status,
+  required List<Map<String, dynamic>> finalTax,
 }) {
   return Container(
     width: 384, // Standard thermal printer width
@@ -157,28 +158,28 @@ Widget getThermalReceiptWidget({
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          const Center(
-            child: Text(
-              "Powered By",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14, // Keep smaller for footer
-                color: blackColor,
-              ),
-            ),
-          ),
-          const Center(
-            child: Text(
-              "www.sentinixtechsolutions.com",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: blackColor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 80),
+          // const SizedBox(height: 8),
+          // const Center(
+          //   child: Text(
+          //     "Powered By",
+          //     style: TextStyle(
+          //       fontWeight: FontWeight.bold,
+          //       fontSize: 14, // Keep smaller for footer
+          //       color: blackColor,
+          //     ),
+          //   ),
+          // ),
+          // const Center(
+          //   child: Text(
+          //     "www.sentinixtechsolutions.com",
+          //     style: TextStyle(
+          //       fontWeight: FontWeight.bold,
+          //       fontSize: 14,
+          //       color: blackColor,
+          //     ),
+          //   ),
+          // ),
+          const SizedBox(height: 40),
         ],
       ),
     ),

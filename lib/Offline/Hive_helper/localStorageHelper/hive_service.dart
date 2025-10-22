@@ -32,78 +32,6 @@ class HiveService {
   }
 
   // Cart Management
-  // static Future<void> saveCartItems(
-  //     List<Map<String, dynamic>> billingItems) async {
-  //   final cartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
-  //   await cartBox.clear(); // Clear existing cart
-  //
-  //   for (var item in billingItems) {
-  //     final hiveItem = HiveCartItem.fromMap(item);
-  //     await cartBox.add(hiveItem);
-  //   }
-  // }
-
-  // static Future<void> saveCartItems(
-  //   List<Map<String, dynamic>> billingItems, [
-  //   String? categoryId,
-  // ]) async {
-  //   final cartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
-  //   await cartBox.clear();
-  //
-  //   if (categoryId != null) {
-  //     debugPrint("🟢 Offline SaveCartItems for category: $categoryId");
-  //
-  //     final productBox =
-  //         await Hive.openBox<HiveProduct>('products_$categoryId');
-  //
-  //     for (var item in billingItems) {
-  //       final productId = item['_id'] ?? item['id'];
-  //       final product = productBox.values.firstWhere(
-  //         (p) => p.id == productId,
-  //         orElse: () => HiveProduct(
-  //           id: productId,
-  //           name: item['name'] ?? 'Unknown Product',
-  //           basePrice: (item['basePrice'] ?? 0.0).toDouble(),
-  //           parcelPrice: (item['parcelPrice'] ?? 0.0).toDouble(),
-  //           acPrice: (item['acPrice'] ?? 0.0).toDouble(),
-  //           swiggyPrice: (item['swiggyPrice'] ?? 0.0).toDouble(),
-  //           hdPrice: (item['hdPrice'] ?? 0.0).toDouble(),
-  //         ),
-  //       );
-  //       debugPrint('Product: ${product.name} | '
-  //           'Base: ${product.basePrice}, '
-  //           'Parcel: ${product.parcelPrice}, '
-  //           'AC: ${product.acPrice}, '
-  //           'Swiggy: ${product.swiggyPrice}, '
-  //           'HD: ${product.hdPrice}');
-  //       final hiveItem = HiveCartItem(
-  //         id: product.id,
-  //         product: product.id,
-  //         name: product.name,
-  //         image: product.image,
-  //         basePrice: product.basePrice ?? 0.0,
-  //         parcelPrice: product.parcelPrice ?? 0.0,
-  //         acPrice: product.acPrice ?? 0.0,
-  //         swiggyPrice: product.swiggyPrice ?? 0.0,
-  //         hdPrice: product.hdPrice ?? 0.0,
-  //         quantity: item['quantity'] ?? 1,
-  //         selectedAddons: item['selectedAddons']?.cast<Map<String, dynamic>>(),
-  //       );
-  //
-  //       debugPrint(
-  //           "✅ Saved cart item: ${hiveItem.name} | Base: ${hiveItem.basePrice}, AC: ${hiveItem.acPrice}, Parcel: ${hiveItem.parcelPrice}");
-  //
-  //       await cartBox.add(hiveItem);
-  //     }
-  //   } else {
-  //     // ONLINE MODE
-  //     debugPrint("🔵 Online SaveCartItems");
-  //     for (var item in billingItems) {
-  //       final hiveItem = HiveCartItem.fromMap(item);
-  //       await cartBox.add(hiveItem);
-  //     }
-  //   }
-  // }
   static Future<void> saveCartItems(
     List<Map<String, dynamic>> billingItems, [
     String? categoryId,
@@ -120,18 +48,13 @@ class HiveService {
       for (var item in billingItems) {
         final productId = item['_id'] ?? item['id'] ?? item['product'];
 
-        debugPrint("📦 Processing item: ${item['name']}");
-        debugPrint("   Looking for product ID: $productId");
-
         // Find product in Hive
         HiveProduct? product;
         try {
           product = productBox.values.firstWhere(
             (p) => p.id == productId,
           );
-          debugPrint("   ✅ Found product in Hive: ${product.name}");
         } catch (e) {
-          debugPrint("   ⚠️ Product not found in Hive, creating default");
           product = HiveProduct(
             id: productId,
             name: item['name'] ?? 'Unknown Product',
@@ -142,14 +65,6 @@ class HiveService {
             hdPrice: (item['hdPrice'] ?? 0.0).toDouble(),
           );
         }
-
-        // Log product prices
-        debugPrint("   💰 Product Prices:");
-        debugPrint("      Base: ${product.basePrice}");
-        debugPrint("      AC: ${product.acPrice}");
-        debugPrint("      Parcel: ${product.parcelPrice}");
-        debugPrint("      Swiggy: ${product.swiggyPrice}");
-        debugPrint("      HD: ${product.hdPrice}");
 
         // Create HiveCartItem with ALL price fields properly set
         final hiveItem = HiveCartItem(
@@ -177,33 +92,26 @@ class HiveService {
           isFree: item['isFree'] ?? false,
         );
 
-        debugPrint("   ✅ Created HiveCartItem:");
-        debugPrint("      Name: ${hiveItem.name}");
-        debugPrint("      Base: ${hiveItem.basePrice}");
-        debugPrint("      AC: ${hiveItem.acPrice}");
-        debugPrint("      Parcel: ${hiveItem.parcelPrice}");
-        debugPrint("      Swiggy: ${hiveItem.swiggyPrice}");
-        debugPrint("      HD: ${hiveItem.hdPrice}");
-
         await cartBox.add(hiveItem);
       }
     } else {
       // ONLINE MODE - Prices should already be in the map
-      debugPrint("🔵 Online SaveCartItems");
       for (var item in billingItems) {
-        debugPrint("📦 Online item: ${item['name']}");
-        debugPrint("   Incoming data: $item");
+        try {
+          final hiveItem = HiveCartItem.fromMap(item);
 
-        final hiveItem = HiveCartItem.fromMap(item);
+          debugPrint("   ✅ Converted to HiveCartItem:");
+          debugPrint("      Base: ${hiveItem.basePrice}");
+          debugPrint("      AC: ${hiveItem.acPrice}");
+          debugPrint("      Parcel: ${hiveItem.parcelPrice}");
+          debugPrint("      Swiggy: ${hiveItem.swiggyPrice}");
+          debugPrint("      HD: ${hiveItem.hdPrice}");
 
-        debugPrint("   ✅ Converted to HiveCartItem:");
-        debugPrint("      Base: ${hiveItem.basePrice}");
-        debugPrint("      AC: ${hiveItem.acPrice}");
-        debugPrint("      Parcel: ${hiveItem.parcelPrice}");
-        debugPrint("      Swiggy: ${hiveItem.swiggyPrice}");
-        debugPrint("      HD: ${hiveItem.hdPrice}");
-
-        await cartBox.add(hiveItem);
+          await cartBox.add(hiveItem);
+        } catch (e, st) {
+          debugPrint("❌ Error converting item ${item['name']}: $e");
+          debugPrint("Stack trace: $st");
+        }
       }
     }
 
@@ -255,104 +163,42 @@ class HiveService {
 
   // Calculate billing totals offline
 
-  // static HiveBillingSession calculateBillingTotals(
-  //   List<Map<String, dynamic>> billingItems,
-  //   bool isDiscount, {
-  //   String? orderType,
-  // }) {
-  //   double subtotal = 0.0;
-  //   double totalTax = 0.0;
-  //   double totalDiscount = 0.0;
-  //
-  //   List<HiveCartItem> hiveItems = [];
-  //
-  //   for (var item in billingItems) {
-  //     final hiveItem = HiveCartItem.fromMap(item);
-  //
-  //     // ✅ Use built-in method that picks correct price
-  //     double itemPrice = hiveItem.getPriceByOrderType(orderType);
-  //     int itemQty = hiveItem.quantity ?? 1;
-  //
-  //     // 🧩 Calculate addon total
-  //     double addonTotal = 0.0;
-  //     if (hiveItem.selectedAddons != null) {
-  //       for (var addon in hiveItem.selectedAddons!) {
-  //         if (!(addon['isFree'] ?? false)) {
-  //           double addonPrice = (addon['price'] ?? 0.0).toDouble();
-  //           int addonQty = addon['quantity'] ?? 0;
-  //           addonTotal += (addonPrice * addonQty);
-  //         }
-  //       }
-  //     }
-  //
-  //     // 🧾 Calculate item subtotal (base price + addons) * quantity
-  //     double itemSubtotal = (itemPrice + addonTotal) * itemQty;
-  //
-  //     // Update hiveItem
-  //     hiveItem.unitPrice = itemPrice;
-  //     hiveItem.basePrice = itemPrice;
-  //     hiveItem.subtotal = itemSubtotal;
-  //
-  //     // 💰 Calculate tax (18%)
-  //     double itemTax = itemSubtotal * 0.18;
-  //     hiveItem.taxPrice = itemTax;
-  //
-  //     // 💵 Total per item
-  //     hiveItem.totalPrice = itemSubtotal + itemTax;
-  //
-  //     subtotal += itemSubtotal;
-  //     totalTax += itemTax;
-  //
-  //     hiveItems.add(hiveItem);
-  //   }
-  //
-  //   // 🎁 Apply discount if needed
-  //   if (isDiscount) {
-  //     totalDiscount = subtotal * 0.1; // 10%
-  //     subtotal -= totalDiscount;
-  //   }
-  //
-  //   double total = subtotal + totalTax;
-  //
-  //   return HiveBillingSession(
-  //     isDiscountApplied: isDiscount,
-  //     subtotal: subtotal,
-  //     totalTax: totalTax,
-  //     total: total,
-  //     totalDiscount: totalDiscount,
-  //     items: hiveItems,
-  //     orderType: orderType,
-  //     lastUpdated: DateTime.now(),
-  //   );
-  // }
   static Future<HiveBillingSession> calculateBillingTotals(
     List<Map<String, dynamic>> billingItems,
     bool isDiscount, {
     String? orderType,
+    String? categoryId, // Add categoryId parameter
   }) async {
-    debugPrint("🧮 calculateBillingTotals called");
-    debugPrint("   Order Type: $orderType");
-    debugPrint("   Items count: ${billingItems.length}");
-    debugPrint("   Discount applied: $isDiscount");
-
     double subtotal = 0.0;
     double totalTax = 0.0;
     double totalDiscount = 0.0;
 
     List<HiveCartItem> hiveItems = [];
 
+    // Open the correct product box based on categoryId
+    Box<HiveProduct> productBox;
+    if (categoryId != null) {
+      productBox = await Hive.openBox<HiveProduct>('products_$categoryId');
+    } else {
+      productBox = await Hive.openBox<HiveProduct>('products');
+    }
+
     for (int i = 0; i < billingItems.length; i++) {
       var item = billingItems[i];
-      debugPrint("\n📦 Processing item ${i + 1}/${billingItems.length}");
-      debugPrint("   Item data: $item");
+
       final productId = item['id']?.toString() ??
           item['product']?.toString() ??
           item['productId']?.toString() ??
           item['_id']?.toString();
-      final productBox = await Hive.openBox<HiveProduct>('products');
-      final hiveProduct = productBox.values.firstWhere(
-        (p) => p.id == productId,
-        orElse: () => HiveProduct(
+
+      // Fetch product from Hive to get all prices
+      HiveProduct? hiveProduct;
+      try {
+        hiveProduct = productBox.values.firstWhere(
+          (p) => p.id == productId,
+        );
+      } catch (e) {
+        hiveProduct = HiveProduct(
           id: productId,
           name: item['name'] ?? 'Unknown Product',
           basePrice: (item['basePrice'] ?? 0.0).toDouble(),
@@ -360,55 +206,40 @@ class HiveService {
           acPrice: (item['acPrice'] ?? 0.0).toDouble(),
           swiggyPrice: (item['swiggyPrice'] ?? 0.0).toDouble(),
           hdPrice: (item['hdPrice'] ?? 0.0).toDouble(),
-        ),
-      );
+        );
+      }
+
+      // Merge item data with product prices from Hive
       final mergedItem = {
         ...item,
-        'basePrice': item['basePrice'] ?? hiveProduct.basePrice,
-        'acPrice': item['acPrice'] ?? hiveProduct.acPrice,
-        'parcelPrice': item['parcelPrice'] ?? hiveProduct.parcelPrice,
-        'swiggyPrice': item['swiggyPrice'] ?? hiveProduct.swiggyPrice,
-        'hdPrice': item['hdPrice'] ?? hiveProduct.hdPrice,
+        'basePrice': hiveProduct.basePrice,
+        'acPrice': hiveProduct.acPrice,
+        'parcelPrice': hiveProduct.parcelPrice,
+        'swiggyPrice': hiveProduct.swiggyPrice,
+        'hdPrice': hiveProduct.hdPrice,
       };
-      final hiveItem = HiveCartItem.fromMap(mergedItem);
 
-      debugPrint("   After fromMap:");
-      debugPrint("      Name: ${hiveItem.name}");
-      debugPrint("      Base: ${hiveItem.basePrice}");
-      debugPrint("      AC: ${hiveItem.acPrice}");
-      debugPrint("      Parcel: ${hiveItem.parcelPrice}");
-      debugPrint("      Swiggy: ${hiveItem.swiggyPrice}");
-      debugPrint("      HD: ${hiveItem.hdPrice}");
+      final hiveItem = HiveCartItem.fromMap(mergedItem);
 
       // ✅ Get correct price based on order type
       double itemPrice = hiveItem.getPriceByOrderType(orderType);
       int itemQty = hiveItem.quantity ?? 1;
 
-      debugPrint(
-          "   📊 Selected price for order type '$orderType': $itemPrice");
-      debugPrint("   📊 Quantity: $itemQty");
-
       // 🧩 Calculate addon total
       double addonTotal = 0.0;
       if (hiveItem.selectedAddons != null) {
-        debugPrint("   🎁 Processing addons:");
         for (var addon in hiveItem.selectedAddons!) {
           if (!(addon['isFree'] ?? false)) {
             double addonPrice = (addon['price'] ?? 0.0).toDouble();
             int addonQty = addon['quantity'] ?? 0;
             double addonSubtotal = addonPrice * addonQty;
             addonTotal += addonSubtotal;
-            debugPrint(
-                "      - ${addon['name']}: ₹$addonPrice x $addonQty = ₹$addonSubtotal");
           }
         }
-        debugPrint("   🎁 Total addons: ₹$addonTotal");
       }
 
       // 🧾 Calculate item subtotal (base price + addons) * quantity
       double itemSubtotal = (itemPrice + addonTotal) * itemQty;
-      debugPrint(
-          "   💵 Item subtotal: (₹$itemPrice + ₹$addonTotal) x $itemQty = ₹$itemSubtotal");
 
       // Update hiveItem with calculated values
       hiveItem.unitPrice = itemPrice;
@@ -416,13 +247,11 @@ class HiveService {
       hiveItem.subtotal = itemSubtotal;
 
       // 💰 Calculate tax (18%)
-      double itemTax = itemSubtotal * 0.18;
+      double itemTax = itemSubtotal * 0.0;
       hiveItem.taxPrice = itemTax;
-      debugPrint("   💰 Tax (18%): ₹$itemTax");
 
       // 💵 Total per item
       hiveItem.totalPrice = itemSubtotal + itemTax;
-      debugPrint("   💵 Item total: ₹${hiveItem.totalPrice}");
 
       subtotal += itemSubtotal;
       totalTax += itemTax;
@@ -430,20 +259,13 @@ class HiveService {
       hiveItems.add(hiveItem);
     }
 
-    debugPrint("\n📊 Billing Summary:");
-    debugPrint("   Subtotal: ₹$subtotal");
-
     // 🎁 Apply discount if needed
     if (isDiscount) {
       totalDiscount = subtotal * 0.1; // 10%
       subtotal -= totalDiscount;
-      debugPrint("   Discount (10%): -₹$totalDiscount");
-      debugPrint("   Subtotal after discount: ₹$subtotal");
     }
 
-    debugPrint("   Tax (18%): ₹$totalTax");
     double total = subtotal + totalTax;
-    debugPrint("   TOTAL: ₹$total");
 
     return HiveBillingSession(
       isDiscountApplied: isDiscount,
@@ -493,7 +315,6 @@ class HiveService {
 
       // Open the Hive box
       final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-      print("Orders saved in Hive before: ${ordersBox.values.length}");
 
       // Generate unique ID
       // inside saveOfflineOrder(...)
@@ -501,11 +322,11 @@ class HiveService {
 // then use orderId as the Hive key
 
       // Debug logs for input
-      print("Saving Offline Order...");
-      print("OrderId: $orderId");
-      print("OrderPayloadJson type: ${orderPayloadJson.runtimeType}");
-      print("OrderPayloadJson: $orderPayloadJson");
-      print("Items raw: $items");
+      debugPrint("Saving Offline Order...");
+      debugPrint("OrderId: $orderId");
+      debugPrint("OrderPayloadJson type: ${orderPayloadJson.runtimeType}");
+      debugPrint("OrderPayloadJson: $orderPayloadJson");
+      debugPrint("Items raw: $items");
 
       // Convert items to HiveCartItem with better error handling
       List<HiveCartItem> hiveItems = [];
@@ -513,8 +334,8 @@ class HiveService {
       for (int i = 0; i < items.length; i++) {
         try {
           final item = items[i];
-          print("Processing item $i: $item");
-          print("Item keys: ${item.keys.toList()}");
+          debugPrint("Processing item $i: $item");
+          debugPrint("Item keys: ${item.keys.toList()}");
 
           // Validate required fields before conversion
           if (item['name'] == null || item['name'].toString().isEmpty) {
@@ -523,12 +344,12 @@ class HiveService {
 
           final hiveItem = HiveCartItem.fromMap(item);
           hiveItems.add(hiveItem);
-          print("Successfully converted item $i: $hiveItem");
+          debugPrint("Successfully converted item $i: $hiveItem");
         } catch (e, stackTrace) {
-          print("❌ Error converting item $i to HiveCartItem: ${items[i]}");
-          print("❌ Error type: ${e.runtimeType}");
-          print("❌ Error message: $e");
-          print("❌ Stack trace: $stackTrace");
+          debugPrint("❌ Error converting item $i to HiveCartItem: ${items[i]}");
+          debugPrint("❌ Error type: ${e.runtimeType}");
+          debugPrint("❌ Error message: $e");
+          debugPrint("❌ Stack trace: $stackTrace");
 
           // Create a fallback item to prevent complete failure
           final fallbackItem = HiveCartItem(
@@ -541,7 +362,7 @@ class HiveService {
             selectedAddons: [],
           );
           hiveItems.add(fallbackItem);
-          print("✅ Created fallback item: $fallbackItem");
+          debugPrint("✅ Created fallback item: $fallbackItem");
         }
       }
 
@@ -565,7 +386,6 @@ class HiveService {
         paymentMethod: paymentMethod,
         phone: phone,
         waiterName: waiterName,
-        // New fields
         orderNumber: orderNumber,
         subtotal: subtotal,
         taxAmount: taxAmount,
@@ -574,24 +394,19 @@ class HiveService {
         finalTaxes: finalTaxes,
         tableName: tableName,
       );
-      // String _orderBox = 'orders_today_box';
-      // final box = await Hive.openBox(_orderBox);
-      // box.put('orders_today',order);
       // Save to Hive
       await ordersBox.put(orderId, order);
 
-      // await ordersBox.put(orderId, order);
-
       // Confirm save
       final saved = ordersBox.get(orderId);
-      print("Orders saved in Hive after: ${ordersBox.values.length}");
-      print("✅ Order saved successfully: ${saved?.id}");
-      print("✅ Order saved successfully: ${saved?.tableName}");
+      debugPrint("Orders saved in Hive after: ${ordersBox.values.length}");
+      debugPrint("✅ Order saved successfully: ${saved?.id}");
+      debugPrint("✅ Order saved successfully: ${saved?.tableName}");
 
       return orderId;
     } catch (e, stackTrace) {
-      print("❌ Critical error in saveOfflineOrder: $e");
-      print("❌ Stack trace: $stackTrace");
+      debugPrint("❌ Critical error in saveOfflineOrder: $e");
+      debugPrint("❌ Stack trace: $stackTrace");
       rethrow;
     }
   }
@@ -648,11 +463,11 @@ class HiveService {
   // Sync Management
   static Future<void> syncPendingOrders(ApiProvider apiProvider) async {
     final pendingOrders = await getPendingSyncOrders();
-    print("Pending orders to sync: ${pendingOrders.length}");
+    debugPrint("Pending orders to sync: ${pendingOrders.length}");
 
     for (var order in pendingOrders) {
       try {
-        print("Syncing order ${order.id} (${order.syncAction})...");
+        debugPrint("Syncing order ${order.id} (${order.syncAction})...");
 
         // Decode JSON and sanitize it before sending
         Map<String, dynamic> payload = {};
@@ -660,7 +475,7 @@ class HiveService {
           payload = Map<String, dynamic>.from(
               jsonDecode(order.orderPayloadJson ?? '{}'));
         } catch (e) {
-          print("⚠️ Error parsing orderPayloadJson for ${order.id}: $e");
+          debugPrint("⚠️ Error parsing orderPayloadJson for ${order.id}: $e");
           continue;
         }
 
@@ -683,18 +498,19 @@ class HiveService {
         if (order.syncAction == 'CREATE') {
           final response =
               await apiProvider.postGenerateOrderAPI(cleanedPayload);
-          print("📤 CREATE payload: $cleanedPayload");
-          print("📥 CREATE response: ${response.toJson()}");
+          debugPrint("📤 CREATE payload: $cleanedPayload");
+          debugPrint("📥 CREATE response: ${response.toJson()}");
 
           if (response.order != null) {
             await markOrderAsSynced(order.id!);
-            print("✅ Order created & synced");
+            debugPrint("✅ Order created & synced");
           } else {
-            print("❌ Create failed for order ${order.id}");
+            debugPrint("❌ Create failed for order ${order.id}");
           }
         } else if (order.syncAction == 'UPDATE') {
           if (order.existingOrderId == null) {
-            print("❌ Missing existingOrderId for UPDATE order: ${order.id}");
+            debugPrint(
+                "❌ Missing existingOrderId for UPDATE order: ${order.id}");
             continue;
           }
 
@@ -703,31 +519,31 @@ class HiveService {
             order.existingOrderId!,
           );
 
-          print("📤 UPDATE payload: $cleanedPayload");
-          print("📥 UPDATE response: ${response.toJson()}");
+          debugPrint("📤 UPDATE payload: $cleanedPayload");
+          debugPrint("📥 UPDATE response: ${response.toJson()}");
 
           if (response.order != null) {
             await markOrderAsSynced(order.id!);
-            print("✅ Order updated & synced");
+            debugPrint("✅ Order updated & synced");
           } else {
-            print("❌ Update failed for order ${order.id}");
+            debugPrint("❌ Update failed for order ${order.id}");
           }
         }
       } catch (e) {
-        print("❌ Failed to sync order ${order.id}: $e");
+        debugPrint("❌ Failed to sync order ${order.id}: $e");
       }
     }
   }
 
   static Future<void> markOrderAsSynced(String orderId) async {
     final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    print(
+    debugPrint(
         "Unsynced orders left: ${ordersBox.values.where((o) => o.isSynced == false).length}");
     final order = ordersBox.get(orderId);
     if (order != null) {
       order.isSynced = true;
       await ordersBox.put(orderId, order);
-      print("✅ Order $orderId marked as synced in Hive");
+      debugPrint("✅ Order $orderId marked as synced in Hive");
     }
   }
 
@@ -739,7 +555,7 @@ class HiveService {
 
   static Future<void> fixHiveTypeIssue() async {
     try {
-      print("🔧 Fixing Hive type mismatch issue...");
+      debugPrint("🔧 Fixing Hive type mismatch issue...");
 
       // Close all boxes first
       await closeBox();
@@ -752,7 +568,7 @@ class HiveService {
       await Hive.deleteBoxFromDisk('pendingActions');
       await Hive.deleteBoxFromDisk('app_state');
 
-      print("✅ Cleared all existing Hive data");
+      debugPrint("✅ Cleared all existing Hive data");
 
       // Re-register adapters with correct type IDs
       if (!Hive.isAdapterRegistered(0)) {
@@ -765,7 +581,7 @@ class HiveService {
         Hive.registerAdapter(HiveOrderAdapter());
       }
 
-      print("✅ Re-registered all adapters");
+      debugPrint("✅ Re-registered all adapters");
 
       // Test opening boxes
       final testCartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
@@ -777,9 +593,9 @@ class HiveService {
       await testOrderBox.close();
       await testBillingBox.close();
 
-      print("✅ Hive type issue fixed successfully!");
+      debugPrint("✅ Hive type issue fixed successfully!");
     } catch (e) {
-      print("❌ Error fixing Hive issue: $e");
+      debugPrint("❌ Error fixing Hive issue: $e");
       rethrow;
     }
   }
@@ -911,6 +727,6 @@ class HiveService {
     await box.delete('last_online_order_id_numeric');
     await box.delete('last_online_order_id_numeric_len');
     await box.delete('last_online_order_id_prefix');
-    print("🔄 Reset last online order id tracking");
+    debugPrint("🔄 Reset last online order id tracking");
   }
 }

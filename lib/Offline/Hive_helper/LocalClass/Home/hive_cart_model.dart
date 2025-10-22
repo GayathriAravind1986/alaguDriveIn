@@ -305,24 +305,25 @@ class HiveCartItem extends HiveObject {
       taxPrice: _safeDouble(map["taxPrice"]),
       totalPrice: _safeDouble(map["totalPrice"]),
       // Dynamic pricing fields
-      acPrice: _safeDouble(map["acPrice"]),
-      swiggyPrice: _safeDouble(map["swiggyPrice"]),
-      parcelPrice: _safeDouble(map["parcelPrice"]),
-      hdPrice: _safeDouble(map["hdPrice"]),
+      acPrice: _safeDouble(map["acPrice"] ?? map["basePrice"]),
+      swiggyPrice: _safeDouble(map["swiggyPrice"] ?? map["basePrice"]),
+      parcelPrice: _safeDouble(map["parcelPrice"] ?? map["basePrice"]),
+      hdPrice: _safeDouble(map["hdPrice"] ?? map["basePrice"]),
     );
   }
 
   static int _safeInt(dynamic value) {
-    if (value == null) return 1;
+    if (value == null) return 0;
     if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
     if (value is double) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 1;
-    return 1;
+    return 0;
   }
 
   static double _safeDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is double) return value;
+    if (value is num) return value.toDouble();
     if (value is int) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
