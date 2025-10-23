@@ -24,6 +24,7 @@ import 'package:simple/ModelClass/Order/Update_generate_order_model.dart';
 import 'package:simple/ModelClass/ShopDetails/getStockMaintanencesModel.dart';
 import 'package:simple/ModelClass/Table/Get_table_model.dart';
 import 'package:simple/ModelClass/Waiter/getWaiterModel.dart';
+import 'package:simple/Offline/ConnectivityChecking/wifiOn/Off.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:simple/Reusable/image.dart';
 import 'package:simple/Reusable/space.dart';
@@ -122,7 +123,8 @@ extension OrderTypeX on OrderType {
   }
 }
 
-class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
+class FoodOrderingScreenViewState extends State<FoodOrderingScreenView>
+    with ConnectivityMixin {
   GetCategoryModel getCategoryModel = GetCategoryModel();
   GetProductByCatIdModel getProductByCatIdModel = GetProductByCatIdModel();
   PostAddToBillingModel postAddToBillingModel = PostAddToBillingModel();
@@ -143,7 +145,7 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
   List<TextEditingController> splitAmountControllers = [];
   List<String?> selectedPaymentMethods = [];
   double totalSplit = 0.0;
-
+  //bool isOnline = true;
   String selectedCategory = "All";
   String? selectedCatId = "";
 
@@ -1531,6 +1533,11 @@ class FoodOrderingScreenViewState extends State<FoodOrderingScreenView> {
                                         mainAxisAlignment:
                                             MainAxisAlignment.start,
                                         children: [
+                                          ConnectionStatusWidget(
+                                            isOnline: isOnline,
+                                            onTap: checkInternetConnection,
+                                          ),
+                                          SizedBox(width: size.width * 0.02),
                                           Text("Choose Category",
                                               style: MyTextStyle.f18(blackColor,
                                                   weight: FontWeight.bold)),

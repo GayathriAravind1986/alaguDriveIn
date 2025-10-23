@@ -411,9 +411,22 @@ class HiveService {
     }
   }
 
+  // static Future<List<HiveOrder>> getPendingSyncOrders() async {
+  //   final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
+  //   return ordersBox.values.where((order) => order.isSynced == false).toList();
+  // }
   static Future<List<HiveOrder>> getPendingSyncOrders() async {
-    final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-    return ordersBox.values.where((order) => order.isSynced == false).toList();
+    try {
+      final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
+      final pendingOrders =
+          ordersBox.values.where((order) => order.isSynced == false).toList();
+
+      print('Found ${pendingOrders.length} pending orders');
+      return pendingOrders;
+    } catch (e) {
+      print('Error getting pending orders: $e');
+      return [];
+    }
   }
 
   static Future<void> deleteOrder(String orderId) async {
