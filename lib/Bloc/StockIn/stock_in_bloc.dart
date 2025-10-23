@@ -164,7 +164,9 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
               ),
             );
             emit(offlineLocationModel);
-          } else {
+          }
+          else
+          {
             emit(location.GetLocationModel(
               success: false,
               data: null,
@@ -176,7 +178,6 @@ class StockInBloc extends Bloc<StockInEvent, dynamic> {
           }
         }
       } else {
-        // 📱 Offline → Hive
         try {
           final hiveLocation = await loadLocationFromHive();
           debugPrint(
