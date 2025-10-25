@@ -8,9 +8,7 @@ import 'package:simple/Api/apiProvider.dart';
 import 'package:simple/Bloc/observer/observer.dart';
 import 'package:simple/Bloc/theme_cubit.dart';
 import 'package:flutter/foundation.dart';
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_category_model.dart';
-import 'package:simple/ModelClass/HomeScreen/Category&Product/Get_product_by_catId_model.dart'
-as product;
+import 'package:simple/Offline/HiveIntializer/hive_init.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Order/hive_pending_delete.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/category_model.dart';
@@ -22,39 +20,25 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_stock_model.dart
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_table_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_user_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_waiter_model.dart';
-// NOTE: Removed 'hide HiveProduct' to ensure consistent typing
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
-// import 'package:simple/Offline/Hive_helper/LocalClass/Report/hive_report_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_location_model.dart';
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_pending_stock_model.dart';
-import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_stock.dart';
-// NOTE: Removed 'hide HiveSupplier' to ensure consistent typing
 import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_model.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/Stock/hive_serive_stock.dart';
-import 'package:simple/Offline/Hive_helper/localStorageHelper/bulk_product.dart';
 import 'package:simple/Offline/Hive_helper/localStorageHelper/hive-pending_delete_service.dart';
+import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart';
 import 'package:simple/Offline/Network_status/NetworkStatusService.dart';
 import 'package:simple/Reusable/color.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:simple/UI/SplashScreen/splash_screen.dart';
-import 'package:simple/Offline/Hive_helper/localStorageHelper/hive_service.dart';
-
-// Import the adapter files
-// import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_supplier_adapter.dart';
-// import 'package:simple/Offline/Hive_helper/LocalClass/Stock/hive_product_adapter.dart';
-
-// import 'Offline/Hive_helper/LocalClass/Home/hive_addon_model.dart';
 import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  await Hive.openBox('appConfigBox');
-  final apiProvider = ApiProvider();
-  initConnectivityListener(apiProvider);
-  await HiveServicedelete.initDeleteBox();
-  try
-  {
+  // await Hive.initFlutter();
+  await initHive();
+
+  try {
     Hive.registerAdapter(HiveCategoryAdapter());
     Hive.registerAdapter(HiveProductAdapter());
     Hive.registerAdapter(HiveAddonAdapter());
@@ -71,12 +55,12 @@ Future<void> main() async {
     Hive.registerAdapter(HiveUserAdapter());
     Hive.registerAdapter(HiveReportModelAdapter());
     Hive.registerAdapter(HivePendingStockAdapter());
-
   } catch (e) {
     debugPrint("Hive adapter registration error: $e");
   }
 
   try {
+    await Hive.openBox('appConfigBox');
     await Hive.openBox<HiveCategory>('categories');
     await Hive.openBox<HiveCartItem>('cart_items');
     await Hive.openBox<HiveOrder>('orders');
@@ -90,20 +74,21 @@ Future<void> main() async {
     await Hive.openBox<HiveWaiter>('waiters_box');
     await Hive.openBox<HiveUser>('users_box');
     await Hive.openBox<HivePendingStock>('pending_stock');
-  }
-  catch (e)
-  {
+  } catch (e) {
     debugPrint("Hive openBox error: $e");
   }
-
+  final apiProvider = ApiProvider();
+  initConnectivityListener(apiProvider);
+  await HiveServicedelete.initDeleteBox();
   Connectivity().onConnectivityChanged.listen((result) async {
     if (result != ConnectivityResult.none) {
+      await HiveService.syncPendingOrders(ApiProvider());
       await HiveStockService.syncPendingStock(ApiProvider());
       await HiveServicedelete.syncPendingDeletes(ApiProvider());
     }
   });
 
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
@@ -112,7 +97,6 @@ Future<void> main() async {
   await NetworkManager().initialize();
   runApp(const App());
 }
-
 
 class App extends StatelessWidget {
   const App({super.key});
