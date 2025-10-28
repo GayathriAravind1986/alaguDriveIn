@@ -226,28 +226,47 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
           }
           emit(value);
         } else {
+          // 🔄 FORCE REFRESH: Close and reopen the box to ensure fresh data
+          try {
+            await Hive.box('products_${event.catId}').close();
+          } catch (e) {
+            // Box might not be open, continue
+          }
+
+          try {
+            await Hive.box('master_products').close();
+          } catch (e) {
+            // Box might not be open, continue
+          }
+
           final localProducts = await loadProductsFromHive(event.catId,
               searchKey: event.searchKey ?? "",
               searchCode: event.searchCode ?? "");
 
+          // 🎯 DEBUG: Check if quantities are updated
+          debugPrint("🔄 Loading products from Hive for category: ${event.catId}");
+          for (var product in localProducts) {
+            debugPrint("   📦 ${product.name} - Available Qty: ${product.availableQuantity}");
+          }
+
           final filteredProducts = localProducts.where((p) {
-            if ((event.searchKey.isEmpty) && (event.searchCode.isEmpty)) {
+            if ((event.searchKey?.isEmpty ?? true) && (event.searchCode?.isEmpty ?? true)) {
               return true;
             }
 
             bool matches = false;
 
-            if (event.searchKey.isNotEmpty) {
+            if (event.searchKey?.isNotEmpty ?? false) {
               matches = p.name
-                      ?.toLowerCase()
-                      .contains(event.searchKey.toLowerCase()) ??
+                  ?.toLowerCase()
+                  .contains(event.searchKey!.toLowerCase()) ??
                   false;
             }
-            if (event.searchCode.isNotEmpty) {
+            if (event.searchCode?.isNotEmpty ?? false) {
               matches = matches ||
                   (p.shortCode
-                          ?.toLowerCase()
-                          .contains(event.searchCode.toLowerCase()) ??
+                      ?.toLowerCase()
+                      .contains(event.searchCode!.toLowerCase()) ??
                       false);
             }
             return matches;
@@ -255,35 +274,42 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
 
           final offlineProducts = filteredProducts
               .map((p) => product.Rows(
-                    id: p.id,
-                    name: p.name,
-                    image: p.image,
-                    basePrice: p.basePrice,
-                    availableQuantity: p.availableQuantity,
-                    isStock: p.isStock ?? false,
-                    shortCode: p.shortCode,
-                    parcelPrice: p.parcelPrice,
-                    acPrice: p.acPrice,
-                    swiggyPrice: p.swiggyPrice,
-                    hdPrice: p.hdPrice,
-                    addons: p.addons
-                            ?.map((a) => product.Addons(
-                                  id: a.id,
-                                  name: a.name,
-                                  price: a.price,
-                                  isFree: a.isFree,
-                                  maxQuantity: a.maxQuantity,
-                                  isAvailable: a.isAvailable,
-                                  quantity: 0,
-                                  isSelected: false,
-                                ))
-                            .toList() ??
-                        [],
-                    counter: 0,
-                  ))
+            id: p.id,
+            name: p.name,
+            image: p.image,
+            basePrice: p.basePrice,
+            availableQuantity: p.availableQuantity, // This should reflect updated quantity
+            isStock: p.isStock ?? false,
+            shortCode: p.shortCode,
+            parcelPrice: p.parcelPrice,
+            acPrice: p.acPrice,
+            swiggyPrice: p.swiggyPrice,
+            hdPrice: p.hdPrice,
+            addons: p.addons
+                ?.map((a) => product.Addons(
+              id: a.id,
+              name: a.name,
+              price: a.price,
+              isFree: a.isFree,
+              maxQuantity: a.maxQuantity,
+              isAvailable: a.isAvailable,
+              quantity: 0,
+              isSelected: false,
+            ))
+                .toList() ??
+                [],
+            counter: 0,
+          ))
               .toList();
-          debugPrint(
-              "offlineProduct: ${offlineProducts.map((e) => e.toJson()).toList()}");
+
+          // 🎯 DEBUG: Verify the final product quantities
+          debugPrint("✅ Final offline products with quantities:");
+          for (var product in offlineProducts) {
+            debugPrint("   📦 ${product.name} - Available Qty: ${product.availableQuantity}");
+          }
+
+          debugPrint("📦 Loaded ${offlineProducts.length} products from offline storage");
+
           emit(product.GetProductByCatIdModel(
             success: true,
             rows: offlineProducts,
@@ -291,7 +317,9 @@ class FoodCategoryBloc extends Bloc<FoodCategoryEvent, dynamic> {
             errorResponse: null,
           ));
         }
-      } catch (e) {
+      } catch (e)
+      {
+        debugPrint("❌ Error in FoodProductItem event: $e");
         emit(product.GetProductByCatIdModel(
           success: false,
           rows: [],

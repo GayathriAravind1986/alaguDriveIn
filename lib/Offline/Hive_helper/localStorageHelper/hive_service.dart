@@ -1,4 +1,3 @@
-// hive_service.dart
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -10,12 +9,15 @@ import 'package:simple/Offline/Hive_helper/LocalClass/Home/hive_order_model.dart
 import 'package:simple/Offline/Hive_helper/LocalClass/Home/product_model.dart';
 import 'package:uuid/uuid.dart';
 
+import '../LocalClass/Home/category_model.dart';
+
 class HiveService {
   static const String CART_BOX = 'cart_items';
   static const String ORDERS_BOX = 'orders';
   static const String BILLING_SESSION_BOX = 'billing_session';
   static const String SYNC_QUEUE_BOX = 'sync_queue';
   static const String orderTypeBoxName = 'order_type';
+  static const String MASTER_PRODUCTS_BOX = 'master_products';
   static Box? _pendingActionsBox;
 
   static Future<Box> getPendingActionsBox() async {
@@ -33,9 +35,9 @@ class HiveService {
 
   // Cart Management
   static Future<void> saveCartItems(
-    List<Map<String, dynamic>> billingItems, [
-    String? categoryId,
-  ]) async {
+      List<Map<String, dynamic>> billingItems, [
+        String? categoryId,
+      ]) async {
     final cartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
     await cartBox.clear();
 
@@ -43,7 +45,7 @@ class HiveService {
       debugPrint("🟢 Offline SaveCartItems for category: $categoryId");
 
       final productBox =
-          await Hive.openBox<HiveProduct>('products_$categoryId');
+      await Hive.openBox<HiveProduct>('products_$categoryId');
 
       for (var item in billingItems) {
         final productId = item['_id'] ?? item['id'] ?? item['product'];
@@ -52,7 +54,7 @@ class HiveService {
         HiveProduct? product;
         try {
           product = productBox.values.firstWhere(
-            (p) => p.id == productId,
+                (p) => p.id == productId,
           );
         } catch (e) {
           product = HiveProduct(
@@ -75,7 +77,7 @@ class HiveService {
           quantity: item['quantity'] ?? 1,
           qty: item['quantity'] ?? 1,
           availableQuantity:
-              item['availableQuantity'] ?? (item['quantity'] ?? 1),
+          item['availableQuantity'] ?? (item['quantity'] ?? 1),
 
           // ✅ CRITICAL: Set ALL price fields from product
           basePrice: product.basePrice ?? 0.0,
@@ -132,20 +134,20 @@ class HiveService {
   // Billing Session Management
   static Future<void> saveBillingSession(HiveBillingSession session) async {
     final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
     await billingBox.add(session);
   }
 
   static Future<HiveBillingSession?> getBillingSession() async {
     final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     return billingBox.values.isNotEmpty ? billingBox.values.first : null;
   }
 
   static Future<void> clearBillingSession() async {
     final billingBox =
-        await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+    await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
     await billingBox.clear();
   }
 
@@ -162,13 +164,12 @@ class HiveService {
   }
 
   // Calculate billing totals offline
-
   static Future<HiveBillingSession> calculateBillingTotals(
-    List<Map<String, dynamic>> billingItems,
-    bool isDiscount, {
-    String? orderType,
-    String? categoryId, // Add categoryId parameter
-  }) async {
+      List<Map<String, dynamic>> billingItems,
+      bool isDiscount, {
+        String? orderType,
+        String? categoryId, // Add categoryId parameter
+      }) async {
     double subtotal = 0.0;
     double totalTax = 0.0;
     double totalDiscount = 0.0;
@@ -195,7 +196,7 @@ class HiveService {
       HiveProduct? hiveProduct;
       try {
         hiveProduct = productBox.values.firstWhere(
-          (p) => p.id == productId,
+              (p) => p.id == productId,
         );
       } catch (e) {
         hiveProduct = HiveProduct(
@@ -279,7 +280,123 @@ class HiveService {
     );
   }
 
-  // Order Management
+  // UPDATED METHOD: Update product quantities in ALL storage locations
+  static Future<void> updateProductQuantities(List<Map<String, dynamic>> items) async {
+    try {
+      debugPrint("🔄 Updating product quantities for ${items.length} items...");
+
+      for (var item in items) {
+        final productId = item['product']?.toString();
+        final quantity = item['quantity'] ?? 1;
+
+        if (productId == null) {
+          debugPrint("⚠️ Skipping item with null product ID: $item");
+          continue;
+        }
+
+        debugPrint("🔍 Looking for product: $productId, quantity to deduct: $quantity");
+
+        // Update quantity in ALL storage locations
+        await _updateProductQuantityEverywhere(productId, quantity);
+      }
+
+      debugPrint("✅ Product quantity update completed");
+    } catch (e, stackTrace) {
+      debugPrint("❌ Error updating product quantities: $e");
+      debugPrint("❌ Stack trace: $stackTrace");
+    }
+  }
+
+  // UPDATED HELPER: Update quantity in ALL boxes including ALL category boxes
+  static Future<void> _updateProductQuantityEverywhere(String productId, int quantity) async {
+    try {
+      int updateCount = 0;
+
+      // 1. Try master products box
+      if (await _updateQuantityInBox('master_products', productId, quantity)) {
+        updateCount++;
+        debugPrint("   ✅ Updated in master box");
+      }
+
+      // 2. UPDATED: Use actual category IDs from categories box
+      // Import the method from local_storage_product.dart or duplicate the logic
+      final categoryIds = await _getAllCategoryIds(); // You'll need to add this method to hive_service.dart too
+      debugPrint("   🔍 Searching in ${categoryIds.length} actual categories...");
+
+      for (var categoryId in categoryIds) {
+        final boxName = 'products_$categoryId';
+        if (await _updateQuantityInBox(boxName, productId, quantity)) {
+          updateCount++;
+          debugPrint("   ✅ Updated in category box: $boxName");
+        }
+      }
+
+      if (updateCount == 0) {
+        debugPrint("❌ Product $productId not found in any storage location");
+      } else {
+        debugPrint("✅ Successfully updated quantity for product: $productId in $updateCount locations");
+      }
+    } catch (e) {
+      debugPrint("❌ Error in _updateProductQuantityEverywhere: $e");
+    }
+  }
+
+  // Add this method to hive_service.dart as well:
+  static Future<List<String>> _getAllCategoryIds() async {
+    try {
+      final categoriesBox = await Hive.openBox<HiveCategory>('categories');
+      final allCategories = categoriesBox.values.toList();
+
+      final categoryIds = allCategories
+          .map((category) => category.id)
+          .where((id) => id != null && id.isNotEmpty)
+          .cast<String>()
+          .toList();
+
+      categoryIds.add("");
+
+      debugPrint("📂 Found ${categoryIds.length} categories in categories box");
+      return categoryIds;
+    } catch (e) {
+      debugPrint('❌ Error getting category IDs: $e');
+      return ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']; // Fallback
+    }
+  }
+
+  // Generic method to update quantity in a specific box
+  static Future<bool> _updateQuantityInBox(String boxName, String productId, int quantity) async {
+    try {
+      debugPrint("   🔎 Searching in box: $boxName");
+      final box = await Hive.openBox<HiveProduct>(boxName);
+
+      // Get all products and search manually
+      final allProducts = box.values.toList();
+      for (var product in allProducts) {
+        if (product.id == productId) {
+          final currentQuantity = product.availableQuantity ?? 0;
+          final newQuantity = currentQuantity - quantity;
+
+          debugPrint("   📦 FOUND: ${product.name} in $boxName");
+          debugPrint("      Current quantity: $currentQuantity");
+          debugPrint("      Quantity to deduct: $quantity");
+          debugPrint("      New quantity: ${newQuantity > 0 ? newQuantity : 0}");
+
+          product.availableQuantity = newQuantity > 0 ? newQuantity : 0;
+          await box.put(productId, product);
+          debugPrint("   ✅ UPDATED: ${product.name} to ${product.availableQuantity} in $boxName");
+          return true;
+        }
+      }
+      debugPrint("   ❌ Product $productId not found in $boxName");
+      return false;
+    } catch (e) {
+      // Box might not exist or other error - just continue
+      debugPrint("   ⚠️ Could not access box $boxName: $e");
+      return false;
+    }
+  }
+
+  // Order Management - MODIFIED to ensure quantity update
   static Future<String> saveOfflineOrder({
     required String orderPayloadJson,
     required String orderStatus,
@@ -313,20 +430,22 @@ class HiveService {
         Hive.registerAdapter(HiveCartItemAdapter());
       }
 
-      // Open the Hive box
-      final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-
-      // Generate unique ID
-      // inside saveOfflineOrder(...)
-      final orderId = await HiveService.generateNextOfflineOrderIdString();
-// then use orderId as the Hive key
-
       // Debug logs for input
       debugPrint("Saving Offline Order...");
-      debugPrint("OrderId: $orderId");
-      debugPrint("OrderPayloadJson type: ${orderPayloadJson.runtimeType}");
       debugPrint("OrderPayloadJson: $orderPayloadJson");
       debugPrint("Items raw: $items");
+
+      // 🔄 UPDATE PRODUCT QUANTITIES BEFORE SAVING ORDER - MOVED TO TOP
+      debugPrint("🔄 STEP 1: Updating product quantities...");
+      await updateProductQuantities(items);
+      debugPrint("✅ Product quantities updated successfully");
+
+      // Generate unique ID
+      final orderId = await HiveService.generateNextOfflineOrderIdString();
+      debugPrint("Generated OrderId: $orderId");
+
+      // Open the Hive box
+      final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
 
       // Convert items to HiveCartItem with better error handling
       List<HiveCartItem> hiveItems = [];
@@ -334,22 +453,13 @@ class HiveService {
       for (int i = 0; i < items.length; i++) {
         try {
           final item = items[i];
-          debugPrint("Processing item $i: $item");
-          debugPrint("Item keys: ${item.keys.toList()}");
-
-          // Validate required fields before conversion
-          if (item['name'] == null || item['name'].toString().isEmpty) {
-            print("Warning: Item $i has empty name, setting default");
-          }
+          debugPrint("Processing item $i: ${item['name']} - Qty: ${item['quantity']}");
 
           final hiveItem = HiveCartItem.fromMap(item);
           hiveItems.add(hiveItem);
-          debugPrint("Successfully converted item $i: $hiveItem");
+          debugPrint("Successfully converted item $i: ${hiveItem.name}");
         } catch (e, stackTrace) {
-          debugPrint("❌ Error converting item $i to HiveCartItem: ${items[i]}");
-          debugPrint("❌ Error type: ${e.runtimeType}");
-          debugPrint("❌ Error message: $e");
-          debugPrint("❌ Stack trace: $stackTrace");
+          debugPrint("❌ Error converting item $i: $e");
 
           // Create a fallback item to prevent complete failure
           final fallbackItem = HiveCartItem(
@@ -362,7 +472,6 @@ class HiveService {
             selectedAddons: [],
           );
           hiveItems.add(fallbackItem);
-          debugPrint("✅ Created fallback item: $fallbackItem");
         }
       }
 
@@ -394,14 +503,14 @@ class HiveService {
         finalTaxes: finalTaxes,
         tableName: tableName,
       );
+
       // Save to Hive
       await ordersBox.put(orderId, order);
 
       // Confirm save
       final saved = ordersBox.get(orderId);
-      debugPrint("Orders saved in Hive after: ${ordersBox.values.length}");
       debugPrint("✅ Order saved successfully: ${saved?.id}");
-      debugPrint("✅ Order saved successfully: ${saved?.tableName}");
+      debugPrint("✅ Total orders in Hive: ${ordersBox.values.length}");
 
       return orderId;
     } catch (e, stackTrace) {
@@ -411,15 +520,11 @@ class HiveService {
     }
   }
 
-  // static Future<List<HiveOrder>> getPendingSyncOrders() async {
-  //   final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
-  //   return ordersBox.values.where((order) => order.isSynced == false).toList();
-  // }
   static Future<List<HiveOrder>> getPendingSyncOrders() async {
     try {
       final ordersBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
       final pendingOrders =
-          ordersBox.values.where((order) => order.isSynced == false).toList();
+      ordersBox.values.where((order) => order.isSynced == false).toList();
 
       print('Found ${pendingOrders.length} pending orders');
       return pendingOrders;
@@ -501,7 +606,7 @@ class HiveService {
 
         // 🧹 Remove null or empty fields in general
         payload.removeWhere((key, value) =>
-            value == null ||
+        value == null ||
             (value is String && value.trim().isEmpty) ||
             (value is List && value.isEmpty));
 
@@ -510,7 +615,7 @@ class HiveService {
         // 🔹 CREATE or UPDATE
         if (order.syncAction == 'CREATE') {
           final response =
-              await apiProvider.postGenerateOrderAPI(cleanedPayload);
+          await apiProvider.postGenerateOrderAPI(cleanedPayload);
           debugPrint("📤 CREATE payload: $cleanedPayload");
           debugPrint("📥 CREATE response: ${response.toJson()}");
 
@@ -580,6 +685,7 @@ class HiveService {
       await Hive.deleteBoxFromDisk(SYNC_QUEUE_BOX);
       await Hive.deleteBoxFromDisk('pendingActions');
       await Hive.deleteBoxFromDisk('app_state');
+      await Hive.deleteBoxFromDisk(MASTER_PRODUCTS_BOX);
 
       debugPrint("✅ Cleared all existing Hive data");
 
@@ -600,7 +706,7 @@ class HiveService {
       final testCartBox = await Hive.openBox<HiveCartItem>(CART_BOX);
       final testOrderBox = await Hive.openBox<HiveOrder>(ORDERS_BOX);
       final testBillingBox =
-          await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
+      await Hive.openBox<HiveBillingSession>(BILLING_SESSION_BOX);
 
       await testCartBox.close();
       await testOrderBox.close();
@@ -629,7 +735,7 @@ class HiveService {
       final numericStr = match.group(1)!;
       final numeric = int.tryParse(numericStr) ?? 0;
       final prefix =
-          orderIdRaw.substring(0, orderIdRaw.length - numericStr.length);
+      orderIdRaw.substring(0, orderIdRaw.length - numericStr.length);
       await box.put('last_online_order_id_numeric', numeric);
       await box.put('last_online_order_id_numeric_len', numericStr.length);
       await box.put('last_online_order_id_prefix', prefix);
@@ -668,9 +774,9 @@ class HiveService {
     final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
     final rawDynamic = box.get('last_online_order_id_raw');
     final prefixDynamic =
-        box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
+    box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
     final numericDynamic =
-        box.get('last_online_order_id_numeric', defaultValue: 0);
+    box.get('last_online_order_id_numeric', defaultValue: 0);
     final numericLenDynamic = box.get('last_online_order_id_numeric_len',
         defaultValue: defaultPadding);
 
@@ -708,9 +814,9 @@ class HiveService {
       {String defaultPrefix = 'OFF-', int defaultPadding = 4}) async {
     final box = await Hive.openBox(LAST_ONLINE_ORDER_ID_BOX);
     final numericDynamic =
-        box.get('last_online_order_id_numeric', defaultValue: 0);
+    box.get('last_online_order_id_numeric', defaultValue: 0);
     final prefixDynamic =
-        box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
+    box.get('last_online_order_id_prefix', defaultValue: defaultPrefix);
     final numericLenDynamic = box.get('last_online_order_id_numeric_len',
         defaultValue: defaultPadding);
 

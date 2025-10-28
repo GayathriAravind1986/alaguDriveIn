@@ -35,8 +35,8 @@ import 'Offline/Hive_helper/localStorageHelper/connection.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // await Hive.initFlutter();
-  await initHive();
+  await Hive.initFlutter();
+  // await initHive();
 
   try {
     Hive.registerAdapter(HiveCategoryAdapter());
