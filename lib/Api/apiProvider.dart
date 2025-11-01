@@ -1170,7 +1170,7 @@ class ApiProvider {
     try {
       var dio = Dio();
       var response = await dio.request(
-        '${Constants.baseUrl}api/products?locationId=$locationId',
+        '${Constants.baseUrl}api/products?isStock=true&filter=false&locationId=$locationId',
         options: Options(
           method: 'GET',
           headers: {

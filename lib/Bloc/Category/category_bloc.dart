@@ -63,12 +63,6 @@ class FoodProductItemOffline extends FoodCategoryEvent {
   FoodProductItemOffline(this.offlineData);
 }
 
-// class AddToBilling extends FoodCategoryEvent {
-//   List<Map<String, dynamic>> billingItems;
-//   bool? isDiscount;
-//   final OrderType? orderType;
-//   AddToBilling(this.billingItems, this.isDiscount, this.orderType);
-// }
 class AddToBilling extends FoodCategoryEvent {
   final List<Map<String, dynamic>> billingItems;
   final bool? isDiscount;
